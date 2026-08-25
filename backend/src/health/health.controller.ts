@@ -1,8 +1,11 @@
 import { Controller, Get } from '@nestjs/common';
-import type { HealthStatus } from '@crm/shared';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { HealthStatusSchema, type HealthStatus } from '@crm/shared';
 
+import { ApiZodResponse } from '../openapi/index.js';
 import { HealthService } from './health.service.js';
 
+@ApiTags('Health')
 @Controller('health')
 export class HealthController {
   constructor(private readonly health: HealthService) {}
@@ -13,6 +16,14 @@ export class HealthController {
    * `status` and `dependencies`, not the HTTP code.
    */
   @Get()
+  @ApiOperation({
+    summary: 'Service and dependency health',
+    description:
+      'Always answers 200 while the process is alive. Read `status` and `dependencies` ' +
+      'rather than the HTTP code: a failing database makes `status` "down", not the ' +
+      'response an error.',
+  })
+  @ApiZodResponse(200, HealthStatusSchema, 'The service and each dependency it needs.')
   check(): Promise<HealthStatus> {
     return this.health.check();
   }

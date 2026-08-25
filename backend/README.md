@@ -78,13 +78,52 @@ Notes that will bite if you miss them:
 - **Prisma 7 needs a driver adapter.** `PrismaService` owns the `pg.Pool` and closes it in
   `onModuleDestroy` — `$disconnect()` alone leaves connections open.
 
+## API conventions
+
+Established in **US-7** and applied globally — a new endpoint gets all of this for free.
+
+**Success, single:** `{ "data": { ... } }`
+**Success, list:** `{ "data": [ ... ], "pagination": { page, pageSize, total, totalPages, hasNext, hasPrevious } }`
+**Failure, always:** `{ "error": { statusCode, code, message, details?, requestId, timestamp } }`
+
+- **Validate with Zod.** Wrap a schema with `createZodDto` and type the parameter with it;
+  the global pipe does the rest, before your handler runs. Invalid input is a 422 with
+  per-field, dot-pathed details.
+- **Throw `ApiException`**, not Nest's built-ins, so the client gets a real error `code`
+  rather than one guessed from the HTTP status.
+- **Never leak internals.** The filter turns anything unrecognised into a generic 500 and
+  logs the detail server-side. Prisma's messages name tables and columns and are treated
+  as internal.
+- **Every request has an id**, echoed in `x-request-id` and included in the error body,
+  and every log line during that request carries it.
+- `@NoEnvelope()` opts a route out of the wrapper. Reach for it rarely.
+
+## API documentation
+
+Swagger UI at **`/api/docs`**, raw OpenAPI at **`/api/docs-json`**.
+
+Request and response schemas are generated from the same Zod schemas that validate them —
+`ApiZodBody`, `ApiZodQuery`, and `ApiZodResponse` in `src/openapi/` read `zodSchema` off
+the DTO. Documentation therefore cannot drift from enforcement, because there is only one
+definition.
+
+`zodToOpenApi` is deliberately **strict**: it throws on a Zod node it does not understand,
+so an undocumented shape breaks the build rather than appearing in the docs as `{}`. If you
+hit that, add a case rather than working around it.
+
+**In production the docs are off** unless `SWAGGER_ENABLED_IN_PRODUCTION=true` _and_
+`SWAGGER_USER` / `SWAGGER_PASSWORD` are both set, in which case they serve behind basic
+auth. Enabling without credentials refuses to serve — it does not fall back to public docs.
+
 ## Structure
 
 ```
 src/
+├── common/     API conventions: envelope, errors, validation, request id
 ├── config/     Env schema, validation, typed accessor
 ├── generated/  Prisma client — generated, gitignored, do not edit
 ├── health/     GET /health
+├── openapi/    Swagger setup and the Zod → OpenAPI converter
 ├── prisma/     PrismaService, PrismaModule
 ├── testing/    Test-database preparation and Prisma CLI wrapper
 ├── app.module.ts
@@ -100,15 +139,18 @@ behaviour. Empty modules hide which parts of the system actually exist.
 
 ## Health endpoint
 
-Reports the process **and** PostgreSQL, as the shared `HealthStatus` DTO from
+Reports the process **and** PostgreSQL. Wrapped in the standard `{ data }` envelope since
+US-7, carrying the shared `HealthStatus` DTO from
 `@crm/shared`:
 
 ```json
 {
-  "status": "ok",
-  "service": "backend",
-  "timestamp": "2026-08-25T20:00:00.000Z",
-  "dependencies": { "database": { "status": "up", "latencyMs": 3 } }
+  "data": {
+    "status": "ok",
+    "service": "backend",
+    "timestamp": "2026-08-25T20:00:00.000Z",
+    "dependencies": { "database": { "status": "up", "latencyMs": 3 } }
+  }
 }
 ```
 

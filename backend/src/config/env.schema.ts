@@ -1,6 +1,15 @@
 import { z } from 'zod';
 
 /**
+ * Environment variables are strings, and `z.coerce.boolean()` is the wrong tool
+ * for them: it follows JavaScript truthiness, so the string `"false"` coerces to
+ * `true`. Listing the accepted spellings is unglamorous and correct.
+ */
+const BooleanFromString = z
+  .enum(['true', 'false', '1', '0'])
+  .transform((value) => value === 'true' || value === '1');
+
+/**
  * The single source of truth for this service's environment contract.
  *
  * Every variable the backend reads is declared here. Nothing else in the
@@ -30,6 +39,24 @@ export const EnvSchema = z.object({
 
   /** How long to wait for a free pooled connection before failing. */
   DATABASE_CONNECTION_TIMEOUT_MS: z.coerce.number().int().positive().default(5_000),
+
+  /** Where the Swagger UI is served from. No leading slash — Nest adds it. */
+  SWAGGER_PATH: z.string().min(1).default('api/docs'),
+
+  /**
+   * Off in production unless this is deliberately set, and even then only with
+   * credentials — see `SWAGGER_USER`. Outside production the docs are always on,
+   * because a developer having to enable them defeats the point.
+   */
+  SWAGGER_ENABLED_IN_PRODUCTION: BooleanFromString.default('false'),
+
+  /**
+   * Basic-auth credentials guarding the docs in production. Both must be set for
+   * production docs to serve at all; a public schema of every endpoint is a gift
+   * to anyone probing the service.
+   */
+  SWAGGER_USER: z.string().min(1).optional(),
+  SWAGGER_PASSWORD: z.string().min(1).optional(),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

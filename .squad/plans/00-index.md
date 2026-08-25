@@ -9,3 +9,4 @@ One row per feature folder under `.squad/plans/`. `NN` continues as a global exe
 | `prisma-postgres`     | [00-overview.md](./prisma-postgres/00-overview.md)       | 03       |
 | `domain-schema`       | [00-overview.md](./domain-schema/00-overview.md)         | 04       |
 | `api-conventions`     | [00-overview.md](./api-conventions/00-overview.md)       | 05       |
+| `openapi-docs`        | [00-overview.md](./openapi-docs/00-overview.md)          | 06       |

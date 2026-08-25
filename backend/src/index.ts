@@ -6,6 +6,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module.js';
 import { ContextLogger, RequestContextService } from './common/index.js';
 import { TypedConfigService } from './config/index.js';
+import { setupSwagger } from './openapi/index.js';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule, { bufferLogs: false });
@@ -21,6 +22,10 @@ async function bootstrap(): Promise<void> {
   app.enableShutdownHooks();
 
   const config = app.get(TypedConfigService);
+
+  // Mounted before listen so the docs are ready with the first request. Decides
+  // for itself whether to serve at all — see decideSwagger (US-8, AC4).
+  setupSwagger(app, config);
 
   const port = config.get('PORT');
   const host = config.get('HOST');
