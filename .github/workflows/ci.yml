@@ -1,0 +1,133 @@
+name: CI
+
+# AC1: every pull request, and every push to the default branch so `master`
+# itself is never left silently broken by a merge that raced another.
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+# A second push to the same PR makes the first run irrelevant. Cancelling it
+# keeps the queue short and the feedback fast — but never on master, where each
+# commit's result is a record worth having.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
+
+# Least privilege. Nothing here writes to the repository.
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Lint, type-check, test, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    # AC3: disposable Postgres and Redis, thrown away with the runner. The test
+    # database itself is created by `prepare-test-db.js`, which also applies
+    # every committed migration — the same script a developer runs locally, so
+    # CI cannot drift from what they see.
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: crm
+          POSTGRES_PASSWORD: crm_local_dev
+          POSTGRES_DB: crm
+        ports:
+          - 5432:5432
+        # Without this the steps start against a Postgres that is listening but
+        # not yet accepting queries.
+        options: >-
+          --health-cmd "pg_isready -U crm -d crm"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
+      redis:
+        image: redis:8-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+
+    env:
+      NODE_ENV: test
+      # Matches backend/.env.test, so the same suite runs the same way here and
+      # on a laptop. Set explicitly all the same: process.env wins over the
+      # file, and a reader of this workflow should not have to open another one.
+      DATABASE_URL: postgresql://crm:crm_local_dev@127.0.0.1:5432/crm_test?schema=public
+      REDIS_URL: redis://127.0.0.1:6379/1
+      REDIS_KEY_PREFIX: 'crm-ci:'
+      DATABASE_POOL_SIZE: '5'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          # AC5: keyed on package-lock.json, so an unchanged dependency tree is
+          # restored rather than re-downloaded.
+          node-version-file: .nvmrc
+          cache: npm
+
+      # `ci`, not `install` — it installs exactly the lockfile and fails if
+      # package.json and the lock have drifted, which is a thing worth failing
+      # on. `postinstall` generates the Prisma client.
+      - name: Install dependencies
+        run: npm ci
+
+      # Deliberately separate steps rather than one `npm run verify`. When this
+      # goes red, the step name in the GitHub UI is the diagnosis.
+      - name: Lint
+        run: npm run lint
+
+      - name: Check formatting
+        run: npm run format:check
+
+      - name: Type-check
+        run: npm run typecheck
+
+      # AC2 + AC3. Runs unit and integration tests together: the suite talks to
+      # a real Postgres and a real Redis, and nothing skips itself when they are
+      # missing. `prepare-test-db.js` creates crm_test and migrates it first.
+      - name: Test
+        run: npm test
+
+      - name: Build backend
+        run: npm run build --workspace @crm/backend
+
+      # Distinct from the type-check: this one runs Vite and produces the real
+      # bundle, which can fail for reasons TypeScript never sees.
+      - name: Build frontend
+        run: npm run build --workspace @crm/frontend
+
+  compose:
+    name: Compose file is valid
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    # Cheap guard on US-11. A broken compose file does not fail any test, but it
+    # does cost the next person their morning.
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate docker-compose.yml
+        run: docker compose config --quiet
+
+      - name: Check the entrypoints are executable
+        # Git tracks the executable bit; a Windows contributor can easily drop
+        # it, and the container then starts with "permission denied".
+        run: |
+          for script in infrastructure/docker/*.sh infrastructure/docker/postgres-init/*.sh; do
+            if [ ! -x "$script" ]; then
+              echo "::error file=$script::not executable — run: git update-index --chmod=+x $script"
+              exit 1
+            fi
+          done
+          echo "All entrypoint scripts are executable."
