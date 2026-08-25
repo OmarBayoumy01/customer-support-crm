@@ -13,6 +13,8 @@
     "db:up": "docker run -d --name crm-postgres -e POSTGRES_USER=crm -e POSTGRES_PASSWORD=crm_local_dev -e POSTGRES_DB=crm -p 5432:5432 postgres:18-alpine",
     "db:create-test": "docker exec crm-postgres createdb -U crm crm_test",
     "db:down": "docker rm -f crm-postgres",
+    "redis:up": "docker run -d --name crm-redis -p 6379:6379 redis:8-alpine",
+    "redis:down": "docker rm -f crm-redis",
     "migrate:dev": "prisma migrate dev",
     "migrate:deploy": "prisma migrate deploy",
     "migrate:reset": "prisma migrate reset --force"
@@ -26,6 +28,8 @@
     "@nestjs/swagger": "11.4.7",
     "@prisma/adapter-pg": "7.10.0",
     "@prisma/client": "7.10.0",
+    "bullmq": "5.65.0",
+    "ioredis": "5.9.0",
     "pg": "8.23.0",
     "reflect-metadata": "0.2.2",
     "rxjs": "7.8.2",

@@ -56,15 +56,17 @@ holds the committed migration history.
 npm run db:up          --workspace @crm/backend   # start postgres:18-alpine as crm-postgres
 npm run db:create-test --workspace @crm/backend   # create the crm_test database
 npm run db:down        --workspace @crm/backend   # stop and remove the container
+npm run redis:up       --workspace @crm/backend   # start redis:8-alpine as crm-redis
+npm run redis:down     --workspace @crm/backend   # stop and remove it
 
 npm run migrate:dev    --workspace @crm/backend   # create a migration from a schema change
 npm run migrate:deploy --workspace @crm/backend   # apply committed migrations
 npm run migrate:reset  --workspace @crm/backend   # drop and rebuild from scratch
 ```
 
-> **US-11 replaces the `db:*` scripts with `docker-compose.yml`.** When it does, it must
-> keep the same image tag, database names, and credentials, and these three scripts should
-> be deleted rather than left alongside Compose.
+> **US-11 replaces the `db:*` and `redis:*` scripts with `docker-compose.yml`.** When it
+> does, it must keep the same image tags, database names, credentials, and ports, and these
+> five scripts should be deleted rather than left alongside Compose.
 
 Notes that will bite if you miss them:
 
@@ -97,6 +99,36 @@ Established in **US-7** and applied globally — a new endpoint gets all of this
 - **Every request has an id**, echoed in `x-request-id` and included in the error body,
   and every log line during that request carries it.
 - `@NoEnvelope()` opts a route out of the wrapper. Reach for it rarely.
+
+## Cache and background jobs
+
+Redis, through two abstractions. **Nothing outside `src/redis/` touches the client
+directly** — if you need a command the abstraction lacks, add a method there.
+
+```ts
+await cache.get<T>(key); // undefined on a miss OR an outage — callers cannot tell
+await cache.set(key, value, ttlSeconds?);
+await cache.delete(key);
+await cache.deleteByPrefix('ticket:42:'); // SCAN, never KEYS
+await cache.wrap(key, ttl, () => loadFromDb()); // read-through
+
+queues.registerWorker('sla-timers', async (job) => {
+  /* … */
+});
+await queues.add('sla-timers', 'check-breach', { ticketId });
+```
+
+- **Redis is not a hard dependency.** An unreachable Redis logs a warning, the service
+  starts anyway, `/health` reports `degraded` rather than `down`, and every cache operation
+  degrades: reads look like misses, writes are no-ops, `wrap` just calls its loader every
+  time. A cache blip must not take the service out of a load balancer.
+- **Jobs retry with exponential backoff** (`QUEUE_MAX_ATTEMPTS`, `QUEUE_BACKOFF_MS`) and, on
+  the final failure, land on the `dead-letter` queue carrying their original data and the
+  reason. That last part is ours, not BullMQ's.
+- **No jobs are defined in `src/redis/`.** The story that needs one defines it.
+- **Two Redis connections, deliberately** — BullMQ needs `maxRetriesPerRequest: null` for
+  its blocking reads, and a cache needs the opposite so a command fails fast instead of
+  queueing for a reconnect that may never come.
 
 ## Logging
 
@@ -161,6 +193,7 @@ src/
 ├── health/     GET /health
 ├── openapi/    Swagger setup and the Zod → OpenAPI converter
 ├── prisma/     PrismaService, PrismaModule
+├── redis/      RedisService, CacheService, QueueService
 ├── testing/    Test-database preparation and Prisma CLI wrapper
 ├── app.module.ts
 └── index.ts    Bootstrap

@@ -4,6 +4,7 @@ import { CommonModule } from './common/index.js';
 import { TypedConfigModule } from './config/index.js';
 import { HealthModule } from './health/health.module.js';
 import { PrismaModule } from './prisma/index.js';
+import { RedisModule } from './redis/index.js';
 
 /**
  * Deliberately minimal.
@@ -19,5 +20,5 @@ import { PrismaModule } from './prisma/index.js';
  * empty modules are cargo-cult structure that costs review time and hides which
  * parts of the system actually exist.
  */
-@Module({ imports: [TypedConfigModule, CommonModule, PrismaModule, HealthModule] })
+@Module({ imports: [TypedConfigModule, CommonModule, PrismaModule, RedisModule, HealthModule] })
 export class AppModule {}

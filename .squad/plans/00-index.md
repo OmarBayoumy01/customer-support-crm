@@ -11,3 +11,4 @@ One row per feature folder under `.squad/plans/`. `NN` continues as a global exe
 | `api-conventions`     | [00-overview.md](./api-conventions/00-overview.md)       | 05       |
 | `openapi-docs`        | [00-overview.md](./openapi-docs/00-overview.md)          | 06       |
 | `structured-logging`  | [00-overview.md](./structured-logging/00-overview.md)    | 07       |
+| `redis-cache-queues`  | [00-overview.md](./redis-cache-queues/00-overview.md)    | 08       |

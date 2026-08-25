@@ -43,6 +43,37 @@ export const EnvSchema = z.object({
   DATABASE_CONNECTION_TIMEOUT_MS: z.coerce.number().int().positive().default(5_000),
 
   /**
+   * Redis connection string. Required, but unlike `DATABASE_URL` an unreachable
+   * Redis does not stop the service booting — the cache degrades and `/health`
+   * reports it down. See RedisService.
+   */
+  REDIS_URL: z
+    .string()
+    .min(1)
+    .refine(
+      (value) => value.startsWith('redis://') || value.startsWith('rediss://'),
+      'must be a redis:// or rediss:// connection string',
+    ),
+
+  /**
+   * Namespaces every cache key. Two environments sharing one Redis — which
+   * happens more often than anyone plans for — must not read each other's
+   * entries.
+   */
+  REDIS_KEY_PREFIX: z.string().default('crm:'),
+
+  REDIS_CONNECT_TIMEOUT_MS: z.coerce.number().int().positive().default(5_000),
+
+  /** Default cache lifetime when a caller does not specify one. */
+  CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(300),
+
+  /** How many times a background job is tried before it is dead-lettered. */
+  QUEUE_MAX_ATTEMPTS: z.coerce.number().int().positive().max(20).default(3),
+
+  /** Base delay for exponential backoff between job attempts. */
+  QUEUE_BACKOFF_MS: z.coerce.number().int().positive().default(1_000),
+
+  /**
    * Verbosity, changeable without a code change (US-9, AC4). Left optional so
    * the default can depend on `NODE_ENV` — quiet in production, `debug`
    * everywhere else.
