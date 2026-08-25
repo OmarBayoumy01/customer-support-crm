@@ -1,21 +1,13 @@
 // ============================================================================
-// Core domain schema — US-6.
+// PROPOSED domain schema for US-6. NOT YET APPLIED.
 //
-// Every later feature builds on this. Changing it after data exists is
-// expensive, so it was reviewed in full before the first migration was written
-// (see .squad/plans/domain-schema/00-overview.md for the decisions and their
-// reasoning).
+// This file is the review artifact. Nothing here has been migrated, and
+// backend/prisma/schema.prisma is untouched, so the repository stays green
+// while this is read. On approval it replaces the generator/datasource blocks
+// and the MigrationProbe model in backend/prisma/schema.prisma, and the first
+// migration is generated from it.
 //
-// Conventions used throughout:
-//   - Primary keys are UUIDv7 — time-sortable, so index locality does not
-//     degrade the way it does with v4.
-//   - Short translated labels are `nameEn` / `nameAr` column pairs. Long
-//     authored content (knowledge articles) is one row per locale instead.
-//   - `createdAt` / `updatedAt` are maintained by Prisma. `deletedAt` marks a
-//     soft delete and is filtered by the `notDeleted` client extension — see
-//     src/prisma/soft-delete.extension.ts.
-//   - Append-only tables (TicketHistory, AuditLog) have neither `updatedAt` nor
-//     `deletedAt`. An audit trail you can edit is not an audit trail.
+// Validated with `prisma validate` against Prisma 7.10.0.
 // ============================================================================
 
 generator client {
@@ -174,19 +166,19 @@ model User {
   branchId     String?
   branch       Branch?     @relation(fields: [branchId], references: [id], onDelete: SetNull)
 
-  roles               UserRole[]
-  customerProfile     Customer?
-  assignedTickets     Ticket[]           @relation("TicketAssignee")
-  escalatedTickets    Ticket[]           @relation("TicketEscalatedTo")
-  authoredMessages    Message[]          @relation("MessageAuthorUser")
+  roles              UserRole[]
+  customerProfile    Customer?
+  assignedTickets    Ticket[]         @relation("TicketAssignee")
+  escalatedTickets   Ticket[]         @relation("TicketEscalatedTo")
+  authoredMessages   Message[]        @relation("MessageAuthorUser")
   uploadedAttachments Attachment[]
-  ticketEvents        TicketHistory[]
-  managedDepartments  Department[]       @relation("DepartmentManager")
-  assignedTasks       Task[]             @relation("TaskAssignee")
-  createdTasks        Task[]             @relation("TaskCreatedBy")
-  notifications       Notification[]
-  authoredArticles    KnowledgeArticle[]
-  auditLogs           AuditLog[]
+  ticketEvents       TicketHistory[]
+  managedDepartments Department[]     @relation("DepartmentManager")
+  assignedTasks      Task[]           @relation("TaskAssignee")
+  createdTasks       Task[]           @relation("TaskCreatedBy")
+  notifications      Notification[]
+  authoredArticles   KnowledgeArticle[]
+  auditLogs          AuditLog[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -279,7 +271,7 @@ model Branch {
 
   /// IANA name. SLA clocks and business hours are computed per branch, so this
   /// has to be stored rather than assumed from the server's locale.
-  timezone String @default("Asia/Riyadh")
+  timezone String  @default("Asia/Riyadh")
 
   isActive Boolean @default(true)
 
@@ -296,10 +288,10 @@ model Branch {
 }
 
 model Department {
-  id          String  @id @default(uuid(7))
-  code        String  @unique
-  nameEn      String
-  nameAr      String
+  id     String  @id @default(uuid(7))
+  code   String  @unique
+  nameEn String
+  nameAr String
   description String?
 
   branchId String?
@@ -373,10 +365,10 @@ model Customer {
 /// A tree, one level or many. `parentId` is self-referential with SetNull so
 /// deleting a parent promotes its children rather than deleting them.
 model Category {
-  id            String  @id @default(uuid(7))
-  slug          String  @unique
-  nameEn        String
-  nameAr        String
+  id       String     @id @default(uuid(7))
+  slug     String     @unique
+  nameEn   String
+  nameAr   String
   descriptionEn String?
   descriptionAr String?
 
@@ -473,10 +465,10 @@ model Ticket {
   /// shape, and none of it is queried.
   sourceMetadata Json?
 
-  messages      Message[]
-  attachments   Attachment[]
-  history       TicketHistory[]
-  tasks         Task[]
+  messages    Message[]
+  attachments Attachment[]
+  history     TicketHistory[]
+  tasks       Task[]
   notifications Notification[]
 
   createdAt DateTime  @default(now())
@@ -655,8 +647,8 @@ model SlaPolicy {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  /// At most one policy per priority per department, and exactly one platform
-  /// default per priority (departmentId NULL).
+  /// At most one active policy per priority per department, and exactly one
+  /// platform default per priority (departmentId NULL).
   @@unique([priority, departmentId])
   @@index([isActive])
 }

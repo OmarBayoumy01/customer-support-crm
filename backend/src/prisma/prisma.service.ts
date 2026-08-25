@@ -4,6 +4,7 @@ import { Pool } from 'pg';
 
 import { TypedConfigService } from '../config/index.js';
 import { PrismaClient } from '../generated/prisma/client.js';
+import { softDeleteExtension } from './soft-delete.extension.js';
 
 /**
  * The single seam between the application and PostgreSQL.
@@ -42,6 +43,20 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       this.logger.error(`Idle database client error: ${error.message}`);
     });
   }
+
+  /**
+   * The same client with soft-deleted rows filtered out. **Use this for every
+   * ordinary read.**
+   *
+   *   this.prisma.notDeleted.ticket.findMany()   // live tickets
+   *   this.prisma.ticket.findMany()              // includes deleted rows
+   *
+   * Reaching for the unfiltered client is legitimate — restoring a record, an
+   * administrative export, a hard-delete job — but it should be a decision
+   * someone made, which is why it is the longer-looking path rather than the
+   * default. See soft-delete.extension.ts for what is and is not covered.
+   */
+  readonly notDeleted = this.$extends(softDeleteExtension);
 
   async onModuleInit(): Promise<void> {
     await this.$connect();

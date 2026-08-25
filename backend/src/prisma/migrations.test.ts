@@ -102,13 +102,29 @@ test('AC2 — every migration applies cleanly to an empty database', async () =>
     );
     const names = tables.rows.map((row) => row.table_name);
 
-    // US-6 drops MigrationProbe and adds the real domain tables. When it does,
-    // change this assertion to one of those rather than deleting it — the point
-    // is that a migration produced a table, not that this table exists forever.
-    assert.ok(
-      names.includes('MigrationProbe'),
-      `expected MigrationProbe among the created tables, got: ${names.join(', ')}`,
+    // The point is that replaying the committed migrations from empty produces
+    // the schema the application expects — not merely that `migrate deploy`
+    // exited zero. Ticket and Message are the two the platform cannot work
+    // without, and Message carries `isInternal`.
+    for (const expected of ['Ticket', 'Message', 'Customer', 'User']) {
+      assert.ok(
+        names.includes(expected),
+        `expected ${expected} among the created tables, got: ${names.join(', ')}`,
+      );
+    }
+
+    // US-5's temporary probe was dropped by US-6's migration. Replaying the
+    // whole history must end at that same place, or the migration chain and the
+    // schema have diverged.
+    assert.ok(!names.includes('MigrationProbe'), 'MigrationProbe should have been dropped');
+
+    const isInternal = await client.query<{ column_name: string; is_nullable: string }>(
+      `SELECT column_name, is_nullable FROM information_schema.columns
+       WHERE table_schema = 'public' AND table_name = 'Message' AND column_name = 'isInternal'`,
     );
+
+    assert.equal(isInternal.rowCount, 1, 'Message.isInternal must exist — it is non-negotiable');
+    assert.equal(isInternal.rows[0]?.is_nullable, 'NO', 'isInternal must not be nullable');
   } finally {
     await client.end();
   }

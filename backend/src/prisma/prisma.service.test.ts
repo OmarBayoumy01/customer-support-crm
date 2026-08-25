@@ -32,16 +32,21 @@ after(async () => {
 });
 
 test('AC3 — generated model types are available and correctly typed', async () => {
-  const created = await prisma.migrationProbe.create({ data: { note: 'type-generation' } });
+  const code = `PROBE-${String(process.pid)}-${String(Math.floor(performance.now()))}`;
+
+  const created = await prisma.branch.create({
+    data: { code, nameEn: 'Type generation', nameAr: 'توليد الأنواع' },
+  });
 
   assert.equal(typeof created.id, 'string');
-  assert.equal(created.note, 'type-generation');
+  assert.equal(created.nameEn, 'Type generation');
   assert.ok(created.createdAt instanceof Date, 'createdAt should be a Date, not a string');
+  assert.equal(created.isActive, true, 'schema defaults come back on the created row');
 
-  const found = await prisma.migrationProbe.findUnique({ where: { id: created.id } });
-  assert.equal(found?.note, 'type-generation');
+  const found = await prisma.branch.findUnique({ where: { id: created.id } });
+  assert.equal(found?.code, code);
 
-  await prisma.migrationProbe.delete({ where: { id: created.id } });
+  await prisma.branch.delete({ where: { id: created.id } });
 });
 
 test('AC3 — an unknown field on the create input is a compile error', () => {
@@ -52,8 +57,16 @@ test('AC3 — an unknown field on the create input is a compile error', () => {
   //
   // Never awaited or executed — building the promise is enough for the compiler.
   const build = (): unknown =>
-    // @ts-expect-error `nope` is not a field on MigrationProbe
-    prisma.migrationProbe.create({ data: { note: 'x', nope: true } });
+    // @ts-expect-error `nope` is not a field on Branch
+    prisma.branch.create({ data: { code: 'x', nameEn: 'x', nameAr: 'x', nope: true } });
+
+  assert.equal(typeof build, 'function');
+});
+
+test('AC3 — an enum column only accepts its own members, at compile time', () => {
+  const build = (): unknown =>
+    // @ts-expect-error 'SORT_OF_URGENT' is not a TicketPriority
+    prisma.ticket.findMany({ where: { priority: 'SORT_OF_URGENT' } });
 
   assert.equal(typeof build, 'function');
 });
@@ -62,12 +75,17 @@ test('AC4 — concurrent queries are pooled, never exceeding the configured size
   const poolSize = prisma.poolSize();
   assert.ok(poolSize > 0, 'pool size should be configured');
 
-  const results = await Promise.all(
-    Array.from({ length: 25 }, () => prisma.migrationProbe.count()),
-  );
+  const results = await Promise.all(Array.from({ length: 25 }, () => prisma.ticket.count()));
 
-  assert.equal(results.length, 25);
-  assert.equal(new Set(results).size, 1, 'every concurrent count should agree');
+  assert.equal(results.length, 25, 'every concurrent query should resolve');
+  assert.ok(
+    results.every((count) => Number.isInteger(count)),
+    'every concurrent query should return a real result, not a rejection',
+  );
+  // Deliberately not asserting the counts agree. Test files run in parallel
+  // against one database, so other suites are inserting and deleting tickets
+  // while this runs — and agreement was never what this test was about. The
+  // pool assertions below are.
 
   const stats = prisma.poolStats();
   assert.ok(
@@ -80,7 +98,7 @@ test('AC4 — concurrent queries are pooled, never exceeding the configured size
 test('AC4 — connections are released rather than leaked, and are reused', async () => {
   const before = prisma.poolStats();
 
-  await Promise.all(Array.from({ length: 25 }, () => prisma.migrationProbe.count()));
+  await Promise.all(Array.from({ length: 25 }, () => prisma.ticket.count()));
 
   const after = prisma.poolStats();
 
