@@ -1,24 +1,28 @@
 import { Module } from '@nestjs/common';
 
 import { HealthController } from './health.controller.js';
+import { HealthService } from './health.service.js';
 
 /**
- * Liveness endpoint.
+ * Liveness and dependency reporting.
  *
- * Today it reports only that the process is up: there is no database and no
- * Redis yet. The story's technical notes ask for dependency connectivity, and
- * that arrives with the dependencies themselves —
+ * As of **US-5** this reports the process *and* PostgreSQL. `PrismaService`
+ * comes from the global `PrismaModule`, so nothing needs importing here.
  *
- *   - US-5 registers a PostgreSQL check here
- *   - US-10 registers a Redis check here
+ * **US-10 adds Redis** by injecting its client into `HealthService` and pushing
+ * one more entry into the `dependencies` map — `critical: false`, because the
+ * platform can serve requests with a cold cache. It does not touch the DTO:
+ * `dependencies` is the extension point, and that is why it is a keyed map
+ * rather than a fixed set of fields.
  *
- * When either lands, the controller aggregates results: `status` becomes
- * `'degraded'` when a non-critical dependency is down and `'down'` when a
- * critical one is. The shape returned to callers does not change, because it is
- * already the shared `HealthStatus` DTO.
+ * Note for anyone reading an older version of this file: the previous comment
+ * claimed the response shape would never change. It did change, in US-5 — the
+ * phase exit criteria require `/health` to report database and Redis state, and
+ * the flat DTO had nowhere to put it.
  *
- * Deliberately NOT using `@nestjs/terminus` yet — wiring health indicators to
- * services that cannot run would be untestable scaffolding.
+ * Still deliberately NOT using `@nestjs/terminus`. Two dependencies checked by
+ * one small service is less machinery than a health-indicator framework, and
+ * the response is already a shared DTO the frontend can consume directly.
  */
-@Module({ controllers: [HealthController] })
+@Module({ controllers: [HealthController], providers: [HealthService] })
 export class HealthModule {}

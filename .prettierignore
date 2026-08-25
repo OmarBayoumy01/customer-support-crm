@@ -6,3 +6,5 @@ coverage
 .tsbuild
 package-lock.json
 .squad
+backend/src/generated
+backend/prisma/migrations

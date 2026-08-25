@@ -11,6 +11,25 @@ export const EnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'staging', 'production']).default('development'),
   PORT: z.coerce.number().int().positive().max(65535).default(3000),
   HOST: z.string().min(1).default('0.0.0.0'),
+
+  /**
+   * Deliberately has no default. A service that cannot reach its database must
+   * not boot into a half-working state — same fail-fast stance as every other
+   * variable here.
+   */
+  DATABASE_URL: z
+    .string()
+    .min(1)
+    .refine(
+      (value) => value.startsWith('postgresql://') || value.startsWith('postgres://'),
+      'must be a postgresql:// connection string',
+    ),
+
+  /** Maximum connections held open by the pg pool. See PrismaService. */
+  DATABASE_POOL_SIZE: z.coerce.number().int().positive().max(100).default(10),
+
+  /** How long to wait for a free pooled connection before failing. */
+  DATABASE_CONNECTION_TIMEOUT_MS: z.coerce.number().int().positive().default(5_000),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

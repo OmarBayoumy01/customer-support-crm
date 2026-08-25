@@ -14,6 +14,11 @@ const initial: HealthStatus = {
   status: 'ok',
   service: 'frontend',
   timestamp: new Date().toISOString(),
+  // The browser has no dependencies of its own to report. The field is required
+  // rather than optional so a backend response can never omit it silently — and
+  // this compile error is exactly the drift-detection the comment above claims:
+  // US-5 added the field, and the frontend had to be updated in the same change.
+  dependencies: {},
 };
 
 HealthStatusSchema.parse(initial);

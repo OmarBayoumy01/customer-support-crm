@@ -8,6 +8,12 @@ import { TypedConfigService } from './config/index.js';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule, { bufferLogs: false });
+
+  // Nest does not run `onModuleDestroy` on SIGINT/SIGTERM unless asked. Without
+  // this the database pool is never closed on Ctrl-C or on container stop, and
+  // connections are left open server-side.
+  app.enableShutdownHooks();
+
   const config = app.get(TypedConfigService);
 
   const port = config.get('PORT');

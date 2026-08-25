@@ -25,7 +25,8 @@
     "test": "npm run test --workspaces --if-present",
     "verify": "npm run typecheck && npm run lint && npm run format:check && npm run test",
     "clean": "tsc -b --clean",
-    "prepare": "husky"
+    "prepare": "husky",
+    "postinstall": "npm run prisma:generate --workspace @crm/backend"
   },
   "lint-staged": {
     "*.{ts,tsx}": [

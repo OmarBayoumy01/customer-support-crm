@@ -15,6 +15,10 @@ export default tseslint.config(
       '**/.vite/**',
       '**/.tsbuild/**',
       '.squad/**',
+      // Prisma's generated client. It already ships `@ts-nocheck` and
+      // `/* eslint-disable */`, so this is belt-and-braces — but it also keeps
+      // the type-aware rules from walking thousands of generated lines.
+      '**/src/generated/**',
     ],
   },
 
@@ -80,8 +84,20 @@ export default tseslint.config(
     // process.env directly. backend/src/config/ is the one place allowed to
     // touch the environment — everywhere else this is an error, not a
     // convention people are asked to remember.
+    //
+    // The exceptions are all code that runs *outside* the Nest application, so
+    // TypedConfigService does not exist for it to use:
+    //   - src/config/**        the config module itself
+    //   - prisma.config.ts     read by the Prisma CLI, before any app exists
+    //   - src/testing/**       test-database tooling and CLI wrappers
+    //   - *.test.ts            harnesses that shell out or build a fixture env
     files: ['backend/**/*.ts'],
-    ignores: ['backend/src/config/**'],
+    ignores: [
+      'backend/src/config/**',
+      'backend/prisma.config.ts',
+      'backend/src/testing/**',
+      'backend/**/*.test.ts',
+    ],
     rules: { 'no-process-env': 'error' },
   },
 

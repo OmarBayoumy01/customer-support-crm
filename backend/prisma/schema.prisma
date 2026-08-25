@@ -1,0 +1,30 @@
+// The datasource URL lives in `prisma.config.ts`, NOT here. Prisma 7 rejects a
+// `url` in the datasource block with P1012.
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "esm"
+
+  // Without this the generated code imports './enums.ts'. `tsc` emits that
+  // specifier verbatim, and Node then cannot resolve it from `dist/` at
+  // runtime (ERR_MODULE_NOT_FOUND). This repo compiles to `dist/` and runs the
+  // built output, so the Prisma default is broken here. Do not remove.
+  importFileExtension = "js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// TEMPORARY — owned by US-5, dropped by US-6.
+///
+/// Exists only so the migration workflow has a schema change to prove itself
+/// against (AC2) and so generated model types can be asserted (AC3). No
+/// application code references it; only tests do. US-6's first migration drops
+/// this table and replaces it with the real domain schema.
+model MigrationProbe {
+  id        String   @id @default(uuid())
+  note      String
+  createdAt DateTime @default(now())
+}
