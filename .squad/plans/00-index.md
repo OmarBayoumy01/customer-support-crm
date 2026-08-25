@@ -12,3 +12,4 @@ One row per feature folder under `.squad/plans/`. `NN` continues as a global exe
 | `openapi-docs`        | [00-overview.md](./openapi-docs/00-overview.md)          | 06       |
 | `structured-logging`  | [00-overview.md](./structured-logging/00-overview.md)    | 07       |
 | `redis-cache-queues`  | [00-overview.md](./redis-cache-queues/00-overview.md)    | 08       |
+| `docker-compose`      | [00-overview.md](./docker-compose/00-overview.md)        | 09       |

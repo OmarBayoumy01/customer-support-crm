@@ -1,0 +1,134 @@
+# The whole stack, locally, with one command:
+#
+#   cp .env.example .env
+#   docker compose up
+#
+# Frontend on http://localhost:5173, API on http://localhost:3000,
+# API docs on http://localhost:3000/api/docs.
+#
+# This file is DEVELOPMENT ONLY. Production images and deployment are P15.
+# Dockerfiles and entrypoints live in infrastructure/docker/; this stays at the
+# repository root because that is where `docker compose` looks.
+
+name: customer-support-crm
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-crm}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-crm_local_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-crm}
+    ports:
+      - '${POSTGRES_PORT:-5432}:5432'
+    volumes:
+      # Named, so `docker compose down` and back up keeps the data (AC3).
+      # Only `down -v` destroys it, which is the point of having to ask.
+      #
+      # `/var/lib/postgresql`, NOT the `/data` subdirectory underneath it.
+      # Postgres 18 changed this: the image now stores data in a
+      # major-version-specific subdirectory so `pg_upgrade --link` can work
+      # without crossing a mount boundary, and mounting the old path makes the
+      # container refuse to start.
+      - postgres-data:/var/lib/postgresql
+      # Creates the separate test database on first boot. Scripts here run only
+      # when the data directory is empty, so this is not re-run on restart.
+      - ./infrastructure/docker/postgres-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      # `-d` matters: without it pg_isready reports ready while the init scripts
+      # are still running, and the backend races ahead into a half-built database.
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-crm} -d ${POSTGRES_DB:-crm}']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    restart: unless-stopped
+
+  redis:
+    image: redis:8-alpine
+    # Persist to disk so a restart keeps queued jobs. Redis is a cache here, but
+    # it is also BullMQ's storage, and losing a queue on restart is a surprise.
+    command: ['redis-server', '--appendonly', 'yes']
+    ports:
+      - '${REDIS_PORT:-6379}:6379'
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/backend.dev.Dockerfile
+    depends_on:
+      # `service_healthy`, not just `service_started`: the entrypoint runs
+      # migrations immediately, and a Postgres that has accepted a TCP
+      # connection is not necessarily one that will accept a query.
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      HOST: 0.0.0.0
+      PORT: 3000
+      # `postgres` and `redis` are the service names — Compose resolves them on
+      # its own network. These are NOT the host-side URLs in backend/.env.
+      DATABASE_URL: postgresql://${POSTGRES_USER:-crm}:${POSTGRES_PASSWORD:-crm_local_dev}@postgres:5432/${POSTGRES_DB:-crm}?schema=public
+      REDIS_URL: redis://redis:6379/0
+      LOG_LEVEL: ${LOG_LEVEL:-debug}
+    ports:
+      - '${BACKEND_PORT:-3000}:3000'
+    volumes:
+      # The source, live — this is what makes AC2 work.
+      - ./:/app
+      # Anonymous volumes shadowing the mount, so the image's installed
+      # dependencies survive instead of being hidden by the host's tree. Without
+      # these, a host without node_modules gives a container without them either.
+      - /app/node_modules
+      - /app/backend/node_modules
+      - /app/frontend/node_modules
+      - /app/packages/shared/node_modules
+      # Compiled output kept OFF the bind mount, on the container's own
+      # filesystem. This is what makes AC2 work end to end: `tsc` polls the
+      # mounted source and writes here, and because this is a real Linux
+      # filesystem, `node --watch` gets the inotify event and restarts. Left on
+      # the bind mount, the write propagates to the host but fires no event
+      # inside the container, and the process never reloads — which is exactly
+      # what happened before these two lines existed.
+      - /app/backend/dist
+      - /app/packages/shared/dist
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/frontend.dev.Dockerfile
+    depends_on:
+      backend:
+        condition: service_started
+    environment:
+      # Read by the browser, so it is the HOST-side URL, not the service name —
+      # the request is made by the user's browser, which is not on this network.
+      VITE_API_URL: http://localhost:${BACKEND_PORT:-3000}
+      # A bind mount from Windows or macOS does not deliver filesystem events
+      # into the container, so without polling HMR never fires (AC2).
+      VITE_USE_POLLING: 'true'
+    ports:
+      - '${FRONTEND_PORT:-5173}:5173'
+    volumes:
+      - ./:/app
+      - /app/node_modules
+      - /app/backend/node_modules
+      - /app/frontend/node_modules
+      - /app/packages/shared/node_modules
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  redis-data:

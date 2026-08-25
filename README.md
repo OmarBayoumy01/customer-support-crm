@@ -11,14 +11,54 @@ escalate → resolve → report**
 
 ## Getting started
 
-One command installs everything.
+**You need Docker Desktop, and nothing else.** Not Node, not Postgres, not Redis.
 
 ```
 git clone <repo>
 cd customer-support-crm
-nvm use            # picks up .nvmrc → Node 24.15.0
-npm install        # installs every workspace
-npm run verify     # type-check, lint, format check, tests
+docker compose up
+```
+
+That is the whole setup. It starts Postgres, Redis, the API, and the frontend, creates
+the databases, applies every migration, and waits for each service to be healthy before
+starting the one that depends on it. The first run builds two images and takes a few
+minutes; afterwards it is seconds.
+
+| What              | Where                          |
+| ----------------- | ------------------------------ |
+| Frontend          | http://localhost:5173          |
+| API               | http://localhost:3000          |
+| Health            | http://localhost:3000/health   |
+| API documentation | http://localhost:3000/api/docs |
+
+`/health` is the one to check first: it reports the database and Redis, so if something is
+wrong it tells you which thing.
+
+**Edit any file and it takes effect** — no rebuild, no restart. The backend takes a few
+seconds (TypeScript recompiles, then the process restarts); the frontend is near-instant.
+
+To change a port or a credential, `cp .env.example .env` and edit it. Every value has a
+working default, so the file is optional.
+
+```
+docker compose logs -f backend   # follow one service
+docker compose down              # stop; your data survives
+docker compose down -v           # stop and DELETE the database
+docker compose up --build        # after changing a Dockerfile or a dependency
+```
+
+### Working on the host instead
+
+If you would rather run Node directly — faster tests, a debugger attached — you still need
+the databases from Docker:
+
+```
+nvm use                                   # .nvmrc → Node 24.15.0
+npm install                               # installs every workspace
+docker compose up -d postgres redis       # just the data services
+cp backend/.env.example backend/.env
+npm run migrate:deploy --workspace @crm/backend
+npm run verify                            # type-check, lint, format check, tests
 ```
 
 `npm install` is run **from the repository root only**. This is an npm workspaces
@@ -28,17 +68,34 @@ monorepo — running `npm install` inside `frontend/` or `backend/` can produce 
 `npm install` also installs the Git hooks, via the `prepare` script. A fresh clone is
 gated from the first commit with no extra step.
 
+**The test suite needs Postgres and Redis running.** No test skips itself when they are
+absent — it fails loudly and tells you which command to run.
+
+### If something will not start
+
+- **A port is already in use.** Set `POSTGRES_PORT`, `REDIS_PORT`, `BACKEND_PORT`, or
+  `FRONTEND_PORT` in `.env`. The containers always talk to each other on the standard
+  ports regardless of what you map on the host.
+- **`docker compose up` hangs on `backend`.** It waits for Postgres and Redis to report
+  _healthy_, not merely started. `docker compose logs postgres` will say why.
+- **An edit does nothing.** Bind mounts from Windows and macOS do not deliver filesystem
+  events into Linux containers, so the watchers poll instead. If polling has been turned
+  off, this is the first thing that breaks.
+- **`Cannot find module '@crm/shared'`.** The shared package has not been built. Inside
+  Compose the entrypoint handles it; on the host, `npm run build --workspace @crm/shared`.
+
 ---
 
 ## Repository layout
 
-| Directory          | Contents                                                                 |
-| ------------------ | ------------------------------------------------------------------------ |
-| `frontend/`        | React + Vite app. Placeholder scaffold until Phase P03.                  |
-| `backend/`         | NestJS API. Placeholder scaffold until US-4.                             |
-| `packages/shared/` | DTOs and Zod schemas shared by both. **No auth logic — see its README.** |
-| `infrastructure/`  | Docker, CI, deployment. Empty until US-11 and US-12.                     |
-| `docs/`            | Phase specifications.                                                    |
+| Directory            | Contents                                                                  |
+| -------------------- | ------------------------------------------------------------------------- |
+| `frontend/`          | React + Vite app. Placeholder scaffold until Phase P03.                   |
+| `backend/`           | NestJS API — config, Prisma, Redis, API conventions, OpenAPI, logging.    |
+| `packages/shared/`   | DTOs and Zod schemas shared by both. **No auth logic — see its README.**  |
+| `infrastructure/`    | Docker images and entrypoints for the Compose stack. CI arrives in US-12. |
+| `docs/`              | Phase specifications.                                                     |
+| `docker-compose.yml` | The whole stack for local development. Root-level by convention.          |
 
 ---
 
