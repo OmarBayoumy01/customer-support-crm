@@ -6,3 +6,24 @@
 .squad/.last-copy-prompt.md
 .squad/runs/
 # End squad-kit block
+
+# Node
+node_modules/
+dist/
+build/
+.vite/
+.tsbuild/
+coverage/
+*.tsbuildinfo
+
+# Environment — never commit secrets
+.env
+.env.*
+!.env.example
+
+# Editors / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
