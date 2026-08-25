@@ -1,0 +1,12 @@
+version: 1
+project:
+  name: customer-support-crm
+  primaryLanguage: typescript
+  projectRoots:
+    - .
+tracker:
+  type: none
+naming:
+  includeTrackerId: false
+  globalSequence: true
+agents: []
