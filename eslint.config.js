@@ -76,6 +76,16 @@ export default tseslint.config(
   },
 
   {
+    // AC3: configuration is read through TypedConfigService, never from
+    // process.env directly. backend/src/config/ is the one place allowed to
+    // touch the environment — everywhere else this is an error, not a
+    // convention people are asked to remember.
+    files: ['backend/**/*.ts'],
+    ignores: ['backend/src/config/**'],
+    rules: { 'no-process-env': 'error' },
+  },
+
+  {
     files: ['frontend/**/*.{ts,tsx}'],
     languageOptions: { globals: globals.browser },
     plugins: { 'react-hooks': reactHooks },

@@ -1,17 +1,27 @@
-import { HealthStatusSchema, type HealthStatus } from '@crm/shared';
+import 'reflect-metadata';
 
-/**
- * Placeholder entry point. US-4 replaces this with the NestJS bootstrap.
- *
- * Its job today is to prove AC2 from the backend side: `HealthStatus` is defined
- * once in `@crm/shared`, and renaming a field there breaks the type-check here.
- */
-const sample: HealthStatus = {
-  status: 'ok',
-  service: 'backend',
-  timestamp: new Date().toISOString(),
-};
+import { Logger } from '@nestjs/common';
+import { NestFactory } from '@nestjs/core';
 
-HealthStatusSchema.parse(sample);
+import { AppModule } from './app.module.js';
+import { TypedConfigService } from './config/index.js';
 
-console.log(JSON.stringify(sample));
+async function bootstrap(): Promise<void> {
+  const app = await NestFactory.create(AppModule, { bufferLogs: false });
+  const config = app.get(TypedConfigService);
+
+  const port = config.get('PORT');
+  const host = config.get('HOST');
+
+  await app.listen(port, host);
+
+  new Logger('Bootstrap').log(`Listening on http://${host}:${port}`);
+}
+
+bootstrap().catch((error: unknown) => {
+  // Config validation exits on its own with a readable message (AC2). This
+  // catches Nest's own bootstrap failures — port in use, DI resolution, etc.
+  // Never swallow: log the cause, then fail the process.
+  new Logger('Bootstrap').error(error instanceof Error ? error.message : String(error));
+  process.exit(1);
+});

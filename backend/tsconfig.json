@@ -4,7 +4,9 @@
     "composite": true,
     "outDir": "./dist",
     "rootDir": "./src",
-    "types": ["node"]
+    "types": ["node"],
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true
   },
   "references": [{ "path": "../packages/shared" }],
   "include": ["src/**/*"]
