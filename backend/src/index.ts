@@ -4,17 +4,18 @@ import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 
 import { AppModule } from './app.module.js';
-import { ContextLogger, RequestContextService } from './common/index.js';
+import { STRUCTURED_LOGGER, type StructuredLogger } from './common/index.js';
 import { TypedConfigService } from './config/index.js';
 import { setupSwagger } from './openapi/index.js';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule, { bufferLogs: false });
 
-  // Every log line from here on carries the request id (US-7, AC5). Set after
-  // creation rather than passed to `create`, because the logger needs
-  // `RequestContextService` out of the container.
-  app.useLogger(new ContextLogger(app.get(RequestContextService)));
+  // Every log line from here on is JSON carrying the request id (US-7 AC5,
+  // US-9 AC1). Taken from the container rather than constructed here, so the
+  // access-log middleware and Nest's own logging share one instance, one
+  // configured level, and one sink.
+  app.useLogger(app.get<StructuredLogger>(STRUCTURED_LOGGER));
 
   // Nest does not run `onModuleDestroy` on SIGINT/SIGTERM unless asked. Without
   // this the database pool is never closed on Ctrl-C or on container stop, and

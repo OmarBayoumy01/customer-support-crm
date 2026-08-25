@@ -6,6 +6,12 @@ export interface RequestContext {
   readonly requestId: string;
   readonly method: string;
   readonly path: string;
+  /**
+   * Filled in once the request is authenticated, which is why it is the one
+   * mutable field here. P02's guard calls `setUserId` after verifying the token;
+   * until then every log line for the request simply omits it.
+   */
+  userId?: string;
 }
 
 /**
@@ -39,5 +45,21 @@ export class RequestContextService {
    */
   requestId(): string {
     return this.storage.getStore()?.requestId ?? '-';
+  }
+
+  /**
+   * Attaches the authenticated user to every subsequent log line for this
+   * request (AC1's "user ID where known"). A no-op outside a request.
+   */
+  setUserId(userId: string): void {
+    const context = this.storage.getStore();
+
+    if (context !== undefined) {
+      context.userId = userId;
+    }
+  }
+
+  userId(): string | undefined {
+    return this.storage.getStore()?.userId;
   }
 }

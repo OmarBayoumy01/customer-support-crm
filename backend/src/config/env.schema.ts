@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { LOG_LEVELS } from '../common/logging/log-level.js';
+
 /**
  * Environment variables are strings, and `z.coerce.boolean()` is the wrong tool
  * for them: it follows JavaScript truthiness, so the string `"false"` coerces to
@@ -39,6 +41,13 @@ export const EnvSchema = z.object({
 
   /** How long to wait for a free pooled connection before failing. */
   DATABASE_CONNECTION_TIMEOUT_MS: z.coerce.number().int().positive().default(5_000),
+
+  /**
+   * Verbosity, changeable without a code change (US-9, AC4). Left optional so
+   * the default can depend on `NODE_ENV` — quiet in production, `debug`
+   * everywhere else.
+   */
+  LOG_LEVEL: z.enum(LOG_LEVELS).optional(),
 
   /** Where the Swagger UI is served from. No leading slash — Nest adds it. */
   SWAGGER_PATH: z.string().min(1).default('api/docs'),

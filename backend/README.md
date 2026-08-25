@@ -98,6 +98,42 @@ Established in **US-7** and applied globally — a new endpoint gets all of this
   and every log line during that request carries it.
 - `@NoEnvelope()` opts a route out of the wrapper. Reach for it rarely.
 
+## Logging
+
+One JSON object per line — errors and warnings on stderr, everything else on stdout.
+
+```json
+{
+  "timestamp": "2026-08-26T09:15:02.431Z",
+  "level": "info",
+  "message": "request completed",
+  "requestId": "0f3c…",
+  "method": "GET",
+  "path": "/health",
+  "statusCode": 200,
+  "durationMs": 14.2
+}
+```
+
+- **`LOG_LEVEL`** sets verbosity without a code change: `error | warn | info | debug |
+verbose`. Unset means `info` in production and `debug` everywhere else.
+- **Every line carries the request id**, and `userId` once a request is authenticated —
+  P02's guard calls `RequestContextService.setUserId()`.
+- **Every completed request logs one access line**, including 404s on unmatched routes and
+  requests rejected before reaching a handler. It hangs off `response.on('finish')` rather
+  than an interceptor for exactly that reason.
+- **Secrets are redacted.** Field names matching `password`, `token`, `authorization`,
+  `apiKey`, and friends are replaced — nested, in arrays, case-insensitively, and with
+  separators stripped so `x-api-key` is caught. Interpolated secrets in message text are
+  pattern-scrubbed too. **Prefer `StructuredLogger.emit(level, message, fields)`** over
+  interpolating values into a string: fields are redacted structurally, strings only by
+  pattern.
+
+There is no Pino. The story that built this suggested `nestjs-pino`, which is three
+dependencies outside the approved stack for what is, at this size, a `JSON.stringify` and a
+level check — see `.squad/plans/structured-logging/00-overview.md`. Swapping to it later
+touches `structured-logger.ts` and the middleware and nothing else.
+
 ## API documentation
 
 Swagger UI at **`/api/docs`**, raw OpenAPI at **`/api/docs-json`**.
@@ -119,7 +155,7 @@ auth. Enabling without credentials refuses to serve — it does not fall back to
 
 ```
 src/
-├── common/     API conventions: envelope, errors, validation, request id
+├── common/     API conventions, request context, structured logging
 ├── config/     Env schema, validation, typed accessor
 ├── generated/  Prisma client — generated, gitignored, do not edit
 ├── health/     GET /health

@@ -3,7 +3,11 @@ export { ApiException, statusForCode } from './errors/api.exception.js';
 export { NoEnvelope, NO_ENVELOPE } from './decorators/no-envelope.decorator.js';
 export { AllExceptionsFilter } from './filters/all-exceptions.filter.js';
 export { ResponseEnvelopeInterceptor } from './interceptors/response-envelope.interceptor.js';
-export { ContextLogger } from './logging/context-logger.js';
+export { STRUCTURED_LOGGER } from './logging/logger.token.js';
+export { StructuredLogger, type LogRecord, type LogSink } from './logging/structured-logger.js';
+export { RequestLoggingMiddleware } from './logging/request-logging.middleware.js';
+export { LOG_LEVELS, isEnabled, defaultLevelFor, type LogLevel } from './logging/log-level.js';
+export { redact, redactHeaders, redactText, REDACTED } from './logging/redact.js';
 export {
   RequestContextService,
   type RequestContext,
