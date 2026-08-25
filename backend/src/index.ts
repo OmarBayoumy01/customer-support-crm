@@ -4,10 +4,16 @@ import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 
 import { AppModule } from './app.module.js';
+import { ContextLogger, RequestContextService } from './common/index.js';
 import { TypedConfigService } from './config/index.js';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule, { bufferLogs: false });
+
+  // Every log line from here on carries the request id (US-7, AC5). Set after
+  // creation rather than passed to `create`, because the logger needs
+  // `RequestContextService` out of the container.
+  app.useLogger(new ContextLogger(app.get(RequestContextService)));
 
   // Nest does not run `onModuleDestroy` on SIGINT/SIGTERM unless asked. Without
   // this the database pool is never closed on Ctrl-C or on container stop, and

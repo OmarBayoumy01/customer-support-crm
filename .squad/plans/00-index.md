@@ -8,3 +8,4 @@ One row per feature folder under `.squad/plans/`. `NN` continues as a global exe
 | `nestjs-bootstrap`    | [00-overview.md](./nestjs-bootstrap/00-overview.md)      | 02       |
 | `prisma-postgres`     | [00-overview.md](./prisma-postgres/00-overview.md)       | 03       |
 | `domain-schema`       | [00-overview.md](./domain-schema/00-overview.md)         | 04       |
+| `api-conventions`     | [00-overview.md](./api-conventions/00-overview.md)       | 05       |

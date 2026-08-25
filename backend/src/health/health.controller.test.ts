@@ -37,7 +37,8 @@ test('GET /health returns 200 (AC1)', async () => {
 
 test('GET /health body satisfies the shared HealthStatus DTO', async () => {
   const response = await fetch(`${baseUrl}/health`);
-  const body: unknown = await response.json();
+  const payload = (await response.json()) as { data: unknown };
+  const body: unknown = payload.data;
 
   // Parsing with the shared schema is the assertion: if the backend ever grows
   // its own health shape, this fails.
@@ -50,7 +51,7 @@ test('GET /health body satisfies the shared HealthStatus DTO', async () => {
 
 test('AC1 — the health endpoint reports the database as up', async () => {
   const response = await fetch(`${baseUrl}/health`);
-  const parsed = HealthStatusSchema.parse(await response.json());
+  const parsed = HealthStatusSchema.parse(((await response.json()) as { data: unknown }).data);
 
   const database = parsed.dependencies['database'];
 
@@ -93,7 +94,7 @@ test('AC1 — a database outage is reported, not thrown', async () => {
 
     assert.equal(response.status, 200, 'a down dependency is still a successful report');
 
-    const parsed = HealthStatusSchema.parse(await response.json());
+    const parsed = HealthStatusSchema.parse(((await response.json()) as { data: unknown }).data);
     const database = parsed.dependencies['database'];
 
     assert.ok(database !== undefined);

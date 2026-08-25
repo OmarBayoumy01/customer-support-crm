@@ -1,12 +1,16 @@
 import { Module } from '@nestjs/common';
 
+import { CommonModule } from './common/index.js';
 import { TypedConfigModule } from './config/index.js';
 import { HealthModule } from './health/health.module.js';
 import { PrismaModule } from './prisma/index.js';
 
 /**
- * Deliberately minimal. US-7 attaches the global validation pipe, exception
- * filter, and response interceptor in `index.ts`, not by decorating this module.
+ * Deliberately minimal.
+ *
+ * `CommonModule` (US-7) carries the global validation pipe, exception filter,
+ * response envelope, and request-id middleware. They are registered there as
+ * `APP_*` providers rather than in `index.ts`, because they need injection.
  *
  * `PrismaModule` is global and comes before `HealthModule`, which depends on it.
  *
@@ -15,5 +19,5 @@ import { PrismaModule } from './prisma/index.js';
  * empty modules are cargo-cult structure that costs review time and hides which
  * parts of the system actually exist.
  */
-@Module({ imports: [TypedConfigModule, PrismaModule, HealthModule] })
+@Module({ imports: [TypedConfigModule, CommonModule, PrismaModule, HealthModule] })
 export class AppModule {}
