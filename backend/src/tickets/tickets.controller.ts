@@ -30,6 +30,7 @@ import {
 } from '../openapi/index.js';
 import {
   CreateTicketDto,
+  CreateTicketMessageDto,
   PaginationQueryDto,
   TicketListQueryDto,
   UpdateTicketDto,
@@ -174,6 +175,38 @@ export class TicketsController {
       data: messages,
       pagination: buildPaginationMeta({ page: query.page, pageSize: query.pageSize, total }),
     };
+  }
+
+  /**
+   * Write into the conversation — US-1.
+   *
+   * One endpoint for both a customer-facing reply and an internal note,
+   * separated by `isInternal` in the body. Two endpoints would be two places to
+   * get the project's first non-negotiable rule wrong.
+   *
+   * `ticket:update` rather than a permission of its own: replying is the
+   * ordinary way an agent changes a ticket, and a role that may not update a
+   * ticket has no business writing on it either.
+   */
+  @Post(':id/messages')
+  @RequirePermission('ticket:update')
+  @HttpCode(201)
+  @ApiOperation({
+    summary: 'Add a reply or an internal note',
+    description:
+      'Set isInternal to true for a note. It is required rather than defaulted — an ' +
+      'omitted flag would silently mean customer-facing, which is the wrong way round ' +
+      'for a mistake to fall.',
+  })
+  @ApiZodBody(CreateTicketMessageDto)
+  @ApiZodResponse(201, TicketMessageSchema, 'Created')
+  @ApiResponse({ status: 404, schema: zodToOpenApi(ApiErrorSchema) })
+  async addMessage(
+    @Param('id') id: string,
+    @Body() body: CreateTicketMessageDto,
+    @CurrentUser() user: CurrentUserPayload | undefined,
+  ): Promise<TicketMessage> {
+    return this.tickets.addMessage(id, body, await this.actorFrom(user));
   }
 
   /**

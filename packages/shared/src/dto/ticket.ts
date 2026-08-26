@@ -195,6 +195,27 @@ export const TicketMessageSchema = z.object({
   createdAt: z.string().datetime(),
 });
 
+/**
+ * Writing into the conversation — US-1.
+ *
+ * `isInternal` is the whole story. It is **required**, not defaulted: the
+ * project's first non-negotiable rule is that an internal note must never reach
+ * a customer, and a field with a default is a field a caller can forget. An
+ * omitted flag would silently mean "customer-facing", which is the wrong way
+ * round for a mistake to fall.
+ */
+export const CreateTicketMessageSchema = z.object({
+  body: z.string().trim().min(1).max(20_000),
+  isInternal: z.boolean(),
+  /**
+   * How the reply is being sent. Defaults to the ticket's own channel, which is
+   * almost always what an agent means — you answer an email with an email.
+   */
+  channel: ChannelSchema.optional(),
+});
+
+export type CreateTicketMessage = z.infer<typeof CreateTicketMessageSchema>;
+
 export const TicketHistoryEntrySchema = z.object({
   id: z.string().uuid(),
   eventType: z.string(),

@@ -151,7 +151,6 @@
       }
     },
     "detail": {
-      "composerPending": "Replying arrives with the next story.",
       "meta": {
         "channel": "Channel",
         "created": "Created"
@@ -190,6 +189,21 @@
         "notes": "Notes",
         "noNotes": "Nothing recorded yet."
       }
+    },
+    "composer": {
+      "reply": "Reply",
+      "note": "Internal note",
+      "noteWarning": "Internal note — not visible to the customer",
+      "replyPlaceholder": "Write a reply to the customer…",
+      "notePlaceholder": "Write a note for the team…",
+      "send": "Send",
+      "addNote": "Add note",
+      "replySent": "Reply sent to the customer.",
+      "noteAdded": "Note added. The customer cannot see it.",
+      "switchToNoteTitle": "Turn this reply into an internal note?",
+      "switchToNoteBody": "What you have written will be kept. As a note the customer will never see it, and it will not be sent to them.",
+      "switchToReplyTitle": "Turn this note into a reply?",
+      "switchToReplyBody": "What you have written will be kept — and sending it will deliver it to the customer."
     }
   },
   "states": {

@@ -18,6 +18,7 @@ import type { PermissionKey, PermissionScope, Ticket, TicketDetail } from '@crm/
 import { AppModule } from '../app.module.js';
 import { PasswordService, TokenService } from '../auth/index.js';
 import { PrismaService } from '../prisma/index.js';
+import { TicketsService } from './tickets.service.js';
 
 let app: INestApplication;
 let baseUrl: string;
@@ -33,6 +34,9 @@ let departmentId: string;
 
 /** A manager — sees everything. */
 let allToken: string;
+let allUserId: string;
+/** The service itself, for the reads US-82's portal will make. */
+let tickets: TicketsService;
 /** An agent scoped to their own queue. */
 let assignedToken: string;
 let assignedUserId: string;
@@ -179,7 +183,11 @@ before(async () => {
     ['ticket:update', 'ALL'],
   ]);
 
-  allToken = (await makeUser(managerRole)).token;
+  tickets = app.get(TicketsService);
+
+  const manager = await makeUser(managerRole);
+  allToken = manager.token;
+  allUserId = manager.id;
 
   const agent = await makeUser(agentRole);
   assignedToken = agent.token;
@@ -748,4 +756,139 @@ test('US-46 — internal notes are on the staff timeline, which is what they are
   // queries `isInternal: false`. Filtering here would break the agent's own
   // timeline — the one place the note is supposed to appear.
   assert.ok(detail.body.data!.messages.some((message) => message.isInternal));
+});
+
+// ---------------------------------------------------------------------------
+// US-1 — replying, and the note that must never reach a customer
+// ---------------------------------------------------------------------------
+
+test('US-1 — a reply is stored as a customer-facing agent message', async () => {
+  const ticket = await newTicket();
+
+  const { status, body } = await call<{ isInternal: boolean; senderType: string; body: string }>(
+    'POST',
+    `/tickets/${ticket.id}/messages`,
+    { token: allToken, body: { body: 'Your refund is on its way.', isInternal: false } },
+  );
+
+  assert.equal(status, 201, JSON.stringify(body));
+  assert.equal(body.data?.isInternal, false);
+  assert.equal(body.data?.senderType, 'AGENT');
+  assert.equal(body.data?.body, 'Your refund is on its way.');
+});
+
+test('US-1 — isInternal is required, so it cannot be forgotten into "customer-facing"', async () => {
+  const ticket = await newTicket();
+
+  const { status } = await call('POST', `/tickets/${ticket.id}/messages`, {
+    token: allToken,
+    body: { body: 'No flag at all.' },
+  });
+
+  // A default would make the dangerous value the one you get by omission.
+  assert.equal(status, 422);
+});
+
+test('US-1 AC5 — a note is excluded from a customer-visible read, in the query', async () => {
+  const ticket = await newTicket();
+
+  await call('POST', `/tickets/${ticket.id}/messages`, {
+    token: allToken,
+    body: { body: 'Visible to the customer.', isInternal: false },
+  });
+  await call('POST', `/tickets/${ticket.id}/messages`, {
+    token: allToken,
+    body: { body: 'PRIVATE: do not promise a date.', isInternal: true },
+  });
+
+  const actor = { userId: allUserId, departmentId };
+  const staff = await tickets.messages(ticket.id, actor, { skip: 0, take: 50 });
+  const portal = await tickets.messages(ticket.id, actor, {
+    skip: 0,
+    take: 50,
+    includeInternal: false,
+  });
+
+  assert.equal(staff.total, 2);
+  assert.ok(staff.messages.some((message) => message.isInternal));
+
+  // The project's first non-negotiable rule. Not one note, and not one note's
+  // worth of count either — a portal that says "2 messages" and shows 1 has
+  // leaked the existence of the note without rendering it.
+  assert.equal(portal.total, 1);
+  assert.equal(portal.messages.length, 1);
+  assert.ok(portal.messages.every((message) => !message.isInternal));
+  assert.ok(!portal.messages.some((message) => message.body.includes('PRIVATE')));
+});
+
+test('US-1 AC7 — a note’s attachments go with it, because they hang off the message', async () => {
+  const ticket = await newTicket();
+
+  const note = await call<{ id: string }>('POST', `/tickets/${ticket.id}/messages`, {
+    token: allToken,
+    body: { body: 'Internal, with a file.', isInternal: true },
+  });
+
+  await prisma.attachment.create({
+    data: {
+      messageId: note.body.data!.id,
+      ticketId: ticket.id,
+      fileName: 'private.pdf',
+      contentType: 'application/pdf',
+      sizeBytes: 512,
+      storageKey: `test/${note.body.data!.id}/private.pdf`,
+    },
+  });
+
+  const portal = await tickets.messages(
+    ticket.id,
+    { userId: allUserId, departmentId },
+    { skip: 0, take: 50, includeInternal: false },
+  );
+
+  // AC7 needs no separate rule: an attachment belongs to a message, so a
+  // filtered-out message takes its files with it.
+  assert.ok(portal.messages.every((message) => message.attachments.length === 0));
+});
+
+test('US-1 — a reply stops the response clock; a note does not', async () => {
+  const replied = await newTicket();
+  await call('POST', `/tickets/${replied.id}/messages`, {
+    token: allToken,
+    body: { body: 'Looking into it now.', isInternal: false },
+  });
+
+  const noted = await newTicket();
+  await call('POST', `/tickets/${noted.id}/messages`, {
+    token: allToken,
+    body: { body: 'Chasing payments.', isInternal: true },
+  });
+
+  const [afterReply, afterNote] = await Promise.all([
+    prisma.ticket.findUniqueOrThrow({
+      where: { id: replied.id },
+      select: { firstRespondedAt: true, lastAgentReplyAt: true },
+    }),
+    prisma.ticket.findUniqueOrThrow({
+      where: { id: noted.id },
+      select: { firstRespondedAt: true, lastAgentReplyAt: true },
+    }),
+  ]);
+
+  assert.ok(afterReply.firstRespondedAt !== null);
+  assert.ok(afterReply.lastAgentReplyAt !== null);
+
+  // An agent must not be able to meet a commitment to a customer by writing a
+  // note the customer will never see.
+  assert.equal(afterNote.firstRespondedAt, null);
+  assert.equal(afterNote.lastAgentReplyAt, null);
+});
+
+test('US-1 — writing on a ticket outside the caller’s scope answers 404', async () => {
+  const result = await call('POST', `/tickets/${randomUUID()}/messages`, {
+    token: allToken,
+    body: { body: 'Nope.', isInternal: false },
+  });
+
+  assert.equal(result.status, 404);
 });

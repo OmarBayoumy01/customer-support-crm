@@ -92,6 +92,7 @@ export {
   TicketSlaSchema,
   TicketSchema,
   TicketMessageSchema,
+  CreateTicketMessageSchema,
   TicketHistoryEntrySchema,
   TicketAttachmentSchema,
   TicketDetailSchema,
@@ -104,6 +105,7 @@ export {
   type Ticket,
   type TicketDetail,
   type TicketMessage,
+  type CreateTicketMessage,
   type TicketAttachment,
   type TicketHistoryEntry,
 } from './dto/ticket.js';

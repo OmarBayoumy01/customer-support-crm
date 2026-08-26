@@ -13,6 +13,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { CustomerContextPanel } from './customer-context-panel';
+import { TicketComposer } from './ticket-composer';
 import { TicketConversation } from './ticket-conversation';
 import { TicketHeader } from './ticket-header';
 import {
@@ -129,11 +130,8 @@ export function TicketDetailPage(): React.JSX.Element {
             is about where the composer sits and a layout that only becomes
             correct three stories later is a layout nobody has seen.
           */}
-          <Separator />
-
-          <div className="text-meta text-ink-muted bg-secondary/30 p-4">
-            {t('ticket.detail.composerPending')}
-          </div>
+          {/* US-1 fills the dock US-45 reserved. */}
+          <TicketComposer ticketId={ticket.id} />
         </Card>
 
         {!collapsed && (

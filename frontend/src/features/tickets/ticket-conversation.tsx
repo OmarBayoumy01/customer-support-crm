@@ -228,7 +228,12 @@ export function TicketConversation({
         if (message.isInternal) {
           return (
             <li key={message.id}>
-              <div className="border-sla-warn/40 bg-sla-warn-soft rounded-md border border-dashed p-3">
+              {/*
+                US-1, AC4 — full width, amber ground, and a coloured rule on the
+                inline start. `border-s` rather than `border-l`, so the rule is
+                on the edge the reading starts from in Arabic too.
+              */}
+              <div className="border-sla-warn/40 bg-sla-warn-soft border-s-sla-warn rounded-md border border-s-4 border-dashed p-3">
                 <p className="text-meta mb-1 flex flex-wrap items-center gap-x-2">
                   <span className="text-sla-warn inline-flex items-center gap-1 font-medium">
                     <Lock aria-hidden="true" className="size-3" />

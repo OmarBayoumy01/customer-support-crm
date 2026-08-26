@@ -11,6 +11,7 @@ import {
   type SlaState,
   type Ticket,
   type TicketDetail,
+  type CreateTicketMessage,
   type TicketListQuery,
   type TicketMessage,
   type UpdateTicket,
@@ -613,22 +614,91 @@ export class TicketsService {
   async messages(
     id: string,
     actor: TicketActor,
-    options: { skip: number; take: number },
+    options: { skip: number; take: number; includeInternal?: boolean },
   ): Promise<{ messages: TicketMessage[]; total: number }> {
     await this.detail(id, actor);
 
+    /**
+     * **The project's first non-negotiable rule, as a query.**
+     *
+     * `includeInternal` defaults to true because this is the staff API and a
+     * note is the thing notes exist for. US-82's portal passes `false`, and
+     * when it does the filter is applied **in the database** — not by dropping
+     * rows after fetching them, which the rule explicitly forbids and which
+     * would also leave the count wrong.
+     *
+     * The count uses the same `where` for that reason: a portal that says
+     * "12 messages" and shows 9 has leaked the existence of three notes even
+     * though it never rendered them.
+     */
+    const where: Prisma.MessageWhereInput =
+      options.includeInternal === false ? { ticketId: id, isInternal: false } : { ticketId: id };
+
     const [rows, total] = await Promise.all([
       this.prisma.notDeleted.message.findMany({
-        where: { ticketId: id },
+        where,
         orderBy: { createdAt: 'desc' },
         skip: options.skip,
         take: options.take,
         select: MESSAGE_SELECT,
       }),
-      this.prisma.notDeleted.message.count({ where: { ticketId: id } }),
+      this.prisma.notDeleted.message.count({ where }),
     ]);
 
     return { messages: rows.map(toMessage), total };
+  }
+
+  /**
+   * An agent writes into the conversation — US-1.
+   *
+   * `isInternal` decides everything downstream, and it comes from the caller
+   * rather than from anything inferred. The project's first non-negotiable rule
+   * lives here: what this flag says is what the portal (US-82) filters on, so
+   * getting it from the request body and storing it verbatim is the whole
+   * mechanism.
+   *
+   * Scope is enforced by loading the ticket through `detail` first, the same
+   * way the read endpoints do.
+   *
+   * The SLA clock is told **only** about a customer-facing reply — an internal
+   * note is not a response to the customer, and letting one stop the response
+   * clock would mean an agent could satisfy a service commitment by writing a
+   * note to themselves. `SlaClockService.onAgentReply` refuses an internal one
+   * anyway; passing the flag through keeps the two agreeing rather than relying
+   * on that.
+   */
+  async addMessage(
+    id: string,
+    input: CreateTicketMessage,
+    actor: TicketActor,
+  ): Promise<TicketMessage> {
+    const ticket = await this.detail(id, actor);
+
+    const row = await this.prisma.message.create({
+      data: {
+        ticketId: id,
+        senderType: 'AGENT',
+        authorUserId: actor.userId,
+        body: input.body,
+        isInternal: input.isInternal,
+        channel: input.channel ?? ticket.channel,
+      },
+      select: MESSAGE_SELECT,
+    });
+
+    if (!input.isInternal) {
+      // "Waiting on us" versus "waiting on them" is a column comparison rather
+      // than a correlated subquery over messages — US-6 denormalised it for
+      // exactly this write.
+      await this.prisma.ticket.update({
+        where: { id },
+        data: { lastAgentReplyAt: row.createdAt },
+      });
+    }
+
+    await this.clock.onAgentReply(id, { isInternal: input.isInternal, at: row.createdAt });
+
+    return toMessage(row);
   }
 
   /**

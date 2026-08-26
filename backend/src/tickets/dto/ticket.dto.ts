@@ -1,4 +1,5 @@
 import {
+  CreateTicketMessageSchema,
   CreateTicketSchema,
   PaginationQuerySchema,
   TicketListQuerySchema,
@@ -14,3 +15,6 @@ export class TicketListQueryDto extends createZodDto(TicketListQuerySchema) {}
 
 /** Paging for the history endpoint, which needs no filters of its own. */
 export class PaginationQueryDto extends createZodDto(PaginationQuerySchema) {}
+
+/** A reply or an internal note — US-1. */
+export class CreateTicketMessageDto extends createZodDto(CreateTicketMessageSchema) {}

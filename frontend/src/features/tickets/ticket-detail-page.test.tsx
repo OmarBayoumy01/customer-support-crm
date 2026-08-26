@@ -244,8 +244,9 @@ describe('AC3 — layout', () => {
 
     expect(within(conversation).getByText(/I can see the refund was approved/)).toBeInTheDocument();
 
-    // The dock is part of the conversation column, not the page foot.
-    expect(within(conversation).getByText(/Replying arrives/)).toBeInTheDocument();
+    // The dock is part of the conversation column, not the page foot. US-1
+    // filled it with the composer.
+    expect(within(conversation).getByRole('tab', { name: 'Reply' })).toBeInTheDocument();
   });
 
   test('an internal note is marked as one, three ways over', async () => {

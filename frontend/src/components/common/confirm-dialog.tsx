@@ -15,8 +15,18 @@ import {
 import { cn } from '@/lib/utils';
 
 export interface ConfirmDialogProps {
-  /** The control that opens it. */
-  trigger: ReactNode;
+  /**
+   * The control that opens it.
+   *
+   * Optional, because some confirmations are not opened by a button at all —
+   * US-1 opens one when the composer's mode is about to change, where the
+   * "trigger" is a tab the user has already pressed. Pass `open` instead in
+   * that case.
+   */
+  trigger?: ReactNode;
+  /** Controlled open state. Omit both to let the trigger drive it. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
   /** What is about to happen, in the action's own words. */
   title: string;
   /** The consequence, in one sentence. */
@@ -53,6 +63,8 @@ export interface ConfirmDialogProps {
  */
 export function ConfirmDialog({
   trigger,
+  open,
+  onOpenChange,
   title,
   description,
   confirmLabel,
@@ -61,11 +73,19 @@ export function ConfirmDialog({
 }: ConfirmDialogProps): React.JSX.Element {
   const { t } = useTranslation();
   const [pending, setPending] = useState(false);
-  const [open, setOpen] = useState(false);
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+
+  // Controlled when the caller passes `open`, self-managed otherwise. Both
+  // shapes exist because both are the natural way to write the call site.
+  const isOpen = open ?? uncontrolledOpen;
+  const setOpen = (next: boolean): void => {
+    setUncontrolledOpen(next);
+    onOpenChange?.(next);
+  };
 
   return (
-    <AlertDialog open={open} onOpenChange={setOpen}>
-      <AlertDialogTrigger asChild>{trigger}</AlertDialogTrigger>
+    <AlertDialog open={isOpen} onOpenChange={setOpen}>
+      {trigger === undefined ? null : <AlertDialogTrigger asChild>{trigger}</AlertDialogTrigger>}
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
