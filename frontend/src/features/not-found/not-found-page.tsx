@@ -13,7 +13,7 @@ export function NotFoundPage(): React.JSX.Element {
   const { t } = useTranslation();
 
   return (
-    <main className="mx-auto flex min-h-[60vh] max-w-md flex-col items-center justify-center gap-3 p-6 text-center">
+    <main className="mx-auto flex min-h-[60vh] max-w-md flex-col items-center justify-center gap-3 text-center">
       {/* Mono, because it is a code and codes are data. */}
       <p className="tabular text-ink-faint text-page">404</p>
       <h1 className="text-page font-semibold">{t('errors.notFoundTitle')}</h1>

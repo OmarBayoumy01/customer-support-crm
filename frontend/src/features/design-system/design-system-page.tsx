@@ -111,7 +111,7 @@ export function DesignSystemPage(): React.JSX.Element {
   });
 
   return (
-    <div className="mx-auto max-w-4xl space-y-8 p-6">
+    <div className="mx-auto max-w-4xl space-y-8">
       <header className="space-y-2">
         <h1 className="text-page font-semibold">{t('designSystem.title')}</h1>
         <p className="text-ink-muted">{t('designSystem.subtitle')}</p>

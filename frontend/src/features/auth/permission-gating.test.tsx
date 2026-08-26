@@ -15,7 +15,8 @@ import { beforeEach, describe, expect, test } from 'vitest';
 import type { EffectivePermissions, LoginResponse } from '@crm/shared';
 
 import i18n from '../../i18n';
-import { Sidebar } from '@/components/shell/sidebar';
+import { AppSidebar } from '@/components/shell/sidebar';
+import { SidebarProvider } from '@/components/ui/sidebar';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { AppProviders } from '../../app/providers';
 import { publishSession, resetSessionStore } from '../../lib/session-store';
@@ -111,7 +112,9 @@ function renderSidebar(session: LoginResponse): void {
     <MemoryRouter initialEntries={['/dashboard']}>
       <AppProviders>
         <TooltipProvider>
-          <Sidebar />
+          <SidebarProvider>
+            <AppSidebar />
+          </SidebarProvider>
         </TooltipProvider>
       </AppProviders>
     </MemoryRouter>,

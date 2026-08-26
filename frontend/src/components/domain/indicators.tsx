@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 
+import { Badge } from '@/components/ui/badge';
 import {
   PRIORITY_PRESENTATION,
   SLA_PRESENTATION,
@@ -14,12 +15,18 @@ import { cn } from '@/lib/utils';
 /**
  * The shared badge shape — US-27, AC2.
  *
+ * Built on shadcn's `Badge` rather than a hand-rolled span, so the focus ring,
+ * the icon sizing and the truncation behave the way every other badge in the
+ * product does. `variant="outline"` because the ground and border come from the
+ * domain token — see `design-tokens.ts`, which is the only place allowed to name
+ * the urgency ramp.
+ *
  * Icon **and** text, always. There is no prop to turn the label off, and that
  * is deliberate: the moment one exists, a dense screen somewhere turns it off
  * to save width and the status becomes a coloured dot that a colour-blind agent
  * cannot read. If width is short, the answer is fewer columns.
  */
-function Badge({
+function DomainBadge({
   presentation,
   className,
 }: {
@@ -30,16 +37,10 @@ function Badge({
   const Icon = presentation.icon;
 
   return (
-    <span
-      className={cn(
-        'text-meta inline-flex items-center gap-1 rounded-full border px-2 py-0.5 leading-none whitespace-nowrap',
-        presentation.className,
-        className,
-      )}
-    >
-      <Icon aria-hidden="true" className="size-3 shrink-0" />
+    <Badge variant="outline" className={cn('gap-1', presentation.className, className)}>
+      <Icon aria-hidden="true" className="shrink-0" />
       {t(presentation.labelKey)}
-    </span>
+    </Badge>
   );
 }
 
@@ -50,7 +51,7 @@ export function StatusBadge({
   status: TicketStatus;
   className?: string | undefined;
 }): React.JSX.Element {
-  return <Badge presentation={STATUS_PRESENTATION[status]} className={className} />;
+  return <DomainBadge presentation={STATUS_PRESENTATION[status]} className={className} />;
 }
 
 export function PriorityBadge({
@@ -60,7 +61,7 @@ export function PriorityBadge({
   priority: TicketPriority;
   className?: string | undefined;
 }): React.JSX.Element {
-  return <Badge presentation={PRIORITY_PRESENTATION[priority]} className={className} />;
+  return <DomainBadge presentation={PRIORITY_PRESENTATION[priority]} className={className} />;
 }
 
 /** Formats a duration the way an agent reads a countdown: 2h 15m, 45m, 30s. */
@@ -187,5 +188,7 @@ export function SlaBadge({
 }: SlaProps): React.JSX.Element {
   const fraction = targetSeconds <= 0 ? 1 : elapsedSeconds / targetSeconds;
 
-  return <Badge presentation={SLA_PRESENTATION[slaStateFor(fraction)]} className={className} />;
+  return (
+    <DomainBadge presentation={SLA_PRESENTATION[slaStateFor(fraction)]} className={className} />
+  );
 }

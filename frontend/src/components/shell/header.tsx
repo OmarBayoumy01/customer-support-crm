@@ -1,12 +1,13 @@
-import { useAtom, useSetAtom } from 'jotai';
+import { useSetAtom } from 'jotai';
 import { Bell, ChevronDown, PanelLeft, Plus, Search } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation } from 'react-router';
 
-import { mobileNavOpenAtom, searchOpenAtom, sidebarCollapsedAtom } from '@/app/shell-state';
+import { searchOpenAtom } from '@/app/shell-state';
 import { LanguageToggle } from '@/components/language-toggle';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { useSidebar } from '@/components/ui/sidebar';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -122,9 +123,10 @@ export function Header(): React.JSX.Element {
   const { t } = useTranslation();
   const { user } = useAuth();
   const logout = useLogout();
-  const [collapsed, setCollapsed] = useAtom(sidebarCollapsedAtom);
-  const setMobileOpen = useSetAtom(mobileNavOpenAtom);
   const setSearchOpen = useSetAtom(searchOpenAtom);
+  // One control for both: on a phone the provider opens the drawer, on a
+  // desktop it collapses the rail. That used to be two atoms kept in step.
+  const { toggleSidebar, open } = useSidebar();
 
   const initials =
     user === null ? '?' : `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`.toUpperCase();
@@ -135,13 +137,10 @@ export function Header(): React.JSX.Element {
         variant="ghost"
         size="icon"
         aria-label={t('nav.toggleSidebar')}
-        aria-expanded={!collapsed}
-        onClick={() => {
-          setCollapsed((value) => !value);
-          setMobileOpen((value) => !value);
-        }}
+        aria-expanded={open}
+        onClick={toggleSidebar}
       >
-        <PanelLeft aria-hidden="true" className="size-4" />
+        <PanelLeft aria-hidden="true" className="size-4 rtl:rotate-180" />
       </Button>
 
       <Breadcrumb />

@@ -4,15 +4,22 @@ import { useTranslation } from 'react-i18next';
 import type { TicketDetail } from '@crm/shared';
 
 import { PriorityBadge, StatusBadge, formatRemaining } from '@/components/domain/indicators';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 
 /**
  * One SLA clock — US-45, AC2.
  *
  * Two of these sit in the header: response and resolution. Each is a state, a
- * countdown, and — when expanded — the exact deadline a dispute would be settled
- * on. Collapsed by default because the number an agent glances at is "how long
- * have I got", and the timestamp is only ever needed deliberately.
+ * countdown, and — when opened — the exact deadline a dispute would be settled
+ * on. Closed by default because the number an agent glances at is "how long
+ * have I got"; the timestamp is only ever wanted deliberately.
+ *
+ * Radix's `Collapsible` handles the disclosure, so `aria-expanded` and the
+ * content's mounting are not this component's business.
  */
 function SlaClock({
   labelKey,
@@ -26,12 +33,17 @@ function SlaClock({
   policyName: string | null;
 }): React.JSX.Element {
   const { t, i18n } = useTranslation();
-  const [expanded, setExpanded] = useState(false);
+  const [open, setOpen] = useState(false);
+
+  const Icon = labelKey.endsWith('response') ? Timer : Clock;
 
   if (dueAt === null) {
     return (
-      <div className="min-w-40">
-        <p className="text-meta text-ink-muted">{t(labelKey)}</p>
+      <div className="min-w-40 space-y-0.5">
+        <p className="text-meta text-ink-muted flex items-center gap-1.5">
+          <Icon aria-hidden="true" className="text-ink-faint size-3.5" />
+          {t(labelKey)}
+        </p>
         <p className="text-meta text-ink-faint">{t('ticket.queue.noSla')}</p>
       </div>
     );
@@ -40,39 +52,30 @@ function SlaClock({
   const remainingSeconds = Math.round((Date.parse(dueAt) - Date.now()) / 1000);
   const passed = breached || remainingSeconds <= 0;
 
-  const tone = passed ? 'text-sla-breach' : 'text-sla-ok';
-
   const value =
     remainingSeconds >= 0
       ? t('ticket.sla.remaining', { time: formatRemaining(remainingSeconds) })
       : t('ticket.sla.overBy', { time: formatRemaining(remainingSeconds) });
 
   return (
-    <div className="min-w-40">
-      <button
-        type="button"
-        onClick={() => {
-          setExpanded(!expanded);
-        }}
-        aria-expanded={expanded}
-        className="focus-visible:ring-ring group flex items-center gap-1.5 rounded focus-visible:ring-2 focus-visible:outline-none"
-      >
-        {labelKey.endsWith('response') ? (
-          <Timer aria-hidden="true" className="text-ink-faint size-3.5" />
-        ) : (
-          <Clock aria-hidden="true" className="text-ink-faint size-3.5" />
-        )}
+    <Collapsible open={open} onOpenChange={setOpen} className="min-w-40">
+      <CollapsibleTrigger className="focus-visible:ring-ring -mx-1 flex items-center gap-1.5 rounded px-1 focus-visible:ring-2 focus-visible:outline-none">
+        <Icon aria-hidden="true" className="text-ink-faint size-3.5" />
         <span className="text-meta text-ink-muted">{t(labelKey)}</span>
         <ChevronDown
           aria-hidden="true"
-          className={cn('text-ink-faint size-3 transition-transform', expanded && 'rotate-180')}
+          className={cn('text-ink-faint size-3 transition-transform', open && 'rotate-180')}
         />
-      </button>
+      </CollapsibleTrigger>
 
       {/* State in words as well as colour — never colour alone. */}
-      <p className={cn('tabular text-body font-medium', tone)}>{value}</p>
+      <p
+        className={cn('tabular text-body font-medium', passed ? 'text-sla-breach' : 'text-sla-ok')}
+      >
+        {value}
+      </p>
 
-      {expanded && (
+      <CollapsibleContent>
         <dl className="text-meta text-ink-muted mt-1 space-y-0.5">
           <div className="flex gap-1">
             <dt>{t('ticket.detail.sla.dueAt')}</dt>
@@ -88,8 +91,8 @@ function SlaClock({
             <dd className="text-ink">{policyName ?? t('ticket.detail.sla.noPolicy')}</dd>
           </div>
         </dl>
-      )}
-    </div>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 
@@ -132,48 +135,56 @@ export function TicketHeader({ ticket, className }: TicketHeaderProps): React.JS
   ];
 
   return (
-    <header className={cn('border-line bg-card space-y-3 rounded-md border p-4', className)}>
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 space-y-1">
-          <p className="tabular text-meta text-ink-muted">#{ticket.number}</p>
-          <h1 className="text-title text-ink">{ticket.subject}</h1>
-        </div>
-
-        {/* AC1's inline controls, and AC6's "never behind a dialog". */}
-        <div className="flex flex-wrap items-center gap-2">
-          <StatusBadge status={ticket.status} />
-          <PriorityBadge priority={ticket.priority} />
-          <span className="border-line text-meta text-ink inline-flex items-center gap-1 rounded-full border px-2 py-0.5">
-            <span className="text-ink-muted">{t('ticket.queue.column.assignee')}</span>
-            {ticket.assigneeName ?? t('ticket.queue.unassigned')}
-          </span>
-        </div>
-      </div>
-
-      {/* AC2 — both clocks, above the fold, no scrolling. */}
-      <div className="border-line flex flex-wrap gap-6 border-t pt-3">
-        <SlaClock
-          labelKey="ticket.detail.sla.response"
-          dueAt={ticket.sla.firstResponseDueAt}
-          breached={ticket.sla.firstResponseBreached}
-          policyName={ticket.slaPolicyName}
-        />
-        <SlaClock
-          labelKey="ticket.detail.sla.resolution"
-          dueAt={ticket.sla.resolutionDueAt}
-          breached={ticket.sla.resolutionBreached}
-          policyName={ticket.slaPolicyName}
-        />
-      </div>
-
-      <dl className="text-meta border-line flex flex-wrap gap-x-6 gap-y-1 border-t pt-3">
-        {metadata.map((item) => (
-          <div key={item.label} className="flex gap-1">
-            <dt className="text-ink-muted">{item.label}</dt>
-            <dd className="text-ink">{item.value}</dd>
+    <Card className={cn('gap-0 py-0', className)}>
+      <CardContent className="space-y-3 p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0 space-y-1">
+            <p className="tabular text-meta text-ink-muted">#{ticket.number}</p>
+            <h1 className="text-title text-ink">{ticket.subject}</h1>
           </div>
-        ))}
-      </dl>
-    </header>
+
+          {/* AC1's inline controls, and AC6's "never behind a dialog". */}
+          <div className="flex flex-wrap items-center gap-2">
+            <StatusBadge status={ticket.status} />
+            <PriorityBadge priority={ticket.priority} />
+            <Badge variant="outline" className="font-normal">
+              <span className="text-ink-muted">{t('ticket.queue.column.assignee')}</span>
+              <span className="text-ink">
+                {ticket.assigneeName ?? t('ticket.queue.unassigned')}
+              </span>
+            </Badge>
+          </div>
+        </div>
+
+        <Separator />
+
+        {/* AC2 — both clocks, above the fold, no scrolling. */}
+        <div className="flex flex-wrap gap-6">
+          <SlaClock
+            labelKey="ticket.detail.sla.response"
+            dueAt={ticket.sla.firstResponseDueAt}
+            breached={ticket.sla.firstResponseBreached}
+            policyName={ticket.slaPolicyName}
+          />
+          <SlaClock
+            labelKey="ticket.detail.sla.resolution"
+            dueAt={ticket.sla.resolutionDueAt}
+            breached={ticket.sla.resolutionBreached}
+            policyName={ticket.slaPolicyName}
+          />
+        </div>
+
+        <Separator />
+
+        <dl className="text-meta flex flex-wrap gap-x-6 gap-y-1">
+          {metadata.map((item) => (
+            <div key={item.label} className="flex gap-1">
+              <dt className="text-ink-muted">{item.label}</dt>
+              <dd className="text-ink">{item.value}</dd>
+            </div>
+          ))}
+        </dl>
+      </CardContent>
+    </Card>
   );
 }

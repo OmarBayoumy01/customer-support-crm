@@ -101,13 +101,14 @@ describe('AC1 — four entry types', () => {
       ],
     });
 
-    // Alignment is the encoding AC1 asks for, and it is a logical property so
-    // that Arabic mirrors it without a second rule.
+    // Side is the encoding AC1 asks for. `flex-row-reverse` is writing-mode
+    // relative, so the agent stays on the end side in Arabic without a second
+    // rule — which is why it is used rather than a physical alignment.
     const customerEntry = screen.getByText('From the customer.').closest('li');
     const agentEntry = screen.getByText('From the agent.').closest('li');
 
-    expect(customerEntry?.className).toContain('items-start');
-    expect(agentEntry?.className).toContain('items-end');
+    expect(customerEntry?.className).not.toContain('flex-row-reverse');
+    expect(agentEntry?.className).toContain('flex-row-reverse');
   });
 });
 

@@ -8,6 +8,9 @@ import { TicketTimeline } from '@/components/domain/ticket-timeline';
 import { ErrorState } from '@/components/states/error-state';
 import { DetailSkeleton } from '@/components/states/skeletons';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { CustomerContextPanel } from './customer-context-panel';
 import { TicketConversation } from './ticket-conversation';
@@ -94,23 +97,31 @@ export function TicketDetailPage(): React.JSX.Element {
           scrolling means the composer stays at the foot of the column rather
           than at the foot of the page, which is AC3's actual requirement.
         */}
-        <section
+        {/*
+          `role` rather than a <section> element: shadcn's Card is a div and has
+          no `asChild`, and a labelled region is the same landmark to a screen
+          reader either way.
+        */}
+        <Card
+          role="region"
           aria-label={t('ticket.detail.conversation.title')}
-          className="border-line bg-card flex min-h-[28rem] flex-col rounded-md border"
+          className="min-h-[32rem] gap-0 overflow-hidden py-0 lg:max-h-[calc(100vh-20rem)]"
         >
-          <div className="flex-1 overflow-y-auto p-4">
-            <TicketConversation
-              messages={thread}
-              description={ticket.description}
-              createdAt={ticket.createdAt}
-              customerName={`${ticket.customer.firstName} ${ticket.customer.lastName}`}
-              messageCount={ticket.messageCount}
-              onLoadEarlier={() => {
-                void earlier.fetchNextPage();
-              }}
-              isLoadingEarlier={earlier.isFetching}
-            />
-          </div>
+          <ScrollArea className="flex-1">
+            <div className="p-4">
+              <TicketConversation
+                messages={thread}
+                description={ticket.description}
+                createdAt={ticket.createdAt}
+                customerName={`${ticket.customer.firstName} ${ticket.customer.lastName}`}
+                messageCount={ticket.messageCount}
+                onLoadEarlier={() => {
+                  void earlier.fetchNextPage();
+                }}
+                isLoadingEarlier={earlier.isFetching}
+              />
+            </div>
+          </ScrollArea>
 
           {/*
             The dock. Empty until US-1, which owns replying and adding an
@@ -118,44 +129,53 @@ export function TicketDetailPage(): React.JSX.Element {
             is about where the composer sits and a layout that only becomes
             correct three stories later is a layout nobody has seen.
           */}
-          <div className="border-line text-meta text-ink-muted border-t p-4">
+          <Separator />
+
+          <div className="text-meta text-ink-muted bg-secondary/30 p-4">
             {t('ticket.detail.composerPending')}
           </div>
-        </section>
+        </Card>
 
         {!collapsed && (
-          <aside
+          <Card
+            role="complementary"
             aria-label={t('ticket.detail.context.title')}
-            className="border-line bg-card h-fit rounded-md border"
+            className="h-fit gap-0 overflow-hidden py-0"
           >
-            <div className="border-line flex items-center justify-between border-b px-4 py-2">
-              <h2 className="text-meta text-ink font-medium">{t('ticket.detail.context.title')}</h2>
+            <CardHeader className="flex-row items-center justify-between gap-2 px-4 py-2">
+              <CardTitle className="text-meta text-ink">
+                {t('ticket.detail.context.title')}
+              </CardTitle>
               <Button
                 variant="ghost"
-                size="sm"
-                className="h-7 px-2"
+                size="icon"
+                className="size-7"
                 onClick={() => {
                   setCollapsed(true);
                 }}
                 aria-label={t('ticket.detail.context.collapse')}
               >
-                <PanelRightClose aria-hidden="true" className="size-4 rtl:rotate-180" />
+                <PanelRightClose aria-hidden="true" className="rtl:rotate-180" />
               </Button>
-            </div>
+            </CardHeader>
 
-            <CustomerContextPanel
-              customer={customer.data}
-              isLoading={customer.isPending}
-              recentTickets={recent.data}
-            />
+            <Separator />
 
-            <div className="border-line border-t p-4">
-              <h3 className="text-meta text-ink-muted mb-2 font-medium tracking-wide uppercase">
-                {t('ticket.history.title')}
-              </h3>
-              <TicketTimeline entries={ticket.history} />
-            </div>
-          </aside>
+            <CardContent className="p-0">
+              <CustomerContextPanel
+                customer={customer.data}
+                isLoading={customer.isPending}
+                recentTickets={recent.data}
+              />
+
+              <section className="p-4">
+                <h3 className="text-meta text-ink-muted mb-2 font-medium tracking-wide uppercase">
+                  {t('ticket.history.title')}
+                </h3>
+                <TicketTimeline entries={ticket.history} />
+              </section>
+            </CardContent>
+          </Card>
         )}
       </div>
 

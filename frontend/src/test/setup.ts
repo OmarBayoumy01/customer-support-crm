@@ -48,6 +48,28 @@ stub('hasPointerCapture', () => false);
 stub('setPointerCapture', () => undefined);
 stub('releasePointerCapture', () => undefined);
 
+/**
+ * `matchMedia`, which jsdom does not implement at all.
+ *
+ * shadcn's sidebar asks it whether this is a phone. Everything under test here
+ * is the desktop layout, so it answers no and never notifies — a component that
+ * changed behaviour halfway through a test because a stub fired would be worse
+ * than one that never varies.
+ */
+if (typeof window.matchMedia !== 'function') {
+  window.matchMedia = (query: string): MediaQueryList =>
+    ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: () => undefined,
+      removeListener: () => undefined,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+      dispatchEvent: () => false,
+    }) as MediaQueryList;
+}
+
 afterEach(() => {
   cleanup();
 

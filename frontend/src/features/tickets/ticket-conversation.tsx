@@ -14,6 +14,8 @@ import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Channel, TicketAttachment, TicketMessage } from '@crm/shared';
 
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -50,14 +52,50 @@ function AttachmentChip({ attachment }: { attachment: TicketAttachment }): React
   const Icon = attachment.contentType.startsWith('image/') ? Image : FileText;
 
   return (
-    <span
-      className="border-line bg-card text-meta text-ink-muted inline-flex max-w-full items-center gap-1.5 rounded border px-2 py-1"
+    <Badge
+      variant="outline"
+      className="bg-card text-ink-muted max-w-full rounded-md py-1 font-normal"
       title={t('ticket.detail.conversation.downloadPending')}
     >
-      <Icon aria-hidden="true" className="size-3.5 shrink-0" />
+      <Icon aria-hidden="true" className="shrink-0" />
       <span className="text-ink truncate">{attachment.fileName}</span>
       <span className="tabular shrink-0">{formatSize(attachment.sizeBytes)}</span>
-    </span>
+    </Badge>
+  );
+}
+
+/**
+ * Who wrote it.
+ *
+ * Initials rather than a silhouette: the platform has no avatar uploads, and a
+ * generic icon repeated down a thread distinguishes nobody. The customer and
+ * the agent are also tinted differently, which is one more encoding on top of
+ * the side the bubble sits on.
+ */
+function Author({
+  name,
+  fromCustomer,
+}: {
+  name: string;
+  fromCustomer: boolean;
+}): React.JSX.Element {
+  return (
+    <Avatar className="size-7 shrink-0">
+      <AvatarFallback
+        className={cn(
+          'text-[0.625rem] font-medium',
+          fromCustomer ? 'bg-secondary text-ink-muted' : 'bg-brand-soft text-accent',
+        )}
+      >
+        {name
+          .split(' ')
+          .filter(Boolean)
+          .slice(0, 2)
+          .map((part) => part.charAt(0))
+          .join('')
+          .toUpperCase() || '?'}
+      </AvatarFallback>
+    </Avatar>
   );
 }
 
@@ -221,11 +259,18 @@ export function TicketConversation({
           );
         }
 
+        const author = message.authorName ?? t('ticket.detail.conversation.unknownAuthor');
+
         return (
           <li
             key={message.id}
-            className={cn('flex flex-col', fromCustomer ? 'items-start' : 'items-end')}
+            className={cn(
+              'flex items-start gap-2',
+              fromCustomer ? 'justify-start' : 'flex-row-reverse justify-start',
+            )}
           >
+            <Author name={author} fromCustomer={fromCustomer} />
+
             <div
               className={cn(
                 'max-w-[85%] min-w-0 rounded-md border p-3',
@@ -235,7 +280,7 @@ export function TicketConversation({
               )}
             >
               <p className="text-meta text-ink-muted mb-1 flex flex-wrap items-center gap-x-2">
-                <span>{message.authorName ?? t('ticket.detail.conversation.unknownAuthor')}</span>
+                <span className="text-ink font-medium">{author}</span>
                 <span aria-hidden="true">·</span>
                 <time dateTime={message.createdAt}>{time(message.createdAt)}</time>
                 {message.channel !== null && (

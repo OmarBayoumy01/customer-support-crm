@@ -10,7 +10,7 @@ export function AdminPage(): React.JSX.Element {
   const { t } = useTranslation();
 
   return (
-    <div className="mx-auto max-w-4xl space-y-3 p-6">
+    <div className="mx-auto max-w-4xl space-y-3">
       <h1 className="text-page font-semibold">{t('nav.administration')}</h1>
       <p className="text-ink-muted">{t('admin.placeholder')}</p>
     </div>

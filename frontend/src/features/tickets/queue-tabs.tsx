@@ -2,6 +2,8 @@ import { AlertTriangle, ArrowUpCircle, CheckCircle2, Inbox, UserRound, UserX } f
 import { useTranslation } from 'react-i18next';
 import { TICKET_VIEWS, type TicketCounts, type TicketView } from '@crm/shared';
 
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 
 const VIEW_ICON: Record<TicketView, typeof Inbox> = {
@@ -27,11 +29,12 @@ export interface QueueTabsProps {
  * assemble. The count is the point: "Breached SLA" with a 3 beside it is a
  * decision, and the same tab with nothing beside it is a reassurance.
  *
- * A real `tablist`, so arrow keys move between tabs — the queue is a screen
- * people live in, and living in a screen means using the keyboard.
+ * Radix's `Tabs` underneath, so arrow keys move between tabs and the roving
+ * tabindex is somebody else's problem. The queue is a screen people live in,
+ * and living in a screen means using the keyboard.
  *
- * The active tab is marked by weight, an underline **and** `aria-selected`.
- * Never by colour alone.
+ * The active tab is marked by ground, weight **and** `aria-selected` — Radix
+ * supplies the last of those. Never by colour alone.
  */
 export function QueueTabs({
   view,
@@ -42,47 +45,38 @@ export function QueueTabs({
   const { t } = useTranslation();
 
   return (
-    <div
-      role="tablist"
-      aria-label={t('ticket.queue.views')}
-      className={cn('border-line -mb-px flex items-end gap-1 overflow-x-auto border-b', className)}
+    <Tabs
+      value={view}
+      onValueChange={(next) => {
+        onChange(next as TicketView);
+      }}
+      className={className}
     >
-      {TICKET_VIEWS.map((candidate) => {
-        const Icon = VIEW_ICON[candidate];
-        const active = candidate === view;
-        const count = counts?.[candidate];
+      <TabsList aria-label={t('ticket.queue.views')} className="h-auto w-full justify-start p-1">
+        {TICKET_VIEWS.map((candidate) => {
+          const Icon = VIEW_ICON[candidate];
+          const count = counts?.[candidate];
+          const active = candidate === view;
 
-        return (
-          <button
-            key={candidate}
-            type="button"
-            role="tab"
-            aria-selected={active}
-            onClick={() => {
-              onChange(candidate);
-            }}
-            className={cn(
-              'text-meta focus-visible:ring-ring inline-flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:outline-none',
-              active
-                ? 'border-b-accent text-ink font-medium'
-                : 'text-ink-muted hover:text-ink border-b-transparent',
-            )}
-          >
-            <Icon aria-hidden="true" className="size-3.5" />
-            {t(`ticket.queue.view.${candidate}`)}
-            {count !== undefined && (
-              <span
-                className={cn(
-                  'tabular rounded-full px-1.5 py-0.5 text-[0.6875rem] leading-none',
-                  active ? 'bg-accent/10 text-accent' : 'bg-secondary text-ink-muted',
-                )}
-              >
-                {count}
-              </span>
-            )}
-          </button>
-        );
-      })}
-    </div>
+          return (
+            <TabsTrigger key={candidate} value={candidate} className="gap-1.5">
+              <Icon aria-hidden="true" className="size-3.5" />
+              {t(`ticket.queue.view.${candidate}`)}
+              {count !== undefined && (
+                <Badge
+                  variant="secondary"
+                  className={cn(
+                    'tabular px-1.5 py-0 text-[0.6875rem]',
+                    active && 'bg-accent/10 text-accent',
+                  )}
+                >
+                  {count}
+                </Badge>
+              )}
+            </TabsTrigger>
+          );
+        })}
+      </TabsList>
+    </Tabs>
   );
 }

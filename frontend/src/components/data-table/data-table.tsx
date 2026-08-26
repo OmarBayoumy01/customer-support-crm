@@ -4,6 +4,14 @@ import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { EmptyState, NoResultsState } from '@/components/states/empty-state';
 import { ErrorState } from '@/components/states/error-state';
 import { TableSkeleton } from '@/components/states/skeletons';
@@ -184,35 +192,36 @@ export function DataTable<TRow>({
       ) : null}
 
       {/*
-        AC3 — the wrapper scrolls, not the page, and the table keeps a minimum
-        width so columns stay legible rather than being squeezed to fit.
+        AC3 — the wrapper scrolls, not the page. shadcn's `Table` brings its own
+        `overflow-x-auto` container; the minimum width is ours, so columns stay
+        legible rather than being squeezed to fit.
       */}
-      <div className="border-line overflow-x-auto rounded-md border">
-        <table className="w-full min-w-3xl border-collapse">
-          <thead className="bg-secondary/50">
-            <tr className="border-line border-b">
+      <div className="border-line bg-card overflow-hidden rounded-lg border">
+        <Table className="min-w-3xl">
+          <TableHeader className="bg-secondary/40">
+            <TableRow className="hover:bg-transparent">
               {selectable ? (
-                <th scope="col" className="w-10 ps-3">
+                <TableHead scope="col" className="w-10 ps-3">
                   <Checkbox
                     checked={allOnPage ? true : someOnPage ? 'indeterminate' : false}
                     onCheckedChange={toggleAll}
                     aria-label={t('table.selectAll')}
                   />
-                </th>
+                </TableHead>
               ) : null}
 
               {columns.map((column) => {
                 const active = sort === column.key;
 
                 return (
-                  <th
+                  <TableHead
                     key={column.key}
                     scope="col"
                     // Announced, so a screen-reader user knows the order they
                     // are reading rows in.
                     aria-sort={active ? (dir === 'asc' ? 'ascending' : 'descending') : 'none'}
                     className={cn(
-                      'text-meta text-ink-muted px-3 py-2 font-medium',
+                      'text-meta text-ink-muted h-9 font-medium',
                       column.align === 'end' ? 'text-end' : 'text-start',
                       column.className,
                     )}
@@ -223,7 +232,7 @@ export function DataTable<TRow>({
                         onClick={() => {
                           onSortChange(column.key);
                         }}
-                        className="hover:text-ink inline-flex items-center gap-1"
+                        className="hover:text-ink focus-visible:ring-ring -mx-1 inline-flex items-center gap-1 rounded px-1 focus-visible:ring-2 focus-visible:outline-none"
                       >
                         {column.header}
                         <SortIcon active={active} dir={dir} />
@@ -231,19 +240,19 @@ export function DataTable<TRow>({
                     ) : (
                       column.header
                     )}
-                  </th>
+                  </TableHead>
                 );
               })}
-            </tr>
-          </thead>
+            </TableRow>
+          </TableHeader>
 
-          <tbody className="divide-line divide-y">
+          <TableBody>
             {rows.map((row) => {
               const key = rowKey(row);
               const isSelected = selected?.has(key) === true;
 
               return (
-                <tr
+                <TableRow
                   key={key}
                   data-state={isSelected ? 'selected' : undefined}
                   onClick={
@@ -254,14 +263,13 @@ export function DataTable<TRow>({
                         }
                   }
                   className={cn(
-                    'hover:bg-secondary/60 transition-colors',
-                    isSelected && 'bg-brand-soft/50',
+                    'data-[state=selected]:bg-brand-soft/50',
                     onRowClick !== undefined && 'cursor-pointer',
                     rowClassName?.(row),
                   )}
                 >
                   {selectable ? (
-                    <td
+                    <TableCell
                       className="ps-3"
                       // The checkbox is not a way into the row.
                       onClick={(event) => {
@@ -283,26 +291,26 @@ export function DataTable<TRow>({
                           onSelectedChange(next);
                         }}
                       />
-                    </td>
+                    </TableCell>
                   ) : null}
 
                   {columns.map((column) => (
-                    <td
+                    <TableCell
                       key={column.key}
                       className={cn(
-                        'text-body px-3 py-2.5',
+                        'text-body py-2.5',
                         column.align === 'end' ? 'text-end' : 'text-start',
                         column.className,
                       )}
                     >
                       {column.cell(row)}
-                    </td>
+                    </TableCell>
                   ))}
-                </tr>
+                </TableRow>
               );
             })}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </div>
     </div>
   );

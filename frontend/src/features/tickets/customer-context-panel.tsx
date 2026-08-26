@@ -4,6 +4,9 @@ import { Link } from 'react-router';
 import type { Customer, Ticket } from '@crm/shared';
 
 import { StatusBadge } from '@/components/domain/indicators';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 
@@ -15,10 +18,15 @@ function Section({
   children: React.ReactNode;
 }): React.JSX.Element {
   return (
-    <section className="border-line border-b p-4 last:border-b-0">
-      <h3 className="text-meta text-ink-muted mb-2 font-medium tracking-wide uppercase">{title}</h3>
-      {children}
-    </section>
+    <>
+      <section className="p-4">
+        <h3 className="text-meta text-ink-muted mb-2 font-medium tracking-wide uppercase">
+          {title}
+        </h3>
+        {children}
+      </section>
+      <Separator className="last:hidden" />
+    </>
   );
 }
 
@@ -67,12 +75,24 @@ export function CustomerContextPanel({
     <div className={className}>
       <Section title={t('ticket.detail.context.customer')}>
         <div className="space-y-2">
-          <div className="flex items-start gap-2">
-            <Icon aria-hidden="true" className="text-ink-faint mt-0.5 size-4 shrink-0" />
+          <div className="flex items-center gap-2.5">
+            <Avatar className="size-9">
+              <AvatarFallback className="text-meta">
+                {/*
+                  Initials, not a photograph. The platform has no avatar
+                  uploads, and a generic silhouette on every row says nothing —
+                  two letters at least distinguish one person from another.
+                */}
+                {initials(customer.firstName, customer.lastName)}
+              </AvatarFallback>
+            </Avatar>
             <div className="min-w-0">
               <p className="text-body text-ink font-medium">{displayName}</p>
               {customer.companyName !== null && (
-                <p className="text-meta text-ink-muted">{customer.companyName}</p>
+                <p className="text-meta text-ink-muted flex items-center gap-1">
+                  <Icon aria-hidden="true" className="size-3 shrink-0" />
+                  {customer.companyName}
+                </p>
               )}
             </div>
           </div>
@@ -80,15 +100,18 @@ export function CustomerContextPanel({
           <div className="flex flex-wrap gap-1.5">
             {customer.isVip && (
               // Text plus icon, like every other status on this platform.
-              <span className="text-meta text-sla-warn bg-sla-warn-soft border-sla-warn/25 inline-flex items-center gap-1 rounded-full border px-2 py-0.5">
-                <Star aria-hidden="true" className="size-3" />
+              <Badge
+                variant="outline"
+                className="text-sla-warn bg-sla-warn-soft border-sla-warn/25"
+              >
+                <Star aria-hidden="true" />
                 {t('ticket.detail.context.vip')}
-              </span>
+              </Badge>
             )}
             {!customer.isActive && (
-              <span className="text-meta text-ink-muted border-line inline-flex items-center rounded-full border px-2 py-0.5">
+              <Badge variant="outline" className="text-ink-muted font-normal">
                 {t('ticket.detail.context.inactive')}
-              </span>
+              </Badge>
             )}
           </div>
 
@@ -174,4 +197,9 @@ export function CustomerContextPanel({
       </Section>
     </div>
   );
+}
+
+/** Two letters, uppercased. Enough to tell one person from another at a glance. */
+function initials(firstName: string, lastName: string): string {
+  return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
 }

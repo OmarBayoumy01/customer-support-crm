@@ -1,6 +1,7 @@
 import { X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
+import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
 export interface FilterChip {
@@ -35,9 +36,9 @@ export function FilterChips({ chips, onRemove, className }: FilterChipsProps): R
     <ul className={cn('flex flex-wrap items-center gap-1.5', className)}>
       {chips.map((chip) => (
         <li key={chip.key}>
-          <span className="border-line bg-secondary text-meta text-ink inline-flex items-center gap-1 rounded-full border py-0.5 ps-2 pe-1">
+          <Badge variant="secondary" className="py-0.5 ps-2 pe-1 font-normal">
             <span className="text-ink-muted">{chip.label}</span>
-            {chip.value}
+            <span className="text-ink">{chip.value}</span>
             <button
               type="button"
               onClick={() => {
@@ -49,9 +50,9 @@ export function FilterChips({ chips, onRemove, className }: FilterChipsProps): R
               })}
               className="hover:bg-line focus-visible:ring-ring rounded-full p-0.5 focus-visible:ring-2 focus-visible:outline-none"
             >
-              <X aria-hidden="true" className="size-3" />
+              <X aria-hidden="true" />
             </button>
-          </span>
+          </Badge>
         </li>
       ))}
     </ul>

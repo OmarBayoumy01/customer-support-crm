@@ -17,7 +17,7 @@ export function DashboardPage(): React.JSX.Element {
   const name = user === null ? '' : `${user.firstName} ${user.lastName}`;
 
   return (
-    <div className="mx-auto max-w-4xl space-y-4 p-6">
+    <div className="mx-auto max-w-4xl space-y-4">
       <h1 className="text-page font-semibold">{t('dashboard.title')}</h1>
       <p>{t('dashboard.greeting', { name })}</p>
 

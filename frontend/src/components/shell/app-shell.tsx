@@ -1,63 +1,66 @@
 import { useAtom } from 'jotai';
 import type { ReactNode } from 'react';
-import { useTranslation } from 'react-i18next';
 
-import { isRtl } from '@/i18n';
-
-import { mobileNavOpenAtom } from '@/app/shell-state';
-import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
+import { sidebarCollapsedAtom } from '@/app/shell-state';
+import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Header } from './header';
-import { Sidebar } from './sidebar';
+import { AppSidebar } from './sidebar';
 
 /**
  * Sidebar, header, content — US-28.
  *
- * **AC6 costs nothing here.** The sidebar is first in the DOM inside a flex
- * row, and a flex row respects the document's `dir`, so in Arabic it moves to
- * the right on its own. Every inset in the tree is a logical property, so the
- * mirror is a swap rather than a second stylesheet. There is a test that fails
- * if a physical direction appears in a rendered class.
+ * Built on shadcn's `SidebarProvider`, which owns the collapse state, the
+ * mobile drawer, the icon rail and the `⌘B` shortcut. Those were three separate
+ * hand-rolled mechanisms before, each of which had to be kept in step with the
+ * others; now they are one.
  *
- * The main region scrolls, not the page: an agent working a long ticket thread
- * should not lose the header and the queue they came from.
+ * **The persisted preference is still ours.** The provider is driven as a
+ * controlled component from `sidebarCollapsedAtom` rather than from shadcn's
+ * cookie, because AC3 wants the choice to survive a reload and the atom already
+ * did that — and because the app has one storage story, not two.
+ *
+ * **AC6 costs nothing.** `ui/sidebar.tsx` resolves `side` to
+ * `inset-inline-start`, so in Arabic the panel and its drawer move to the right
+ * with no directional style in this tree. There is a test that fails if a
+ * physical direction appears in a rendered class.
  */
 export function AppShell({ children }: { children: ReactNode }): React.JSX.Element {
-  const { t, i18n } = useTranslation();
-  const [mobileOpen, setMobileOpen] = useAtom(mobileNavOpenAtom);
-
-  /**
-   * Radix's `side` is physical, so the logical one is computed. The drawer has
-   * to come from the same edge the sidebar lives on, and that edge changes with
-   * the language — a drawer sliding in from the left in Arabic would be coming
-   * from the far side of the screen.
-   */
-  const drawerSide = isRtl(i18n.language) ? ('right' as const) : ('left' as const);
+  const [collapsed, setCollapsed] = useAtom(sidebarCollapsedAtom);
 
   return (
     <TooltipProvider delayDuration={300}>
-      <div className="bg-ground flex h-screen overflow-hidden">
-        {/* Below `lg` the sidebar becomes a drawer — see the sheet below. */}
-        <Sidebar className="hidden lg:flex" />
+      <SidebarProvider
+        open={!collapsed}
+        onOpenChange={(open) => {
+          setCollapsed(!open);
+        }}
+      >
+        <AppSidebar />
 
-        <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-          <SheetContent side={drawerSide} className="w-60 p-0">
-            <SheetTitle className="sr-only">{t('nav.label')}</SheetTitle>
-            <Sidebar className="w-full border-e-0" />
-          </SheetContent>
-        </Sheet>
-
-        <div className="flex min-w-0 flex-1 flex-col">
+        <SidebarInset className="min-w-0">
           <Header />
 
           {/*
-            `min-w-0` on the column above and `overflow-auto` here are what stop
-            a wide data table from stretching the shell instead of scrolling
-            inside it — the single most common way a layout like this breaks.
+            The main region scrolls, not the page: an agent working a long
+            ticket thread should not lose the header and the queue they came
+            from.
+
+            `min-w-0` on the inset and `overflow-auto` here are what stop a wide
+            data table from stretching the shell instead of scrolling inside it
+            — the single most common way a layout like this breaks.
           */}
-          <main className="flex-1 overflow-auto">{children}</main>
-        </div>
-      </div>
+          <main className="min-w-0 flex-1 overflow-auto">
+            {/*
+              The content gutter. Generous rather than tight, and capped: a
+              queue stretched across an ultrawide monitor is unreadable, and a
+              ticket thread at that width is worse. `mx-auto` centres what is
+              left.
+            */}
+            <div className="mx-auto w-full max-w-[100rem] p-4 md:p-6">{children}</div>
+          </main>
+        </SidebarInset>
+      </SidebarProvider>
     </TooltipProvider>
   );
 }
