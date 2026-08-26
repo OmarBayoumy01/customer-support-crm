@@ -7,7 +7,23 @@
     "signOutEverywhere": "Sign out everywhere",
     "create": "Create",
     "createTicket": "New ticket",
-    "createCustomer": "New customer"
+    "createCustomer": "New customer",
+    "cancel": "Cancel",
+    "working": "Working…",
+    "search": "Search",
+    "searchIn": "Search {{what}}",
+    "noMatches": "No matches",
+    "clearSearch": "Clear search",
+    "filters": "Filters",
+    "clearFilters_zero": "Clear",
+    "clearFilters_one": "Clear 1 filter",
+    "clearFilters_other": "Clear {{count}} filters",
+    "pagination": "Pagination",
+    "pageOf": "Page {{page}} of {{totalPages}}",
+    "resultCount_one": "{{count}} result",
+    "resultCount_other": "{{count}} results",
+    "previous": "Previous",
+    "next": "Next"
   },
   "nav": {
     "label": "Main navigation",
@@ -88,7 +104,12 @@
     "feedback": "Feedback",
     "accentLabel": "Try a brand accent",
     "accentHint": "Changes the accent at runtime, with no rebuild.",
-    "reset": "Reset"
+    "reset": "Reset",
+    "composites": "Shared components",
+    "assignee": "Assignee",
+    "unassigned": "Unassigned",
+    "resolveExample": "Resolve ticket",
+    "resolveExampleBody": "The customer will be told the ticket is resolved."
   },
   "admin": {
     "placeholder": "Administration screens arrive with their own stories."

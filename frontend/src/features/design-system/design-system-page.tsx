@@ -1,6 +1,10 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { Combobox } from '@/components/common/combobox';
+import { ConfirmDialog } from '@/components/common/confirm-dialog';
+import { FilterBar } from '@/components/common/filter-bar';
+import { ListPagination } from '@/components/common/list-pagination';
 import { PriorityBadge, SlaMeter, slaEdgeClass, StatusBadge } from '@/components/domain/indicators';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -50,6 +54,12 @@ function Swatch({ name, className }: { name: string; className: string }): React
 export function DesignSystemPage(): React.JSX.Element {
   const { t } = useTranslation();
   const [accent, setAccent] = useState(DEFAULT_ACCENT);
+  const [search, setSearch] = useState('');
+  const [assignee, setAssignee] = useState<string | null>(null);
+  const [filters, setFilters] = useState<Record<string, string | null>>({
+    status: null,
+    priority: null,
+  });
 
   return (
     <div className="mx-auto max-w-4xl space-y-8 p-6">
@@ -163,6 +173,72 @@ export function DesignSystemPage(): React.JSX.Element {
               <p className="text-sla-breach text-meta">Enter a valid email address</p>
             </div>
           </div>
+        </div>
+      </Section>
+
+      {/*
+        The composites the vertical slice consumes — US-27, narrowed. Shown as a
+        queue toolbar because that is exactly where they are used together.
+      */}
+      <Section title={t('designSystem.composites')}>
+        <div className="bg-paper border-line space-y-4 rounded-md border p-4">
+          <FilterBar
+            filters={[
+              {
+                key: 'status',
+                label: t('ticket.status.open'),
+                options: [
+                  { value: 'OPEN', label: t('ticket.status.open') },
+                  { value: 'ESCALATED', label: t('ticket.status.escalated') },
+                ],
+              },
+              {
+                key: 'priority',
+                label: t('ticket.priority.high'),
+                options: [
+                  { value: 'HIGH', label: t('ticket.priority.high') },
+                  { value: 'URGENT', label: t('ticket.priority.urgent') },
+                ],
+              },
+            ]}
+            values={filters}
+            onChange={(key, value) => {
+              setFilters((current) => ({ ...current, [key]: value }));
+            }}
+            onClear={() => {
+              setFilters({ status: null, priority: null });
+            }}
+            search={{ value: search, onChange: setSearch, label: t('nav.searchPlaceholder') }}
+          />
+
+          <Separator />
+
+          <div className="flex flex-wrap items-center gap-3">
+            <Combobox
+              id="ds-assignee"
+              label={t('designSystem.assignee')}
+              placeholder={t('designSystem.unassigned')}
+              options={[
+                { value: 'aisha', label: 'Aisha Haddad' },
+                { value: 'marcus', label: 'Marcus Webb' },
+              ]}
+              value={assignee}
+              onChange={setAssignee}
+              className="w-56"
+            />
+
+            <ConfirmDialog
+              trigger={<Button variant="outline">{t('designSystem.resolveExample')}</Button>}
+              title={t('designSystem.resolveExample')}
+              description={t('designSystem.resolveExampleBody')}
+              confirmLabel={t('designSystem.resolveExample')}
+              onConfirm={() => undefined}
+            />
+          </div>
+
+          <Separator />
+
+          <ListPagination page={2} totalPages={5} total={91} onPageChange={() => undefined} />
         </div>
       </Section>
 

@@ -7,7 +7,23 @@
     "signOutEverywhere": "تسجيل الخروج من كل الأجهزة",
     "create": "إنشاء",
     "createTicket": "تذكرة جديدة",
-    "createCustomer": "عميل جديد"
+    "createCustomer": "عميل جديد",
+    "cancel": "إلغاء",
+    "working": "جارٍ التنفيذ…",
+    "search": "بحث",
+    "searchIn": "ابحث في {{what}}",
+    "noMatches": "لا توجد نتائج",
+    "clearSearch": "مسح البحث",
+    "filters": "عوامل التصفية",
+    "clearFilters_zero": "مسح",
+    "clearFilters_one": "مسح عامل تصفية واحد",
+    "clearFilters_other": "مسح {{count}} عوامل تصفية",
+    "pagination": "التنقل بين الصفحات",
+    "pageOf": "صفحة {{page}} من {{totalPages}}",
+    "resultCount_one": "نتيجة واحدة",
+    "resultCount_other": "{{count}} نتائج",
+    "previous": "السابق",
+    "next": "التالي"
   },
   "nav": {
     "label": "التنقل الرئيسي",
@@ -88,7 +104,12 @@
     "feedback": "التنبيهات",
     "accentLabel": "جرّب لون العلامة",
     "accentHint": "يغيّر اللون فورًا دون إعادة بناء.",
-    "reset": "إعادة الضبط"
+    "reset": "إعادة الضبط",
+    "composites": "المكوّنات المشتركة",
+    "assignee": "المسؤول",
+    "unassigned": "غير مُسند",
+    "resolveExample": "حل التذكرة",
+    "resolveExampleBody": "سيتم إبلاغ العميل بأن التذكرة قد حُلّت."
   },
   "admin": {
     "placeholder": "شاشات الإدارة تأتي مع قصصها الخاصة."
