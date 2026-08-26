@@ -75,8 +75,14 @@ npm run db:seed --workspace @crm/backend
 Idempotent — safe to run again, and it runs on every `prisma migrate reset`. It creates:
 
 - 34 permissions and the four system roles (administrator, manager, agent, customer)
+- **Five SLA policies** — one per priority plus a VIP override, each with a three-rung
+  escalation ladder. These are reference data and are created in every environment.
 - **Four development users**, but only when `SEED_PASSWORD` is set and `NODE_ENV` is not
   `production`. Without that variable it creates no users and says so.
+- **The demonstration data set**, behind the same two guards: 2 branches, 3 departments,
+  6 categories, 5 more staff, 5 customers, 14 tickets with real conversations,
+  attachments, tasks and 3 knowledge articles. Roughly a third of it is in Arabic, so RTL
+  can be checked against something other than lorem ipsum.
 
 ### Development accounts
 
@@ -93,6 +99,22 @@ Password is whatever `SEED_PASSWORD` is set to — `DevPassw0rd!` in
 These exist only because a helpdesk with no accounts cannot be signed into. The seed
 **refuses to create them when `NODE_ENV=production`**, and it never overwrites a password
 on re-run — so changing yours locally sticks.
+
+### Demo staff
+
+The demonstration data adds five more accounts, same password, same guards. Sign in as one
+of these to see a queue that actually belongs to somebody:
+
+| Email                     | Role    | Department       |
+| ------------------------- | ------- | ---------------- |
+| `nadia.saleh@crm.local`   | agent   | Customer Support |
+| `tom.becker@crm.local`    | agent   | Customer Support |
+| `huda.mansour@crm.local`  | agent   | Billing          |
+| `priya.raman@crm.local`   | agent   | Technical        |
+| `khalid.otaibi@crm.local` | manager | Technical        |
+
+Everything in the demo set is invented — names, companies, order numbers, amounts. Nothing
+is taken from a real customer.
 
 ---
 

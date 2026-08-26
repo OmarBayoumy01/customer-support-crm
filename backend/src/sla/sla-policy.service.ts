@@ -3,6 +3,7 @@ import type { CreateSlaPolicy, SlaPolicy, SlaTicketFacts, UpdateSlaPolicy } from
 
 import { AuditService } from '../audit/index.js';
 import { PrismaService } from '../prisma/index.js';
+import { SLA_CANDIDATE_ORDER, slaCandidateWhere } from './sla-matching.js';
 import { specificityOf } from './sla-specificity.js';
 import type { Prisma } from '../generated/prisma/client.js';
 
@@ -101,24 +102,8 @@ export class SlaPolicyService {
    */
   async resolveFor(facts: SlaTicketFacts): Promise<SlaPolicy | null> {
     const row = await this.prisma.slaPolicy.findFirst({
-      where: {
-        isActive: true,
-        deletedAt: null,
-        // Each line reads: this policy does not care, or it agrees with the
-        // ticket. Written as OR pairs so the whole thing stays one indexed
-        // query rather than a fetch-then-filter, which the project's second
-        // non-negotiable rule requires of anything scoped and is simply correct
-        // here regardless.
-        AND: [
-          { OR: [{ priority: null }, { priority: facts.priority }] },
-          { OR: [{ categoryId: null }, { categoryId: facts.categoryId }] },
-          { OR: [{ departmentId: null }, { departmentId: facts.departmentId }] },
-          { OR: [{ branchId: null }, { branchId: facts.branchId }] },
-          { OR: [{ customerType: null }, { customerType: facts.customerType }] },
-          { OR: [{ customerIsVip: null }, { customerIsVip: facts.customerIsVip }] },
-        ],
-      },
-      orderBy: [{ specificity: 'desc' }, { createdAt: 'asc' }],
+      where: slaCandidateWhere(facts),
+      orderBy: SLA_CANDIDATE_ORDER,
       select: POLICY_SELECT,
     });
 

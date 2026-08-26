@@ -22,8 +22,8 @@ import argon2 from 'argon2';
 import { Pool } from 'pg';
 
 import { PERMISSION_CATALOGUE, SYSTEM_ROLES } from '../permissions/permission-catalogue.js';
-import { DEFAULT_SLA_POLICIES } from '../sla/default-policies.js';
-import { specificityOf } from '../sla/sla-specificity.js';
+import { seedDefaultSlaPolicies } from '../sla/seed-default-policies.js';
+import { seedDemoData } from './demo-seed.js';
 import { PrismaClient } from '../generated/prisma/client.js';
 
 /** One development account per system role, so every role can be tried by hand. */
@@ -109,70 +109,6 @@ async function seedDevelopmentUsers(prisma: PrismaClient): Promise<void> {
 
   console.log(`\n${String(DEVELOPMENT_USERS.length)} development users ready.`);
   console.log('Sign in with the password from SEED_PASSWORD.');
-}
-
-/**
- * The SLA policies a fresh installation starts with — US-67.
- *
- * Idempotent like everything else here, but there is no natural key to upsert
- * on: the identity of a policy *is* its set of matchers, and the unique index
- * enforcing that uses `NULLS NOT DISTINCT`, which Prisma has no schema syntax
- * for and so cannot target with `upsert`. So: look it up by its matchers,
- * update if found, create if not.
- *
- * The ladder is replaced wholesale on update for the same reason the service
- * does it — rungs are ordered and interdependent, and a half-updated ladder is
- * worse than either version of it.
- */
-async function seedSlaPolicies(prisma: PrismaClient): Promise<void> {
-  for (const policy of DEFAULT_SLA_POLICIES) {
-    const matchers = {
-      priority: policy.priority ?? null,
-      categoryId: policy.categoryId ?? null,
-      departmentId: policy.departmentId ?? null,
-      branchId: policy.branchId ?? null,
-      customerType: policy.customerType ?? null,
-      customerIsVip: policy.customerIsVip ?? null,
-    };
-
-    const steps = policy.escalationSteps.map((step) => ({
-      sequence: step.sequence,
-      clock: step.clock,
-      atPercent: step.atPercent,
-      notify: step.notify,
-      notifyUserId: step.notifyUserId ?? null,
-      changeStatusToEscalated: step.changeStatusToEscalated,
-    }));
-
-    const existing = await prisma.slaPolicy.findFirst({
-      where: { ...matchers, deletedAt: null },
-      select: { id: true },
-    });
-
-    const data = {
-      nameEn: policy.nameEn,
-      nameAr: policy.nameAr,
-      ...matchers,
-      specificity: specificityOf(matchers),
-      firstResponseMinutes: policy.firstResponseMinutes,
-      resolutionMinutes: policy.resolutionMinutes,
-      businessHoursOnly: policy.businessHoursOnly,
-      isActive: policy.isActive,
-    };
-
-    if (existing === null) {
-      await prisma.slaPolicy.create({
-        data: { ...data, escalationSteps: { create: steps } },
-      });
-    } else {
-      await prisma.slaPolicy.update({
-        where: { id: existing.id },
-        data: { ...data, escalationSteps: { deleteMany: {}, create: steps } },
-      });
-    }
-  }
-
-  console.log(`Seeded ${String(DEFAULT_SLA_POLICIES.length)} SLA policies.`);
 }
 
 async function seed(): Promise<void> {
@@ -276,7 +212,12 @@ async function seed(): Promise<void> {
     // The MVP defers the management UI, so this is where service commitments
     // come from. Without them every ticket resolves to no policy and the SLA
     // column reads `none` forever.
-    await seedSlaPolicies(prisma);
+    console.log(`Seeded ${String(await seedDefaultSlaPolicies(prisma))} SLA policies.`);
+
+    // --- Demonstration data (US-120) -----------------------------------------
+    // After the policies, because every demo ticket resolves one to get its
+    // deadlines. Guarded on NODE_ENV and SEED_PASSWORD, same as the users.
+    await seedDemoData(prisma);
 
     console.log('\nSeeding complete.');
   } finally {

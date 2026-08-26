@@ -244,32 +244,75 @@ test('AC2 — a policy whose matcher disagrees is not chosen', async () => {
 });
 
 test('AC2 — every dimension the criterion names can match', async () => {
-  const department = await newDepartment();
+  // Each case names one dimension and proves two things about it: a ticket that
+  // agrees resolves to the policy, and a ticket that disagrees on **that one
+  // field** does not.
+  //
+  // Every case also carries a priority and a department nobody else uses. Both
+  // are load-bearing. The department keeps the six-matcher tuple distinct from
+  // the seeded platform policies, which the unique index would otherwise refuse.
+  // The priority puts the case above the seeded policy for that priority, which
+  // would otherwise win on specificity and make the assertion read as a failure
+  // of matching when it is a success of ranking.
+  const anchor = await newDepartment();
+  const otherDepartment = await newDepartment();
   const branch = await newBranch();
+  const otherBranch = await newBranch();
 
-  for (const matcher of [
-    { priority: 'URGENT' as const },
-    { categoryId },
-    { departmentId: department },
-    { branchId: branch },
-    { customerType: 'COMPANY' as const },
-  ]) {
-    const id = await makePolicy({ ...matcher, resolutionMinutes: 4321 });
+  const base = { priority: 'URGENT' as const, departmentId: anchor };
+  const baseFacts = {
+    priority: 'URGENT' as const,
+    categoryId,
+    departmentId: anchor,
+    branchId: branch,
+    customerType: 'COMPANY' as const,
+  };
 
-    const resolved = await policies.resolveFor(
-      facts({
-        priority: 'URGENT',
-        categoryId,
-        departmentId: department,
-        branchId: branch,
-        customerType: 'COMPANY',
-      }),
+  const cases = [
+    { dimension: 'priority', matcher: base, disagrees: { priority: 'LOW' as const } },
+    {
+      dimension: 'categoryId',
+      matcher: { ...base, categoryId },
+      disagrees: { categoryId: null },
+    },
+    {
+      dimension: 'departmentId',
+      matcher: { priority: 'URGENT' as const, departmentId: otherDepartment },
+      disagrees: { departmentId: anchor },
+    },
+    {
+      dimension: 'branchId',
+      matcher: { ...base, branchId: branch },
+      disagrees: { branchId: otherBranch },
+    },
+    {
+      dimension: 'customerType',
+      matcher: { ...base, customerType: 'COMPANY' as const },
+      disagrees: { customerType: 'INDIVIDUAL' as const },
+    },
+  ];
+
+  for (const testCase of cases) {
+    const id = await makePolicy({ ...testCase.matcher, resolutionMinutes: 4321 });
+
+    const agreeing = await policies.resolveFor(
+      facts({ ...baseFacts, departmentId: testCase.matcher.departmentId }),
     );
 
     assert.equal(
-      resolved?.resolutionMinutes,
+      agreeing?.resolutionMinutes,
       4321,
-      `matching on ${Object.keys(matcher)[0]!} did not resolve`,
+      `matching on ${testCase.dimension} did not resolve`,
+    );
+
+    const disagreeing = await policies.resolveFor(
+      facts({ ...baseFacts, departmentId: testCase.matcher.departmentId, ...testCase.disagrees }),
+    );
+
+    assert.notEqual(
+      disagreeing?.resolutionMinutes,
+      4321,
+      `${testCase.dimension} was ignored when the ticket disagreed with it`,
     );
 
     // Removed again so the next iteration is not competing with this one.
