@@ -71,6 +71,8 @@ export const UpdateCustomerSchema = z.object({
   phone: PhoneSchema.nullable().optional(),
   companyName: z.string().trim().max(160).nullable().optional(),
   type: CustomerTypeSchema.optional(),
+  isVip: z.boolean().optional(),
+  notes: z.string().trim().max(4000).nullable().optional(),
   preferredLocale: LocaleSchema.optional(),
   preferredChannel: ChannelSchema.nullable().optional(),
   departmentId: z.string().uuid().nullable().optional(),
@@ -121,6 +123,10 @@ export const CustomerSchema = z.object({
   phone: z.string().nullable(),
   companyName: z.string().nullable(),
   type: CustomerTypeSchema,
+  /** US-67, AC3 — a VIP takes the VIP SLA policy over the general one. */
+  isVip: z.boolean(),
+  /** Standing context an agent keeps — US-45, AC4. */
+  notes: z.string().nullable(),
   preferredLocale: LocaleSchema,
   preferredChannel: ChannelSchema.nullable(),
   departmentId: z.string().nullable(),

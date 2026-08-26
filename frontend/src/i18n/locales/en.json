@@ -150,6 +150,43 @@
         "reopened": "Ticket reopened",
         "closed": "Ticket closed"
       }
+    },
+    "detail": {
+      "composerPending": "Replying arrives with the next story.",
+      "meta": {
+        "channel": "Channel",
+        "created": "Created"
+      },
+      "sla": {
+        "response": "First response",
+        "resolution": "Resolution",
+        "dueAt": "Due",
+        "policy": "Policy",
+        "noPolicy": "None"
+      },
+      "conversation": {
+        "title": "Conversation",
+        "internalNote": "Internal note",
+        "unknownAuthor": "Unknown"
+      },
+      "context": {
+        "title": "Context",
+        "collapse": "Collapse the context panel",
+        "expand": "Show context",
+        "customer": "Customer",
+        "vip": "VIP",
+        "inactive": "Inactive",
+        "email": "Email",
+        "phone": "Phone",
+        "fullProfile": "Full profile",
+        "history": "History",
+        "openTickets": "Open",
+        "totalTickets": "All time",
+        "recentTickets": "Other tickets",
+        "noOtherTickets": "This is their first ticket.",
+        "notes": "Notes",
+        "noNotes": "Nothing recorded yet."
+      }
     }
   },
   "states": {

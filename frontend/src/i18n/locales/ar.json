@@ -154,6 +154,43 @@
         "reopened": "تمت إعادة فتح التذكرة",
         "closed": "تم إغلاق التذكرة"
       }
+    },
+    "detail": {
+      "composerPending": "إمكانية الرد تأتي مع القصة التالية.",
+      "meta": {
+        "channel": "القناة",
+        "created": "تاريخ الإنشاء"
+      },
+      "sla": {
+        "response": "أول رد",
+        "resolution": "الحل",
+        "dueAt": "الموعد",
+        "policy": "السياسة",
+        "noPolicy": "لا توجد"
+      },
+      "conversation": {
+        "title": "المحادثة",
+        "internalNote": "ملاحظة داخلية",
+        "unknownAuthor": "غير معروف"
+      },
+      "context": {
+        "title": "السياق",
+        "collapse": "طيّ لوحة السياق",
+        "expand": "إظهار السياق",
+        "customer": "العميل",
+        "vip": "من كبار العملاء",
+        "inactive": "غير نشط",
+        "email": "البريد الإلكتروني",
+        "phone": "الهاتف",
+        "fullProfile": "الملف الكامل",
+        "history": "السجل",
+        "openTickets": "مفتوحة",
+        "totalTickets": "الإجمالي",
+        "recentTickets": "تذاكر أخرى",
+        "noOtherTickets": "هذه أول تذكرة له.",
+        "notes": "ملاحظات",
+        "noNotes": "لا توجد ملاحظات بعد."
+      }
     }
   },
   "states": {

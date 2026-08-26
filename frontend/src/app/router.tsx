@@ -24,6 +24,9 @@ const DashboardPage = lazy(async () => ({
 const TicketsQueuePage = lazy(async () => ({
   default: (await import('@/features/tickets/tickets-queue-page')).TicketsQueuePage,
 }));
+const TicketDetailPage = lazy(async () => ({
+  default: (await import('@/features/tickets/ticket-detail-page')).TicketDetailPage,
+}));
 const AdminPage = lazy(async () => ({
   default: (await import('@/features/admin/admin-page')).AdminPage,
 }));
@@ -73,6 +76,7 @@ export function AppRoutes(): React.JSX.Element {
             */}
             <Route element={<RequirePermission permission="ticket:view" />}>
               <Route path="/tickets" element={<TicketsQueuePage />} />
+              <Route path="/tickets/:id" element={<TicketDetailPage />} />
               <Route path="/tickets/mine" element={<Navigate to="/tickets?view=mine" replace />} />
             </Route>
 

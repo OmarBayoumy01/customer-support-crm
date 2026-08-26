@@ -1,0 +1,150 @@
+import { useAtom } from 'jotai';
+import { PanelRightClose, PanelRightOpen } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { useParams } from 'react-router';
+
+import { ticketContextCollapsedAtom } from '@/app/shell-state';
+import { TicketTimeline } from '@/components/domain/ticket-timeline';
+import { ErrorState } from '@/components/states/error-state';
+import { DetailSkeleton } from '@/components/states/skeletons';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+import { CustomerContextPanel } from './customer-context-panel';
+import { TicketConversation } from './ticket-conversation';
+import { TicketHeader } from './ticket-header';
+import { useCustomer, useCustomerTickets, useTicketDetail } from './use-ticket-detail';
+
+/**
+ * The ticket workspace — US-45. The visual centrepiece of the product.
+ *
+ * Three columns on a desktop, and the argument for each is the same: **an agent
+ * should never have to leave this page to answer a question about this ticket.**
+ * Navigating away to check whether the customer has called before loses the
+ * reply you were half-way through writing, and that is how a five-minute ticket
+ * becomes a twenty-minute one.
+ *
+ * - **Centre** — the conversation, which is what the agent is actually reading,
+ *   and the composer docked at its foot (US-1 fills the dock).
+ * - **End side** — customer context and the ticket's own history, collapsible
+ *   so the conversation can take the whole width when somebody is reading a
+ *   long thread.
+ * - **Above both** — the header, carrying everything AC6 says must never be
+ *   behind a dialog.
+ *
+ * On tablet and mobile the columns stack: the header, then the conversation,
+ * then the context. The context panel is last because it is the part you read
+ * once, not the part you scroll.
+ */
+export function TicketDetailPage(): React.JSX.Element {
+  const { t } = useTranslation();
+  const { id = '' } = useParams<{ id: string }>();
+  const [collapsed, setCollapsed] = useAtom(ticketContextCollapsedAtom);
+
+  const detail = useTicketDetail(id);
+  const customerId = detail.data?.customer.id;
+  const customer = useCustomer(customerId);
+  const recent = useCustomerTickets(customerId, id);
+
+  if (detail.isPending) {
+    return <DetailSkeleton />;
+  }
+
+  if (detail.error !== null) {
+    return <ErrorState error={detail.error} onRetry={() => void detail.refetch()} />;
+  }
+
+  const ticket = detail.data;
+
+  return (
+    <div className="space-y-4">
+      <TicketHeader ticket={ticket} />
+
+      <div
+        className={cn(
+          'grid gap-4',
+          // The context column is a fixed, readable width; the conversation
+          // takes whatever is left, which is what AC5's "expands to use the
+          // space" means in practice.
+          collapsed ? 'lg:grid-cols-1' : 'lg:grid-cols-[minmax(0,1fr)_20rem]',
+        )}
+      >
+        {/*
+          The conversation and its composer dock. `flex` with the thread
+          scrolling means the composer stays at the foot of the column rather
+          than at the foot of the page, which is AC3's actual requirement.
+        */}
+        <section
+          aria-label={t('ticket.detail.conversation.title')}
+          className="border-line bg-card flex min-h-[28rem] flex-col rounded-md border"
+        >
+          <div className="flex-1 overflow-y-auto p-4">
+            <TicketConversation
+              messages={ticket.messages}
+              description={ticket.description}
+              createdAt={ticket.createdAt}
+              customerName={`${ticket.customer.firstName} ${ticket.customer.lastName}`}
+            />
+          </div>
+
+          {/*
+            The dock. Empty until US-1, which owns replying and adding an
+            internal note. It is a real region rather than nothing, because AC3
+            is about where the composer sits and a layout that only becomes
+            correct three stories later is a layout nobody has seen.
+          */}
+          <div className="border-line text-meta text-ink-muted border-t p-4">
+            {t('ticket.detail.composerPending')}
+          </div>
+        </section>
+
+        {!collapsed && (
+          <aside
+            aria-label={t('ticket.detail.context.title')}
+            className="border-line bg-card h-fit rounded-md border"
+          >
+            <div className="border-line flex items-center justify-between border-b px-4 py-2">
+              <h2 className="text-meta text-ink font-medium">{t('ticket.detail.context.title')}</h2>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2"
+                onClick={() => {
+                  setCollapsed(true);
+                }}
+                aria-label={t('ticket.detail.context.collapse')}
+              >
+                <PanelRightClose aria-hidden="true" className="size-4 rtl:rotate-180" />
+              </Button>
+            </div>
+
+            <CustomerContextPanel
+              customer={customer.data}
+              isLoading={customer.isPending}
+              recentTickets={recent.data}
+            />
+
+            <div className="border-line border-t p-4">
+              <h3 className="text-meta text-ink-muted mb-2 font-medium tracking-wide uppercase">
+                {t('ticket.history.title')}
+              </h3>
+              <TicketTimeline entries={ticket.history} />
+            </div>
+          </aside>
+        )}
+      </div>
+
+      {collapsed && (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            setCollapsed(false);
+          }}
+        >
+          <PanelRightOpen aria-hidden="true" className="size-4 rtl:rotate-180" />
+          {t('ticket.detail.context.expand')}
+        </Button>
+      )}
+    </div>
+  );
+}

@@ -196,6 +196,7 @@ export class TicketsService {
       ['status', query.status],
       ['priority', query.priority],
       ['categoryId', query.categoryId],
+      ['customerId', query.customerId],
       ['departmentId', query.departmentId],
       ['branchId', query.branchId],
       ['channel', query.channel],
@@ -426,6 +427,7 @@ export class TicketsService {
         resolvedAt: true,
         closedAt: true,
         reopenCount: true,
+        slaPolicy: { select: { nameEn: true } },
         messages: {
           orderBy: { createdAt: 'asc' },
           select: {
@@ -468,6 +470,7 @@ export class TicketsService {
     return {
       ...this.toTicket(row),
       description: row.description,
+      slaPolicyName: row.slaPolicy?.nameEn ?? null,
       resolvedAt: row.resolvedAt?.toISOString() ?? null,
       closedAt: row.closedAt?.toISOString() ?? null,
       reopenCount: row.reopenCount,

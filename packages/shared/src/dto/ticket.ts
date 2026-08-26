@@ -82,6 +82,8 @@ export const TicketListQuerySchema = PaginationQuerySchema.extend({
   status: TicketStatusSchema.optional(),
   priority: TicketPrioritySchema.optional(),
   categoryId: z.string().uuid().optional(),
+  /** Everything one customer has raised — the ticket workspace's context panel. */
+  customerId: z.string().uuid().optional(),
   assigneeId: z.string().uuid().optional(),
   /** `unassigned` is a real filter, and the one an agent picking up work uses. */
   unassigned: z.enum(['true']).optional(),
@@ -195,6 +197,13 @@ export const TicketAttachmentSchema = z.object({
  */
 export const TicketDetailSchema = TicketSchema.extend({
   description: z.string().nullable(),
+  /**
+   * Which service commitment governs this ticket — US-45, AC2.
+   *
+   * On the detail only. The queue shows a countdown; the workspace has to be
+   * able to answer *why that number*, which means naming the policy.
+   */
+  slaPolicyName: z.string().nullable(),
   messages: z.array(TicketMessageSchema),
   attachments: z.array(TicketAttachmentSchema),
   history: z.array(TicketHistoryEntrySchema),

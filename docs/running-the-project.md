@@ -176,18 +176,18 @@ permissions, and a `Set-Cookie: crm_refresh_token=…; Path=/auth; HttpOnly; Sam
 
 All from the repository root.
 
-| Command                                                         | What it does                                                       |
-| --------------------------------------------------------------- | ------------------------------------------------------------------ |
-| `npm run test --workspace @crm/backend`                         | Backend suite (`node:test`). **Needs Postgres and Redis running.** |
-| `npm run test --workspace @crm/frontend`                        | Frontend suite (Vitest + Testing Library)                          |
-| `npm run test --workspace @crm/shared`                          | Shared DTO and schema tests                                        |
-| `npm run typecheck`                                             | `tsc -b` across the project reference graph                        |
-| `npm run lint` / `npm run lint:fix`                             | ESLint                                                             |
-| `npm run format` / `npm run format:check`                       | Prettier                                                           |
-| `npm run verify`                                                | All of the above. What a reviewer runs before merging.             |
-| `npm run migrate:dev --workspace @crm/backend -- --name <name>` | Create a migration from a schema change                            |
-| `npm run migrate:deploy --workspace @crm/backend`               | Apply pending migrations (never interactive)                       |
-| `npm run db:seed --workspace @crm/backend`                      | Seed; idempotent                                                   |
+| Command                                                         | What it does                                                                        |
+| --------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `npm run test --workspace @crm/backend`                         | Backend suite (`node:test`). **Needs Postgres and Redis running.**                  |
+| `npm run test --workspace @crm/frontend`                        | Frontend suite (Vitest + Testing Library)                                           |
+| `npm run test --workspace @crm/shared`                          | Shared DTO and schema tests                                                         |
+| `npm run typecheck`                                             | `tsc -b` across the project reference graph                                         |
+| `npm run lint` / `npm run lint:fix`                             | ESLint                                                                              |
+| `npm run format` / `npm run format:check`                       | Prettier                                                                            |
+| `npm run verify`                                                | All of the above. What a reviewer runs before merging.                              |
+| `npm run migrate:dev --workspace @crm/backend -- --name <name>` | Create a migration from a schema change. **Then run `prisma generate`** — see below |
+| `npm run migrate:deploy --workspace @crm/backend`               | Apply pending migrations (never interactive)                                        |
+| `npm run db:seed --workspace @crm/backend`                      | Seed; idempotent                                                                    |
 
 **Prefer the narrow suite.** `npm run verify` runs everything including the backend
 integration tests, which is minutes. If you changed the frontend, run the frontend suite.
@@ -292,3 +292,19 @@ npm run db:seed --workspace @crm/backend
 
 `npm run migrate:reset --workspace @crm/backend` does the same to the database only, and
 re-runs the seed for you.
+
+### After changing `schema.prisma`, run `prisma generate`
+
+```bash
+npx prisma generate --workspace @crm/backend   # from backend/, just: npx prisma generate
+```
+
+**`migrate dev` does not do this for you here.** With the Prisma 7 config file this project
+uses, the client under `backend/src/generated/prisma` is not regenerated as a side effect of
+creating a migration, and a stale client fails in a way that does not point at itself:
+`tsc` is happy, and the API answers **`400 BAD_REQUEST` with "The request could not be
+processed."** on every request that touches the new column. That is a
+`PrismaClientValidationError` — the client rejecting a field its types do not know about —
+mapped by the exception filter.
+
+If a whole test suite starts answering 400 immediately after a schema change, this is why.

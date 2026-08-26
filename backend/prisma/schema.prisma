@@ -453,6 +453,13 @@ model Customer {
   branchId String?
   branch   Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
 
+  /// Free-text notes an agent keeps about this customer — US-45, AC4.
+  ///
+  /// "Prefers a phone call", "hard of hearing", "always chases on Fridays". Not
+  /// a message and not a ticket: the standing context somebody needs before
+  /// picking up the phone, which otherwise lives in one agent's memory.
+  notes String?
+
   /// Identifier in a customer's own system, for the ERP integration in P13.
   externalRef String?
 

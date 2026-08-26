@@ -28,3 +28,13 @@ export const mobileNavOpenAtom = atom(false);
 
 /** Whether the global search palette is open. */
 export const searchOpenAtom = atom(false);
+
+/**
+ * Whether the ticket workspace's context column is collapsed — US-45, AC5.
+ *
+ * Persisted for the same reason and with the same caveat as the sidebar: it is
+ * a layout preference, not a credential. Kept here rather than in the ticket
+ * feature because it is shell state — it describes how the person likes to
+ * work, not anything about a particular ticket.
+ */
+export const ticketContextCollapsedAtom = atomWithStorage('crm:ticket-context-collapsed', false);
