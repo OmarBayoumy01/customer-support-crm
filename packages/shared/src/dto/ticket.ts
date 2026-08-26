@@ -6,6 +6,7 @@
 import { z } from 'zod';
 
 import { ChannelSchema } from './customer.js';
+import { TicketViewSchema } from './ticket-counts.js';
 import { PaginationQuerySchema } from '../api/pagination.js';
 
 /** Matches `TicketStatus` in the Prisma schema. */
@@ -70,6 +71,13 @@ export type UpdateTicket = z.infer<typeof UpdateTicketSchema>;
 
 /** AC2 — every one of these reaches the database. */
 export const TicketListQuerySchema = PaginationQuerySchema.extend({
+  /**
+   * One of the queue's view tabs — US-42, AC4.
+   *
+   * A named view rather than the caller assembling the same filters by hand, so
+   * the tab, its count and the list it produces all come from one definition.
+   */
+  view: TicketViewSchema.optional(),
   q: z.string().trim().max(200).optional(),
   status: TicketStatusSchema.optional(),
   priority: TicketPrioritySchema.optional(),
@@ -120,6 +128,14 @@ export const TicketSchema = z.object({
   assigneeId: z.string().nullable(),
   assigneeName: z.string().nullable(),
   categoryId: z.string().nullable(),
+  /**
+   * The category as a person reads it — US-42, AC1.
+   *
+   * Bilingual, resolved server-side from the caller's locale rather than sent
+   * as a pair, because the queue renders one of them and shipping both to
+   * render one is a column of dead weight on every row.
+   */
+  categoryName: z.string().nullable(),
   departmentId: z.string().nullable(),
   branchId: z.string().nullable(),
   tags: z.array(z.string()),

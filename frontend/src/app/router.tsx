@@ -21,6 +21,9 @@ const LoginPage = lazy(async () => ({
 const DashboardPage = lazy(async () => ({
   default: (await import('@/features/dashboard/dashboard-page')).DashboardPage,
 }));
+const TicketsQueuePage = lazy(async () => ({
+  default: (await import('@/features/tickets/tickets-queue-page')).TicketsQueuePage,
+}));
 const AdminPage = lazy(async () => ({
   default: (await import('@/features/admin/admin-page')).AdminPage,
 }));
@@ -62,6 +65,17 @@ export function AppRoutes(): React.JSX.Element {
         <Route element={<RequireAuth />}>
           <Route element={<ShellOutlet />}>
             <Route path="/dashboard" element={<DashboardPage />} />
+
+            {/*
+              US-42. `/tickets/mine` is the same screen with the view tab
+              preselected — the sidebar links to it, and one screen answering
+              both is better than two that drift apart.
+            */}
+            <Route element={<RequirePermission permission="ticket:view" />}>
+              <Route path="/tickets" element={<TicketsQueuePage />} />
+              <Route path="/tickets/mine" element={<Navigate to="/tickets?view=mine" replace />} />
+            </Route>
+
             <Route path="/design-system" element={<DesignSystemPage />} />
 
             {/*

@@ -25,13 +25,10 @@ export const ASSIGNED_TICKET_COUNT_KEY = ['tickets', 'assigned', 'count'] as con
 /**
  * How many tickets are on the signed-in agent's plate.
  *
- * **The endpoint does not exist yet** — tickets are a later phase. Until it
- * does, a failure resolves to `undefined` and the badge simply does not render,
- * which is the honest outcome: a sidebar showing `0` because nothing answered
- * would be worse than one showing nothing at all.
- *
- * Everything else is real. The moment `GET /tickets/assigned/count` lands, the
- * badge lights up with no change here.
+ * `GET /tickets/assigned/count` landed with US-42, so this is now real. The
+ * failure path is unchanged and still deliberate: a failure resolves to
+ * `undefined` and the badge does not render, because a sidebar showing `0`
+ * because nothing answered is worse than one showing nothing at all.
  */
 export function useAssignedTicketCount(): UseQueryResult<AssignedTicketCount | undefined> {
   return useQuery({

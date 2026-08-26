@@ -9,6 +9,7 @@ in [`../00-mvp-scope.md`](../00-mvp-scope.md) touch it.
 | --- | ---------------------------------- | -------------------- | ---------- | ----------- |
 | 25  | `25-story-build-the-ticket-api.md` | Build the ticket API | US-40      | US-6, US-22 |
 | 26  | `26-story-track-ticket-history.md` | Track ticket history | US-50      | US-40       |
+| 30  | `30-story-browse-and-filter-the-ticket-queue.md` | Browse and filter the ticket queue | US-42 | US-30, US-40 |
 
 ## No schema change
 

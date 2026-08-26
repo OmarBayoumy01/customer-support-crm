@@ -546,3 +546,92 @@ test('status cannot be changed through PATCH — that is US-47’s guarded trans
   // Accepting it here would be a second, unguarded door onto the state machine.
   assert.equal(row.status, 'NEW');
 });
+
+// ---------------------------------------------------------------------------
+// US-42 — what the queue needs from the API
+// ---------------------------------------------------------------------------
+
+test('US-42 AC4 — the counts endpoint answers all six views in one request', async () => {
+  const mine = await newTicket();
+  await call('PATCH', `/tickets/${mine.id}`, {
+    token: allToken,
+    body: { assigneeId: assignedUserId },
+  });
+
+  const { status, body } = await call<Record<string, number>>('GET', '/tickets/counts', {
+    token: allToken,
+  });
+
+  assert.equal(status, 200, JSON.stringify(body));
+
+  for (const view of ['all', 'unassigned', 'mine', 'escalated', 'breached', 'closed']) {
+    assert.equal(typeof body.data?.[view], 'number', `${view} is missing`);
+  }
+
+  assert.ok((body.data?.all ?? 0) >= 1);
+});
+
+test('US-42 AC4 — the counts carry the caller’s scope, like every other read', async () => {
+  const ticket = await newTicket();
+
+  await call('PATCH', `/tickets/${ticket.id}`, {
+    token: allToken,
+    body: { assigneeId: otherUserId },
+  });
+
+  const manager = await call<Record<string, number>>('GET', '/tickets/counts', { token: allToken });
+  const agent = await call<Record<string, number>>('GET', '/tickets/counts', {
+    token: assignedToken,
+  });
+
+  // The agent is scoped to their own queue, so a ticket assigned to somebody
+  // else must not appear in their total — the same rule the list obeys.
+  assert.ok((agent.body.data?.all ?? 0) < (manager.body.data?.all ?? 0));
+});
+
+test('US-42 AC4 — a named view filters the list the same way its count does', async () => {
+  const ticket = await newTicket();
+
+  await call('PATCH', `/tickets/${ticket.id}`, { token: allToken, body: { assigneeId: null } });
+
+  const list = await call<Ticket[]>('GET', '/tickets?view=unassigned&pageSize=100', {
+    token: allToken,
+  });
+  const counts = await call<Record<string, number>>('GET', '/tickets/counts', { token: allToken });
+
+  assert.ok(list.body.data!.every((row) => row.assigneeId === null));
+  assert.equal(list.body.pagination?.total, counts.body.data?.unassigned);
+});
+
+test('US-42 — the assigned count is what the sidebar badge shows', async () => {
+  const ticket = await newTicket();
+
+  await call('PATCH', `/tickets/${ticket.id}`, {
+    token: allToken,
+    body: { assigneeId: assignedUserId },
+  });
+
+  const { status, body } = await call<{ total: number; atRisk: number }>(
+    'GET',
+    '/tickets/assigned/count',
+    { token: assignedToken },
+  );
+
+  assert.equal(status, 200);
+  assert.ok((body.data?.total ?? 0) >= 1);
+  assert.ok((body.data?.atRisk ?? -1) >= 0);
+});
+
+test('US-42 AC1 — a ticket carries its category as a name, not only an id', async () => {
+  const category = await prisma.category.create({
+    data: { slug: `queue-${run}`, nameEn: `Queue ${run}`, nameAr: 'قائمة' },
+    select: { id: true },
+  });
+
+  const ticket = await newTicket({ categoryId: category.id });
+
+  assert.equal(ticket.categoryId, category.id);
+  // Without this the queue would have to fetch a category lookup to render one
+  // column of one row.
+  assert.equal(ticket.categoryName, `Queue ${run}`);
+});

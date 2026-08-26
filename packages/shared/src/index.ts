@@ -123,3 +123,13 @@ export {
   type SlaPolicy,
   type SlaTicketFacts,
 } from './dto/sla-policy.js';
+
+export {
+  TicketViewSchema,
+  TicketCountsSchema,
+  AssignedTicketCountSchema,
+  TICKET_VIEWS,
+  type TicketView,
+  type TicketCounts,
+  type AssignedTicketCount,
+} from './dto/ticket-counts.js';

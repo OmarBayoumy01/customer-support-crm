@@ -2,7 +2,11 @@ import { Injectable, Logger } from '@nestjs/common';
 import {
   buildPaginationMeta,
   toSkipTake,
+  TICKET_VIEWS,
   type ApiPaginated,
+  type AssignedTicketCount,
+  type TicketCounts,
+  type TicketView,
   type CreateTicket,
   type SlaState,
   type Ticket,
@@ -55,6 +59,7 @@ const TICKET_SELECT = {
     select: { id: true, firstName: true, lastName: true, email: true, companyName: true },
   },
   assignee: { select: { firstName: true, lastName: true } },
+  category: { select: { nameEn: true, nameAr: true } },
 } as const;
 
 type TicketRow = Prisma.TicketGetPayload<{ select: typeof TICKET_SELECT }>;
@@ -142,6 +147,7 @@ export class TicketsService {
       assigneeName:
         row.assignee === null ? null : `${row.assignee.firstName} ${row.assignee.lastName}`,
       categoryId: row.categoryId,
+      categoryName: row.category === null ? null : row.category.nameEn,
       departmentId: row.departmentId,
       branchId: row.branchId,
       tags: row.tags,
@@ -242,9 +248,102 @@ export class TicketsService {
     return groups.length === 0 ? where : { AND: [where, ...groups] };
   }
 
+  /**
+   * The `where` behind one of the queue's view tabs — US-42, AC4.
+   *
+   * Exported through `counts` and applied by `list` so the tab and its count
+   * can never disagree about what the tab means. Two definitions of "Breached
+   * SLA" is the failure mode a live count invites.
+   */
+  private viewWhere(view: TicketView, actor: TicketActor): Prisma.TicketWhereInput {
+    const open: Prisma.TicketWhereInput = { status: { notIn: ['RESOLVED', 'CLOSED'] } };
+
+    switch (view) {
+      case 'unassigned':
+        return { ...open, assigneeId: null };
+
+      case 'mine':
+        return { ...open, assigneeId: actor.userId };
+
+      case 'escalated':
+        return { status: 'ESCALATED' };
+
+      case 'breached':
+        // Both clocks. A response target missed is a broken promise even if the
+        // ticket is later resolved on time, and an agent triaging needs to see
+        // it in the same place.
+        return {
+          ...open,
+          OR: [{ resolutionBreached: true }, { firstResponseBreached: true }],
+        };
+
+      case 'closed':
+        return { status: { in: ['RESOLVED', 'CLOSED'] } };
+
+      case 'all':
+      default:
+        return open;
+    }
+  }
+
+  /**
+   * AC4 — a live count per tab, in one round trip.
+   *
+   * Six counts rather than six list requests: the queue would otherwise ask the
+   * API seven times to render one screen. Each count carries the caller's scope,
+   * so an agent's "All" is their own queue and not the department's.
+   */
+  async counts(actor: TicketActor): Promise<TicketCounts> {
+    const scope = await this.scopeFor(actor);
+
+    const entries = await Promise.all(
+      TICKET_VIEWS.map(async (view) => {
+        const total = await this.prisma.notDeleted.ticket.count({
+          where: { AND: [this.viewWhere(view, actor), scope] },
+        });
+
+        return [view, total] as const;
+      }),
+    );
+
+    return Object.fromEntries(entries) as unknown as TicketCounts;
+  }
+
+  /**
+   * What the sidebar badge shows — US-28, AC5, which has been waiting for this.
+   *
+   * `atRisk` counts the ticket the agent should look at next: already breached,
+   * or inside the warning window. The warning window is a fraction of each
+   * ticket's own target, so it is finished in application code for the same
+   * reason `list` finishes the `warn` filter there — and over one agent's open
+   * queue, which is tens of rows, not thousands.
+   */
+  async assignedCount(actor: TicketActor): Promise<AssignedTicketCount> {
+    const where: Prisma.TicketWhereInput = {
+      assigneeId: actor.userId,
+      status: { notIn: ['RESOLVED', 'CLOSED'] },
+    };
+
+    const rows = await this.prisma.notDeleted.ticket.findMany({
+      where,
+      select: TICKET_SELECT,
+      take: 500,
+    });
+
+    const atRisk = rows
+      .map((row) => this.slaFor(row).state)
+      .filter((state) => state === 'warn' || state === 'breach').length;
+
+    return { total: rows.length, atRisk };
+  }
+
   async list(query: TicketListQuery, actor: TicketActor): Promise<ApiPaginated<Ticket>> {
     const where: Prisma.TicketWhereInput = {
-      AND: [this.whereFrom(query), await this.scopeFor(actor)],
+      AND: [
+        this.whereFrom(query),
+        ...(query.view === undefined ? [] : [this.viewWhere(query.view, actor)]),
+        await this.scopeFor(actor),
+      ],
     };
 
     const dir = query.dir ?? 'desc';

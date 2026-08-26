@@ -2,13 +2,17 @@ import { Body, Controller, Get, HttpCode, Param, Patch, Post, Query } from '@nes
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorSchema,
+  AssignedTicketCountSchema,
   buildPaginationMeta,
+  TicketCountsSchema,
   TicketDetailSchema,
   TicketHistoryEntrySchema,
   TicketSchema,
   toSkipTake,
   type ApiPaginated,
+  type AssignedTicketCount,
   type Ticket,
+  type TicketCounts,
   type TicketDetail,
   type TicketHistoryEntry,
 } from '@crm/shared';
@@ -82,6 +86,41 @@ export class TicketsController {
     @CurrentUser() user: CurrentUserPayload | undefined,
   ): Promise<ApiPaginated<Ticket>> {
     return this.tickets.list(query, await this.actorFrom(user));
+  }
+
+  /**
+   * The queue's view tabs — US-42, AC4.
+   *
+   * Declared before `:id` on purpose. Nest matches routes in declaration order,
+   * so a literal path that arrives after a parameterised one is never reached —
+   * `/tickets/counts` would resolve as a ticket whose id is "counts".
+   */
+  @Get('counts')
+  @RequirePermission('ticket:view')
+  @ApiOperation({
+    summary: 'A live count per queue view',
+    description:
+      'One round trip for all six tabs, each carrying the caller’s scope — an agent’s ' +
+      '"All" is their own queue, not the department’s.',
+  })
+  @ApiZodResponse(200, TicketCountsSchema, 'The counts')
+  async counts(@CurrentUser() user: CurrentUserPayload | undefined): Promise<TicketCounts> {
+    return this.tickets.counts(await this.actorFrom(user));
+  }
+
+  @Get('assigned/count')
+  @RequirePermission('ticket:view')
+  @ApiOperation({
+    summary: 'How much is on the signed-in agent’s plate',
+    description:
+      'What the sidebar badge shows. `atRisk` is the number that decides what to do next: ' +
+      'already breached, or inside the warning window.',
+  })
+  @ApiZodResponse(200, AssignedTicketCountSchema, 'The count')
+  async assignedCount(
+    @CurrentUser() user: CurrentUserPayload | undefined,
+  ): Promise<AssignedTicketCount> {
+    return this.tickets.assignedCount(await this.actorFrom(user));
   }
 
   @Get(':id')

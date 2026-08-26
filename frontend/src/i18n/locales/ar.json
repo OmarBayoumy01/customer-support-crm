@@ -79,6 +79,49 @@
       "remaining": "متبقٍ {{time}}",
       "overBy": "تجاوز {{time}}"
     },
+    "channel": {
+      "email": "البريد الإلكتروني",
+      "whatsapp": "واتساب",
+      "chat": "المحادثة",
+      "sms": "رسالة نصية",
+      "web": "الويب"
+    },
+    "queue": {
+      "title": "التذاكر",
+      "subtitle": "ما يحتاج إلى انتباهك الآن.",
+      "views": "طرق عرض القائمة",
+      "view": {
+        "all": "الكل",
+        "unassigned": "غير مُسندة",
+        "mine": "تذاكري",
+        "escalated": "مُصعّدة",
+        "breached": "تجاوزت مدة الخدمة",
+        "closed": "مغلقة"
+      },
+      "filter": {
+        "status": "الحالة",
+        "priority": "الأولوية",
+        "channel": "القناة",
+        "sla": "مستوى الخدمة"
+      },
+      "removeFilter": "إزالة عامل التصفية {{filter}}: {{value}}",
+      "searchLabel": "البحث في التذاكر",
+      "column": {
+        "id": "الرقم",
+        "subject": "الموضوع",
+        "customer": "العميل",
+        "category": "التصنيف",
+        "priority": "الأولوية",
+        "status": "الحالة",
+        "assignee": "المسؤول",
+        "sla": "مستوى الخدمة",
+        "updated": "آخر تحديث"
+      },
+      "unassigned": "غير مُسندة",
+      "noSla": "لا يوجد هدف",
+      "emptyTitle": "لا توجد تذاكر هنا",
+      "emptyDescription": "تظهر التذاكر الجديدة هنا فور تقديم العملاء لها."
+    },
     "history": {
       "title": "السجل",
       "empty": "لم يطرأ أي تغيير على هذه التذكرة بعد.",

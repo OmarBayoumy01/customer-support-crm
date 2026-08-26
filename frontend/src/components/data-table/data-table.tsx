@@ -42,6 +42,16 @@ export interface DataTableProps<TRow> {
 
   onRowClick?: (row: TRow) => void;
 
+  /**
+   * Extra classes for one row, decided by the row itself.
+   *
+   * Added by US-42 for the SLA edge: the queue marks urgency with a coloured
+   * rule on the inline start of the row rather than by tinting the whole thing,
+   * which would make a busy queue unreadable. Kept as a callback so the table
+   * stays ignorant of what a ticket is.
+   */
+  rowClassName?: (row: TRow) => string | undefined;
+
   /** Distinguishes "nothing matched" from "nothing exists" — AC5. */
   isFiltered?: boolean;
   onClearFilters?: () => void;
@@ -90,6 +100,7 @@ export function DataTable<TRow>({
   onSelectedChange,
   bulkActions,
   onRowClick,
+  rowClassName,
   isFiltered = false,
   onClearFilters,
   emptyTitle,
@@ -246,6 +257,7 @@ export function DataTable<TRow>({
                     'hover:bg-secondary/60 transition-colors',
                     isSelected && 'bg-brand-soft/50',
                     onRowClick !== undefined && 'cursor-pointer',
+                    rowClassName?.(row),
                   )}
                 >
                   {selectable ? (

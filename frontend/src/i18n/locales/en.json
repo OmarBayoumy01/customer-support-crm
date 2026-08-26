@@ -79,6 +79,49 @@
       "remaining": "{{time}} left",
       "overBy": "{{time}} over"
     },
+    "channel": {
+      "email": "Email",
+      "whatsapp": "WhatsApp",
+      "chat": "Chat",
+      "sms": "SMS",
+      "web": "Web"
+    },
+    "queue": {
+      "title": "Tickets",
+      "subtitle": "What needs attention next.",
+      "views": "Queue views",
+      "view": {
+        "all": "All",
+        "unassigned": "Unassigned",
+        "mine": "My tickets",
+        "escalated": "Escalated",
+        "breached": "Breached SLA",
+        "closed": "Closed"
+      },
+      "filter": {
+        "status": "Status",
+        "priority": "Priority",
+        "channel": "Channel",
+        "sla": "SLA"
+      },
+      "removeFilter": "Remove {{filter}} filter: {{value}}",
+      "searchLabel": "Search tickets",
+      "column": {
+        "id": "ID",
+        "subject": "Subject",
+        "customer": "Customer",
+        "category": "Category",
+        "priority": "Priority",
+        "status": "Status",
+        "assignee": "Assignee",
+        "sla": "SLA",
+        "updated": "Updated"
+      },
+      "unassigned": "Unassigned",
+      "noSla": "No target",
+      "emptyTitle": "Nothing in this queue",
+      "emptyDescription": "New tickets appear here as customers raise them."
+    },
     "history": {
       "title": "History",
       "empty": "Nothing has changed on this ticket yet.",
