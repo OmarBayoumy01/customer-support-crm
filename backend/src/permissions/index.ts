@@ -1,5 +1,7 @@
 export { PermissionsModule } from './permissions.module.js';
 export { PermissionsService } from './permissions.service.js';
+export { PermissionsGuard } from './permissions.guard.js';
+export { RequirePermission, REQUIRED_PERMISSION } from './require-permission.decorator.js';
 export { RolesService, type CreateRoleInput, type RoleGrantInput } from './roles.service.js';
 export { ticketScopeWhere, isUnrestricted, type ScopeContext } from './scope.js';
 export {

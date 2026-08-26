@@ -1,5 +1,6 @@
 import { Global, Module } from '@nestjs/common';
 
+import { PermissionsGuard } from './permissions.guard.js';
 import { PermissionsService } from './permissions.service.js';
 import { RolesService } from './roles.service.js';
 
@@ -14,7 +15,7 @@ import { RolesService } from './roles.service.js';
  */
 @Global()
 @Module({
-  providers: [PermissionsService, RolesService],
-  exports: [PermissionsService, RolesService],
+  providers: [PermissionsService, RolesService, PermissionsGuard],
+  exports: [PermissionsService, RolesService, PermissionsGuard],
 })
 export class PermissionsModule {}

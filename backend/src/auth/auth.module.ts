@@ -10,6 +10,7 @@ import { AuthService } from './auth.service.js';
 import { JwtAuthGuard } from './jwt-auth.guard.js';
 import { JwtStrategy } from './jwt.strategy.js';
 import { LoginThrottleService } from './login-throttle.service.js';
+import { PermissionsGuard } from '../permissions/index.js';
 import { PasswordService } from './password.service.js';
 import { TokenRevocationModule } from './token-revocation.module.js';
 import { RefreshService } from './refresh.service.js';
@@ -50,6 +51,11 @@ import { TokenService } from './token.service.js';
     LoginThrottleService,
     JwtStrategy,
     { provide: APP_GUARD, useClass: JwtAuthGuard },
+    // Second, and the order matters: PermissionsGuard reads the user that
+    // JwtAuthGuard put on the request. Registered here rather than in
+    // PermissionsModule because that module is imported first, which would run
+    // the authorisation check before anyone had been authenticated.
+    { provide: APP_GUARD, useClass: PermissionsGuard },
   ],
   // Exported for the stories that build on this one: US-19 needs password
   // hashing, and anything touching sessions needs these two.
