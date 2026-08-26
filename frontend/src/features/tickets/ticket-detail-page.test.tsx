@@ -23,6 +23,22 @@ const realAdapter = http.defaults.adapter;
 const HOUR = 3_600_000;
 const TICKET_ID = '01923456-89ab-7cde-8f01-234567890abc';
 const CUSTOMER_ID = '01923456-89ab-7cde-8f01-234567890abd';
+const CATEGORY_ID = '01923456-89ab-7cde-8f01-234567890abe';
+
+/** The header's category picker asks for these — US-49. */
+const CATEGORIES = [
+  {
+    id: CATEGORY_ID,
+    slug: 'billing-refund',
+    nameEn: 'Refunds',
+    nameAr: 'المبالغ المستردة',
+    parentId: null,
+    departmentId: null,
+    departmentName: null,
+    defaultPriority: null,
+    isActive: true,
+  },
+];
 
 function detail(overrides: Partial<TicketDetail> = {}): TicketDetail {
   return {
@@ -42,7 +58,7 @@ function detail(overrides: Partial<TicketDetail> = {}): TicketDetail {
     },
     assigneeId: null,
     assigneeName: 'Huda Mansour',
-    categoryId: null,
+    categoryId: CATEGORY_ID,
     categoryName: 'Refunds',
     departmentId: null,
     branchId: null,
@@ -129,11 +145,13 @@ function respondWith(ticket: TicketDetail = detail()): void {
   const adapter: AxiosAdapter = (config) => {
     const url = config.url ?? '';
 
-    const data = url.startsWith('/customers/')
-      ? { data: CUSTOMER }
-      : url.startsWith('/tickets?')
-        ? { data: [OTHER_TICKET], pagination: { page: 1, pageSize: 6, total: 1, totalPages: 1 } }
-        : { data: ticket };
+    const data = url.startsWith('/categories')
+      ? { data: CATEGORIES }
+      : url.startsWith('/customers/')
+        ? { data: CUSTOMER }
+        : url.startsWith('/tickets?')
+          ? { data: [OTHER_TICKET], pagination: { page: 1, pageSize: 6, total: 1, totalPages: 1 } }
+          : { data: ticket };
 
     const response: AxiosResponse = { data, status: 200, statusText: '', headers: {}, config };
 
@@ -187,7 +205,10 @@ describe('AC1 — header', () => {
     // the header names them, not that the name appears exactly once.
     expect(screen.getAllByText('Huda Mansour').length).toBeGreaterThan(0);
 
-    expect(screen.getByText('Refunds')).toBeInTheDocument();
+    // US-49 turned category into a control, so it is the picker's value rather
+    // than a line in the metadata strip.
+    expect(await screen.findByRole('combobox', { name: 'Category' })).toHaveTextContent('Refunds');
+
     // US-46 also tags each message with its channel, so "Email" is on the page
     // more than once now. The assertion is that the strip names it.
     expect(screen.getAllByText('Email').length).toBeGreaterThan(0);
@@ -296,11 +317,13 @@ describe('AC4 — customer context', () => {
     const adapter: AxiosAdapter = (config) => {
       const url = config.url ?? '';
 
-      const data = url.startsWith('/customers/')
-        ? { data: { ...CUSTOMER, notes: null } }
-        : url.startsWith('/tickets?')
-          ? { data: [], pagination: { page: 1, pageSize: 6, total: 0, totalPages: 1 } }
-          : { data: detail() };
+      const data = url.startsWith('/categories')
+        ? { data: CATEGORIES }
+        : url.startsWith('/customers/')
+          ? { data: { ...CUSTOMER, notes: null } }
+          : url.startsWith('/tickets?')
+            ? { data: [], pagination: { page: 1, pageSize: 6, total: 0, totalPages: 1 } }
+            : { data: detail() };
 
       return Promise.resolve({
         data,

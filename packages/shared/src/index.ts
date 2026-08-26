@@ -136,3 +136,5 @@ export {
   type TicketCounts,
   type AssignedTicketCount,
 } from './dto/ticket-counts.js';
+
+export { CategorySchema, type Category } from './dto/category.js';

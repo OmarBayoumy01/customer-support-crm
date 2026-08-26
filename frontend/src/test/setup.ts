@@ -11,6 +11,7 @@ import { cleanup } from '@testing-library/react';
 import { afterEach } from 'vitest';
 
 import { resetSessionStore } from '../lib/session-store';
+import { dismissToasts } from '../lib/toast';
 
 /**
  * jsdom implements neither of these, and Radix's popover and dialog positioning
@@ -79,6 +80,11 @@ afterEach(() => {
   // authenticated, and an assertion about being signed out would pass or fail
   // depending on the order the tests happened to run in.
   resetSessionStore();
+
+  // Sonner's queue is module state too, and a toast raised by one test is
+  // still mounted for the next one — which turns "no routing message was
+  // shown" into a failure caused by the previous assertion passing.
+  dismissToasts();
 
   localStorage.clear();
   sessionStorage.clear();

@@ -3,12 +3,13 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TicketDetail } from '@crm/shared';
 
-import { PriorityBadge, StatusBadge, formatRemaining } from '@/components/domain/indicators';
+import { StatusBadge, formatRemaining } from '@/components/domain/indicators';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
+import { TicketClassification } from './ticket-classification';
 
 /**
  * One SLA clock — US-45, AC2.
@@ -110,17 +111,16 @@ export interface TicketHeaderProps {
  * workspace that hides the assignee behind two clicks is a workspace where
  * tickets sit unassigned.
  *
- * **The status, priority and assignee controls are read-only here.** Changing
- * each of them is a story with its own rules: US-47 validates that a status
- * move is legal, US-48 owns assignment, US-49 owns category and priority. This
- * story places them; those three make them act. Rendering a control that
- * silently does nothing would be worse than rendering the value.
+ * **Status and assignee are still read-only.** Changing each of them is a story
+ * with its own rules — US-47 validates that a status move is legal, US-48 owns
+ * assignment — and rendering a control that silently does nothing would be
+ * worse than rendering the value. Priority and category became real controls
+ * with US-49.
  */
 export function TicketHeader({ ticket, className }: TicketHeaderProps): React.JSX.Element {
   const { t, i18n } = useTranslation();
 
   const metadata: { label: string; value: string }[] = [
-    { label: t('ticket.queue.column.category'), value: ticket.categoryName ?? '—' },
     {
       label: t('ticket.detail.meta.channel'),
       value: t(`ticket.channel.${ticket.channel.toLowerCase()}`),
@@ -143,10 +143,14 @@ export function TicketHeader({ ticket, className }: TicketHeaderProps): React.JS
             <h1 className="text-title text-ink">{ticket.subject}</h1>
           </div>
 
-          {/* AC1's inline controls, and AC6's "never behind a dialog". */}
+          {/*
+            AC1's inline controls, and AC6's "never behind a dialog".
+            Priority and category became real controls with US-49; status is
+            US-47's and assignment is US-48's.
+          */}
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge status={ticket.status} />
-            <PriorityBadge priority={ticket.priority} />
+            <TicketClassification ticket={ticket} />
             <Badge variant="outline" className="font-normal">
               <span className="text-ink-muted">{t('ticket.queue.column.assignee')}</span>
               <span className="text-ink">

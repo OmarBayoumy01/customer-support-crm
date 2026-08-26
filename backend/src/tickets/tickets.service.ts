@@ -736,6 +736,35 @@ export class TicketsService {
       }
     }
 
+    /**
+     * AC4 — a category carries a department with it.
+     *
+     * `Category.departmentId` has been a documented routing hint since US-6.
+     * Applying it here rather than in the client means it holds for every
+     * caller: the workspace, US-41's create screen, and whatever files a ticket
+     * from an inbound email in P13.
+     *
+     * **A hint, not a rule.** It is skipped when the same request also sets a
+     * department explicitly, because an agent moving a ticket to a specific
+     * team meant that, and having the category quietly overrule them is the
+     * kind of behaviour that makes people stop trusting a form.
+     */
+    if (
+      input.categoryId !== undefined &&
+      input.categoryId !== null &&
+      input.categoryId !== before.categoryId &&
+      input.departmentId === undefined
+    ) {
+      const category = await this.prisma.notDeleted.category.findFirst({
+        where: { id: input.categoryId },
+        select: { departmentId: true },
+      });
+
+      if (category?.departmentId != null) {
+        data['departmentId'] = category.departmentId;
+      }
+    }
+
     const row = await this.prisma.ticket.update({
       where: { id },
       data,

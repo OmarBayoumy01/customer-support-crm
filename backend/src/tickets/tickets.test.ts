@@ -892,3 +892,142 @@ test('US-1 — writing on a ticket outside the caller’s scope answers 404', as
 
   assert.equal(result.status, 404);
 });
+
+// ---------------------------------------------------------------------------
+// US-49 — category and priority
+// ---------------------------------------------------------------------------
+
+test('US-49 AC3 — the category list is available to anyone who may see a ticket', async () => {
+  await prisma.category.create({
+    data: { slug: `pick-${run}`, nameEn: `Pickable ${run}`, nameAr: 'قابل', isActive: true },
+  });
+
+  const { status, body } = await call<{ nameEn: string; isActive: boolean }[]>(
+    'GET',
+    '/categories',
+    { token: assignedToken },
+  );
+
+  assert.equal(status, 200, JSON.stringify(body));
+  assert.ok(body.data!.some((category) => category.nameEn === `Pickable ${run}`));
+  // A retired category should not appear in a picker.
+  assert.ok(body.data!.every((category) => category.isActive));
+});
+
+test('US-49 AC3 — an inactive category is not offered', async () => {
+  await prisma.category.create({
+    data: { slug: `gone-${run}`, nameEn: `Retired ${run}`, nameAr: 'متقاعد', isActive: false },
+  });
+
+  const { body } = await call<{ nameEn: string }[]>('GET', '/categories', { token: allToken });
+
+  assert.ok(!body.data!.some((category) => category.nameEn === `Retired ${run}`));
+});
+
+test('US-49 AC4 — choosing a category routes the ticket to its department', async () => {
+  const routed = await prisma.department.create({
+    data: { code: `RTE-${run}`, nameEn: 'Billing', nameAr: 'الفوترة' },
+    select: { id: true },
+  });
+
+  const category = await prisma.category.create({
+    data: {
+      slug: `routed-${run}`,
+      nameEn: `Routed ${run}`,
+      nameAr: 'موجّه',
+      departmentId: routed.id,
+    },
+    select: { id: true },
+  });
+
+  const ticket = await newTicket();
+  assert.notEqual(ticket.departmentId, routed.id);
+
+  const updated = await call<Ticket>('PATCH', `/tickets/${ticket.id}`, {
+    token: allToken,
+    body: { categoryId: category.id },
+  });
+
+  assert.equal(updated.body.data?.categoryId, category.id);
+  assert.equal(updated.body.data?.departmentId, routed.id);
+});
+
+test('US-49 AC4 — an explicit department in the same request wins over the routing hint', async () => {
+  const hinted = await prisma.department.create({
+    data: { code: `HNT-${run}`, nameEn: 'Hinted', nameAr: 'مقترح' },
+    select: { id: true },
+  });
+  const chosen = await prisma.department.create({
+    data: { code: `CHS-${run}`, nameEn: 'Chosen', nameAr: 'مختار' },
+    select: { id: true },
+  });
+
+  const category = await prisma.category.create({
+    data: {
+      slug: `hint-${run}`,
+      nameEn: `Hint ${run}`,
+      nameAr: 'تلميح',
+      departmentId: hinted.id,
+    },
+    select: { id: true },
+  });
+
+  const ticket = await newTicket();
+
+  const updated = await call<Ticket>('PATCH', `/tickets/${ticket.id}`, {
+    token: allToken,
+    body: { categoryId: category.id, departmentId: chosen.id },
+  });
+
+  // An agent moving a ticket to a specific team meant it. A category quietly
+  // overruling them is how people stop trusting a form.
+  assert.equal(updated.body.data?.departmentId, chosen.id);
+});
+
+test('US-49 AC2 — a priority change re-evaluates the SLA and moves the deadline', async () => {
+  const ticket = await newTicket({ priority: 'LOW' });
+  const before = ticket.sla.resolutionDueAt;
+
+  assert.ok(before !== null, 'the seeded policies should have given it a deadline');
+
+  const updated = await call<Ticket>('PATCH', `/tickets/${ticket.id}`, {
+    token: allToken,
+    body: { priority: 'URGENT' },
+  });
+
+  const after = updated.body.data!.sla.resolutionDueAt;
+
+  assert.ok(after !== null);
+  // Urgent is a four-hour target against Low's seventy-two, so the deadline
+  // must have moved *earlier* — and the response carries the new one, rather
+  // than the client having to refetch to find out.
+  assert.ok(Date.parse(after) < Date.parse(before));
+});
+
+test('US-49 AC5 — both changes appear in history with old and new values', async () => {
+  const category = await prisma.category.create({
+    data: { slug: `hist-${run}`, nameEn: `History ${run}`, nameAr: 'سجل' },
+    select: { id: true },
+  });
+
+  const ticket = await newTicket({ priority: 'LOW' });
+
+  await call('PATCH', `/tickets/${ticket.id}`, {
+    token: allToken,
+    body: { priority: 'HIGH', categoryId: category.id },
+  });
+
+  const history = await call<
+    { eventType: string; field: string | null; fromValue: string | null; toValue: string | null }[]
+  >('GET', `/tickets/${ticket.id}/history`, { token: allToken });
+
+  const priority = history.body.data!.find((entry) => entry.field === 'priority')!;
+  const categoryEntry = history.body.data!.find((entry) => entry.field === 'categoryId')!;
+
+  assert.equal(priority.eventType, 'PRIORITY_CHANGED');
+  assert.equal(priority.fromValue, 'LOW');
+  assert.equal(priority.toValue, 'HIGH');
+
+  assert.equal(categoryEntry.eventType, 'CATEGORY_CHANGED');
+  assert.equal(categoryEntry.toValue, category.id);
+});

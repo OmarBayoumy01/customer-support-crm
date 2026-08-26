@@ -204,6 +204,11 @@
       "switchToNoteBody": "What you have written will be kept. As a note the customer will never see it, and it will not be sent to them.",
       "switchToReplyTitle": "Turn this note into a reply?",
       "switchToReplyBody": "What you have written will be kept — and sending it will deliver it to the customer."
+    },
+    "classification": {
+      "uncategorised": "Uncategorised",
+      "saved": "Ticket updated.",
+      "routed": "Ticket updated. It now routes to {{department}}."
     }
   },
   "states": {
