@@ -106,3 +106,20 @@ export {
   type TicketMessage,
   type TicketHistoryEntry,
 } from './dto/ticket.js';
+
+export {
+  SlaClockSchema,
+  EscalationTargetSchema,
+  SlaEscalationStepSchema,
+  SlaMatchersSchema,
+  CreateSlaPolicySchema,
+  UpdateSlaPolicySchema,
+  SlaPolicySchema,
+  type SlaClock,
+  type EscalationTarget,
+  type SlaEscalationStepInput,
+  type CreateSlaPolicy,
+  type UpdateSlaPolicy,
+  type SlaPolicy,
+  type SlaTicketFacts,
+} from './dto/sla-policy.js';

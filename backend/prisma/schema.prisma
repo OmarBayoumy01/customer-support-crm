@@ -211,6 +211,7 @@ model User {
   notifications       Notification[]
   authoredArticles    KnowledgeArticle[]
   auditLogs           AuditLog[]
+  escalationSteps     SlaEscalationStep[] @relation("EscalationStepNotifyUser")
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -373,6 +374,7 @@ model Branch {
   departments Department[]
   customers   Customer[]
   tickets     Ticket[]
+  slaPolicies SlaPolicy[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -432,6 +434,14 @@ model Customer {
   /// US-33, AC1.
   type CustomerType @default(INDIVIDUAL)
 
+  /// US-67, AC3 — a VIP gets a dedicated SLA policy.
+  ///
+  /// Deliberately separate from `type`: a company can be a VIP and an
+  /// individual can be a VIP, and US-67's criteria name the two dimensions
+  /// separately. Folding them into one enum would make "VIP company"
+  /// unsayable.
+  isVip Boolean @default(false)
+
   preferredLocale  Locale   @default(EN)
   preferredChannel Channel?
 
@@ -489,8 +499,9 @@ model Category {
   sortOrder Int     @default(0)
   isActive  Boolean @default(true)
 
-  tickets  Ticket[]
-  articles KnowledgeArticle[]
+  tickets     Ticket[]
+  articles    KnowledgeArticle[]
+  slaPolicies SlaPolicy[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -723,28 +734,72 @@ model TicketHistory {
 // SLA
 // ============================================================================
 
-/// One row per (priority, department) pair, rather than one policy row holding
-/// eight columns of per-priority targets. Adding a priority then adds rows, not
-/// columns, and a department that needs no override simply has no row —
-/// departmentId NULL is the platform default.
+/// Which clock an escalation step watches.
+enum SlaClock {
+  FIRST_RESPONSE
+  RESOLUTION
+}
+
+/// Who an escalation step reaches for.
+enum EscalationTarget {
+  ASSIGNEE
+  DEPARTMENT_MANAGER
+  SPECIFIC_USER
+}
+
+/// A service commitment, plus the rules deciding which tickets it governs —
+/// US-67.
+///
+/// Every matcher below is nullable and **NULL means "matches anything"**. A
+/// policy with no matchers at all is the platform fallback; one that sets
+/// priority and department governs a narrower slice. Resolution picks the most
+/// specific match, and `specificity` is what "most specific" means in numbers:
+/// see SLA_MATCHER_WEIGHTS in sla-policy.service.ts.
 model SlaPolicy {
   id     String @id @default(uuid(7))
   nameEn String
   nameAr String
 
-  priority TicketPriority
+  // --- Applicability (AC2, AC3) ---------------------------------------------
+
+  priority TicketPriority?
+
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id], onDelete: Cascade)
 
   departmentId String?
   department   Department? @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+
+  branchId String?
+  branch   Branch? @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  customerType CustomerType?
+
+  /// AC3. True means "VIP customers only"; false means "everybody else"; NULL
+  /// means the policy does not care either way.
+  customerIsVip Boolean?
+
+  /// The sum of the weights of the matchers that are set, written on save.
+  ///
+  /// Stored rather than computed on read so that resolution is one ordered
+  /// query against an index instead of scoring every policy in application
+  /// code. It is derived data and must only ever be written by
+  /// SlaPolicyService.
+  specificity Int @default(0)
+
+  // --- The commitment itself (AC1) ------------------------------------------
 
   firstResponseMinutes Int
   resolutionMinutes    Int
 
   /// When true the clock only advances during the branch's business hours.
-  /// The calendar itself arrives with P08; this is the flag it will read.
+  /// The calendar itself is US-75, which the MVP defers — the MVP clock runs
+  /// 24/7 and nothing reads this yet.
   businessHoursOnly Boolean @default(true)
 
   isActive Boolean @default(true)
+
+  escalationSteps SlaEscalationStep[]
 
   tickets Ticket[]
 
@@ -752,10 +807,42 @@ model SlaPolicy {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  /// At most one policy per priority per department, and exactly one platform
-  /// default per priority (departmentId NULL).
-  @@unique([priority, departmentId])
-  @@index([isActive])
+  /// Ordering by specificity within the active policies is the whole of
+  /// resolution.
+  @@index([isActive, specificity])
+}
+
+/// One rung of a policy's escalation ladder — US-67 AC1, consumed by US-71.
+///
+/// Thresholds are a percentage of the target elapsed rather than absolute
+/// minutes, so one ladder shape works for a four-hour policy and a five-day
+/// one. 75 is "at risk", 100 is the target itself, and anything beyond is an
+/// overdue ticket that nobody has picked up.
+model SlaEscalationStep {
+  id String @id @default(uuid(7))
+
+  policyId String
+  policy   SlaPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+
+  /// Rungs are climbed in order.
+  sequence Int
+
+  clock     SlaClock
+  atPercent Int
+
+  notify       EscalationTarget
+  /// Required when notify is SPECIFIC_USER, ignored otherwise.
+  notifyUserId String?
+  notifyUser   User?   @relation("EscalationStepNotifyUser", fields: [notifyUserId], references: [id], onDelete: SetNull)
+
+  /// Whether crossing this rung also moves the ticket to ESCALATED. Usually
+  /// true on exactly one rung — US-71 AC3.
+  changeStatusToEscalated Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@unique([policyId, sequence])
+  @@index([policyId, clock, atPercent])
 }
 
 // ============================================================================
