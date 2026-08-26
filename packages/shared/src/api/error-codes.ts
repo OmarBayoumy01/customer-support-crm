@@ -22,7 +22,10 @@ export const ApiErrorCodeSchema = z.enum([
   'CONFLICT',
   /** Well-formed and understood, but refused by a business rule. 422. */
   'UNPROCESSABLE',
-  /** Too many requests. Reserved for P15; nothing raises it yet. 429. */
+  /**
+   * Too many requests. 429. Raised by the login throttle (US-14, AC5); P15 will
+   * add general-purpose rate limiting on top of the same code.
+   */
   'RATE_LIMITED',
   /** Anything unhandled. The client is told nothing more than this. 500. */
   'INTERNAL_ERROR',

@@ -2,11 +2,17 @@ import { Controller, Get } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { HealthStatusSchema, type HealthStatus } from '@crm/shared';
 
+import { Public } from '../auth/index.js';
 import { ApiZodResponse } from '../openapi/index.js';
 import { HealthService } from './health.service.js';
 
 @ApiTags('Health')
 @Controller('health')
+// A health check that needs a token leaves a monitoring system unable to tell
+// "the service is down" from "my credential expired" — which is the one
+// distinction it exists to make. US-14 made every route protected by default;
+// this is one of the few that must not be.
+@Public()
 export class HealthController {
   constructor(private readonly health: HealthService) {}
 

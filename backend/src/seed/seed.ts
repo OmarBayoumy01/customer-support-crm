@@ -18,10 +18,96 @@
  */
 /* eslint-disable no-process-env */
 import { PrismaPg } from '@prisma/adapter-pg';
+import argon2 from 'argon2';
 import { Pool } from 'pg';
 
 import { PERMISSION_CATALOGUE, SYSTEM_ROLES } from '../permissions/permission-catalogue.js';
 import { PrismaClient } from '../generated/prisma/client.js';
+
+/** One development account per system role, so every role can be tried by hand. */
+const DEVELOPMENT_USERS = [
+  { email: 'admin@crm.local', firstName: 'Amina', lastName: 'Al-Rashid', role: 'administrator' },
+  { email: 'manager@crm.local', firstName: 'Marcus', lastName: 'Webb', role: 'manager' },
+  { email: 'agent@crm.local', firstName: 'Aisha', lastName: 'Haddad', role: 'agent' },
+  { email: 'customer@crm.local', firstName: 'Omar', lastName: 'Nasser', role: 'customer' },
+] as const;
+
+/**
+ * Creates the accounts a developer signs in with — US-14.
+ *
+ * Three guards, in order of how badly each would go wrong:
+ *
+ *   1. **Never in production.** A known email with a known password on a live
+ *      helpdesk is a back door, and one that would be trivially findable in
+ *      this file.
+ *   2. **Only when `SEED_PASSWORD` is set.** Inventing a default here would
+ *      recreate exactly the problem guard 1 prevents, one environment variable
+ *      later.
+ *   3. **Passwords are only ever set on create.** Re-running the seed must not
+ *      reset a password a developer has since changed.
+ *
+ * Automated tests create their own users and do not depend on any of this.
+ */
+async function seedDevelopmentUsers(prisma: PrismaClient): Promise<void> {
+  if (process.env['NODE_ENV'] === 'production') {
+    console.log('\nSkipping development users: NODE_ENV is production.');
+    return;
+  }
+
+  const password = process.env['SEED_PASSWORD'];
+
+  if (password === undefined || password === '') {
+    console.log('\nSkipping development users: SEED_PASSWORD is not set.');
+    return;
+  }
+
+  const passwordHash = await argon2.hash(password, { type: argon2.argon2id });
+
+  const roleIdByKey = new Map(
+    (await prisma.role.findMany({ select: { id: true, key: true } })).map((row) => [
+      row.key,
+      row.id,
+    ]),
+  );
+
+  console.log('');
+
+  for (const definition of DEVELOPMENT_USERS) {
+    const roleId = roleIdByKey.get(definition.role);
+
+    if (roleId === undefined) {
+      throw new Error(`Role "${definition.role}" is missing; cannot seed ${definition.email}`);
+    }
+
+    const user = await prisma.user.upsert({
+      where: { email: definition.email },
+      create: {
+        email: definition.email,
+        passwordHash,
+        firstName: definition.firstName,
+        lastName: definition.lastName,
+        isActive: true,
+      },
+      // Deliberately does NOT touch `passwordHash` — see guard 3 above.
+      update: {
+        firstName: definition.firstName,
+        lastName: definition.lastName,
+      },
+      select: { id: true },
+    });
+
+    await prisma.userRole.upsert({
+      where: { userId_roleId: { userId: user.id, roleId } },
+      create: { userId: user.id, roleId },
+      update: {},
+    });
+
+    console.log(`Seeded user ${definition.email.padEnd(21)} ${definition.role}`);
+  }
+
+  console.log(`\n${String(DEVELOPMENT_USERS.length)} development users ready.`);
+  console.log('Sign in with the password from SEED_PASSWORD.');
+}
 
 async function seed(): Promise<void> {
   const connectionString = process.env['DATABASE_URL'];
@@ -113,6 +199,12 @@ async function seed(): Promise<void> {
         `Seeded role ${definition.key.padEnd(13)} ${String(definition.grants.length).padStart(2)} grant(s)`,
       );
     }
+
+    // --- Development users (US-14) ------------------------------------------
+    // Until this existed there was no account anyone could sign in with: P01
+    // closed with roles and permissions but no users, so AC1 could not even be
+    // exercised by hand.
+    await seedDevelopmentUsers(prisma);
 
     console.log('\nSeeding complete.');
   } finally {

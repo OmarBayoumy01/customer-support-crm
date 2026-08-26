@@ -4,12 +4,22 @@
     "composite": true,
     "outDir": "./.tsbuild",
     "rootDir": "./src",
+    // Declared because shadcn/ui's CLI requires an alias in components.json and
+    // generates imports against it. Note the generated files are then rewritten
+    // to relative imports — see the note in components.json.
+    "baseUrl": ".",
+    "paths": { "@/*": ["src/*"] },
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "jsx": "react-jsx",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "types": ["vite/client"]
+    "types": ["vite/client"],
+    // The i18n bundles are imported as modules, so the compiler has to see
+    // them. `resolveJsonModule` types them from their contents, which means a
+    // missing key in one locale is a compile error rather than a blank string
+    // discovered in the UI.
+    "resolveJsonModule": true
   },
   "references": [{ "path": "../packages/shared" }],
-  "include": ["src/**/*"]
+  "include": ["src/**/*", "src/**/*.json"]
 }

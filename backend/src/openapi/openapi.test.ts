@@ -23,6 +23,7 @@ import type { SchemaObject } from '@nestjs/swagger';
 import { z } from 'zod';
 
 import { AppModule } from '../app.module.js';
+import { Public } from '../auth/index.js';
 import { ApiException, createZodDto } from '../common/index.js';
 import { TypedConfigService } from '../config/index.js';
 import { ApiZodBody, ApiZodQuery, ApiZodResponse } from './api-zod.decorators.js';
@@ -160,7 +161,16 @@ const CreateThingSchema = z.object({ name: z.string().min(3), quantity: z.number
 class CreateThingDto extends createZodDto(CreateThingSchema) {}
 class ListQueryDto extends createZodDto(PaginationQuerySchema) {}
 
-/** Stands in for P02's real guard: any bearer token is accepted, none is rejected. */
+/**
+ * Stood in for P02's real guard before US-14 built one: any bearer token is
+ * accepted, none is rejected.
+ *
+ * Kept rather than replaced with the real `JwtAuthGuard`, because these tests
+ * are about **US-8's documentation generation** — that a route carrying
+ * `@ApiBearerAuth` is documented as protected and behaves like it. Swapping in
+ * real token verification would make this file fail whenever US-14's signing
+ * changes, which is not what it is here to watch.
+ */
 @Injectable()
 class BearerGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
@@ -177,6 +187,11 @@ class BearerGuard implements CanActivate {
 
 @ApiTags('Documented')
 @Controller('documented')
+// US-14 registered a global `JwtAuthGuard`, so without this every fixture route
+// here would answer 401 before its own guard ran. Opted out deliberately: this
+// controller exists to exercise the OpenAPI generator, and `BearerGuard` above
+// is the guard these tests are actually asserting against.
+@Public()
 class DocumentedController {
   @Post('things')
   @ApiZodBody(CreateThingDto)

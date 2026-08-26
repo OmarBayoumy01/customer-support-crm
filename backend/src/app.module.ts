@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 
+import { AuthModule } from './auth/index.js';
 import { CommonModule } from './common/index.js';
 import { TypedConfigModule } from './config/index.js';
 import { HealthModule } from './health/health.module.js';
@@ -16,10 +17,15 @@ import { RedisModule } from './redis/index.js';
  *
  * `PrismaModule` is global and comes before `HealthModule`, which depends on it.
  *
- * Domain modules (auth, users, customers, tickets, sla, notifications) are NOT
+ * Domain modules (users, customers, tickets, sla, notifications) are NOT
  * scaffolded here. Each is created by the story that owns its behaviour —
  * empty modules are cargo-cult structure that costs review time and hides which
  * parts of the system actually exist.
+ *
+ * `AuthModule` (US-14) registers a **global** `APP_GUARD`, so importing it is
+ * what makes every route in the application require a token unless it is marked
+ * `@Public()`. Removing it does not merely remove login; it silently opens the
+ * whole API.
  */
 @Module({
   imports: [
@@ -29,6 +35,8 @@ import { RedisModule } from './redis/index.js';
     RedisModule,
     // After Prisma and Redis, both of which it depends on.
     PermissionsModule,
+    // After Permissions, whose resolved set the login response carries.
+    AuthModule,
     HealthModule,
   ],
 })

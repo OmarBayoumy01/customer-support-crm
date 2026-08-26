@@ -97,6 +97,73 @@ export const EnvSchema = z.object({
    */
   SWAGGER_USER: z.string().min(1).optional(),
   SWAGGER_PASSWORD: z.string().min(1).optional(),
+
+  // --- Authentication (US-14) ----------------------------------------------
+
+  /**
+   * Signs access tokens. **Deliberately has no default** — the same fail-fast
+   * stance as `DATABASE_URL`, and for a sharper reason: a signing key with a
+   * default is a signing key every attacker already has. 32 characters is the
+   * floor for HS256 to be worth anything.
+   */
+  JWT_ACCESS_SECRET: z.string().min(32, 'must be at least 32 characters'),
+
+  /**
+   * Signs nothing today — refresh tokens are random bytes checked against a
+   * stored hash, not JWTs. Declared now because US-15 rotates them and the
+   * deployment contract should not change under it. Same no-default rule.
+   */
+  JWT_REFRESH_SECRET: z.string().min(32, 'must be at least 32 characters'),
+
+  /** The `iss` claim, and what the strategy verifies incoming tokens against. */
+  JWT_ISSUER: z.string().min(1).default('crm'),
+
+  /**
+   * US-14 AC6 says fifteen minutes, so that is the default. Configurable
+   * because staging sometimes wants it shorter to shake out refresh bugs — but
+   * the criterion is asserted against `ACCESS_TOKEN_TTL_SECONDS` in
+   * `@crm/shared`, not against this.
+   */
+  JWT_ACCESS_TTL_SECONDS: z.coerce.number().int().positive().default(900),
+
+  /** How long a refresh token — and its `Session` row — stays valid. 30 days. */
+  JWT_REFRESH_TTL_SECONDS: z.coerce.number().int().positive().default(2_592_000),
+
+  /**
+   * argon2id parameters. Defaults are the OWASP minimum: 19 MiB of memory, two
+   * passes, one lane. Raising `ARGON2_MEMORY_COST` is the one that actually
+   * costs an attacker; raising it also costs every login, so it is a knob and
+   * not a constant.
+   */
+  ARGON2_MEMORY_COST: z.coerce.number().int().positive().default(19_456),
+  ARGON2_TIME_COST: z.coerce.number().int().positive().default(2),
+  ARGON2_PARALLELISM: z.coerce.number().int().positive().default(1),
+
+  /**
+   * Brute-force thresholds (AC5). Two independent counters, because one office
+   * behind one NAT is one IP: a single counter either locks out a whole floor
+   * of agents or fails to stop an attack on one account.
+   */
+  LOGIN_MAX_ATTEMPTS_PER_EMAIL: z.coerce.number().int().positive().default(5),
+  LOGIN_MAX_ATTEMPTS_PER_IP: z.coerce.number().int().positive().default(20),
+
+  /** Both the counting window and the lockout, in seconds. */
+  LOGIN_THROTTLE_WINDOW_SECONDS: z.coerce.number().int().positive().default(900),
+
+  /**
+   * `Secure` on the refresh cookie. Off by default only because a developer on
+   * plain `http://localhost` would otherwise never receive the cookie at all
+   * and login would appear to work while silently issuing no session.
+   * **Set this to true in every deployed environment.**
+   */
+  COOKIE_SECURE: BooleanFromString.default('false'),
+
+  /**
+   * Password given to the seeded development users. Optional: when it is unset
+   * the seed creates no users at all rather than inventing a password, and it
+   * refuses to create them in production regardless. See `src/seed/seed.ts`.
+   */
+  SEED_PASSWORD: z.string().min(8).optional(),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

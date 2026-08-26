@@ -15,3 +15,4 @@ One row per feature folder under `.squad/plans/`. `NN` continues as a global exe
 | `docker-compose`      | [00-overview.md](./docker-compose/00-overview.md)        | 09       |
 | `ci-pipeline`         | [00-overview.md](./ci-pipeline/00-overview.md)           | 10       |
 | `roles-permissions`   | [00-overview.md](./roles-permissions/00-overview.md)     | 11       |
+| `staff-login`         | [00-overview.md](./staff-login/00-overview.md)           | 12       |

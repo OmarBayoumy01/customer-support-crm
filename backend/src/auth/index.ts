@@ -1,0 +1,12 @@
+export { AuthModule } from './auth.module.js';
+export { AuthService, type RequestOrigin } from './auth.service.js';
+export { PasswordService } from './password.service.js';
+export { TokenService, type AccessTokenInput, type MintedRefreshToken } from './token.service.js';
+export { SessionService, type CreateSessionInput } from './session.service.js';
+export { LoginThrottleService } from './login-throttle.service.js';
+export { JwtAuthGuard } from './jwt-auth.guard.js';
+export { JwtStrategy } from './jwt.strategy.js';
+export { Public, IS_PUBLIC } from './decorators/public.decorator.js';
+export { CurrentUser, type CurrentUserPayload } from './decorators/current-user.decorator.js';
+export { REFRESH_COOKIE, refreshCookieOptions, clearRefreshCookieOptions } from './cookies.js';
+export { LoginRequestDto, LoginResponseDto } from './dto/login.dto.js';

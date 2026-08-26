@@ -82,6 +82,16 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-crm}:${POSTGRES_PASSWORD:-crm_local_dev}@postgres:5432/${POSTGRES_DB:-crm}?schema=public
       REDIS_URL: redis://redis:6379/0
       LOG_LEVEL: ${LOG_LEVEL:-debug}
+      # US-14. Local development values, and obviously so — a deployed
+      # environment supplies its own and `COOKIE_SECURE` becomes true there.
+      # The service refuses to boot if either secret is missing or under 32
+      # characters, which is the point.
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-dev-only-access-secret-change-me-0123456789abcdef}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-dev-only-refresh-secret-change-me-0123456789abcdef}
+      JWT_ISSUER: ${JWT_ISSUER:-crm}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      # Unset this and the seed creates no users — see src/seed/seed.ts.
+      SEED_PASSWORD: ${SEED_PASSWORD:-DevPassw0rd!}
     ports:
       - '${BACKEND_PORT:-3000}:3000'
     volumes:

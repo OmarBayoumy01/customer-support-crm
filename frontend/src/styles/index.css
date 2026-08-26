@@ -1,0 +1,155 @@
+@import 'tailwindcss';
+
+/**
+ * shadcn/ui emits `dark:` classes whether or not the app has a dark theme. The
+ * variant has to exist for them to compile; with no `.dark` ancestor on the
+ * page nothing matches, so this costs nothing until a theme story wants it.
+ */
+@custom-variant dark (&:is(.dark *));
+
+/**
+ * The palette — US-14.
+ *
+ * **P03 Design System & Shell owns the real one.** This story needed a login
+ * screen before that phase exists, so the rule here is: every colour and radius
+ * goes through a token, and no component hard-codes a hex value. P03 replaces
+ * the values in this block and every screen follows, rather than P03 having to
+ * hunt hexes through markup.
+ *
+ * Two layers, deliberately:
+ *
+ *   1. **Role tokens** (`--brand`, `--danger`, `--surface`) — ours, named for
+ *      what a colour *is for*. `--danger` survives a rebrand; `--red-600` does
+ *      not.
+ *   2. **shadcn tokens** (`--primary`, `--destructive`, `--card`) — the names
+ *      every generated component in `src/components/ui/` expects. They are
+ *      defined *from* layer 1 rather than beside it, so there is still exactly
+ *      one place a colour is chosen.
+ */
+:root {
+  /* Layer 1 — ours. */
+  --surface: #ffffff;
+  --surface-muted: #f6f7f9;
+  --line: #d8dce3;
+
+  --content: #1a1d23;
+  --content-muted: #5b6472;
+
+  --brand: #1f5fd6;
+  --brand-strong: #17489f;
+  --brand-contrast: #ffffff;
+
+  --danger: #b32020;
+  --danger-surface: #fdf0f0;
+
+  --radius: 0.5rem;
+
+  /* Layer 2 — what shadcn/ui components read. */
+  --background: var(--surface-muted);
+  --foreground: var(--content);
+
+  --card: var(--surface);
+  --card-foreground: var(--content);
+  --popover: var(--surface);
+  --popover-foreground: var(--content);
+
+  --primary: var(--brand);
+  --primary-foreground: var(--brand-contrast);
+
+  --secondary: var(--surface-muted);
+  --secondary-foreground: var(--content);
+
+  --muted: var(--surface-muted);
+  --muted-foreground: var(--content-muted);
+
+  --accent: var(--surface-muted);
+  --accent-foreground: var(--content);
+
+  --destructive: var(--danger);
+  --destructive-foreground: var(--brand-contrast);
+
+  --border: var(--line);
+  --input: var(--line);
+  --ring: var(--brand);
+}
+
+/**
+ * `@theme inline` rather than `@theme`: it re-reads the `var()` at use time, so
+ * a token overridden further down the tree (a themed panel, a preview pane)
+ * actually takes effect instead of being frozen at its `:root` value.
+ */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* Ours, still reachable as `bg-surface`, `text-content-muted`, and so on. */
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-content: var(--content);
+  --color-content-muted: var(--content-muted);
+  --color-brand: var(--brand);
+  --color-brand-strong: var(--brand-strong);
+  --color-danger: var(--danger);
+  --color-danger-surface: var(--danger-surface);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+/**
+ * The platform ships in English and Arabic from day one, so the document
+ * direction is driven by the active locale (see `src/i18n/index.ts`) rather
+ * than being an afterthought.
+ *
+ * Components use **logical properties only** — `ms-*`, `me-*`, `ps-*`, `pe-*`,
+ * `text-start`, `text-end`. Nothing uses `left` or `right`, which is what makes
+ * the mirror a swap rather than a second stylesheet. There is a test asserting
+ * it.
+ */
+html {
+  color-scheme: light;
+}
+
+body {
+  margin: 0;
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    'Noto Sans Arabic',
+    sans-serif;
+}
+
+/**
+ * A visible focus ring everywhere, not just where someone remembered one.
+ * Keyboard accessibility is in the definition of done for anything with a UI.
+ */
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}

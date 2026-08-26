@@ -11,7 +11,15 @@ const DATABASE_URL = 'postgresql://crm:crm_local_dev@127.0.0.1:5432/crm?schema=p
 
 /** Required alongside it since US-10. Bundled so each case names only what it tests. */
 const REDIS_URL = 'redis://127.0.0.1:6379/0';
-const REQUIRED = { DATABASE_URL, REDIS_URL };
+
+/**
+ * Required since US-14, and for a sharper reason than the two above: a signing
+ * key with a default is a signing key every attacker already has.
+ */
+const JWT_ACCESS_SECRET = 'test-only-access-secret-0123456789abcdefghijklmnop';
+const JWT_REFRESH_SECRET = 'test-only-refresh-secret-0123456789abcdefghijklmnop';
+
+const REQUIRED = { DATABASE_URL, REDIS_URL, JWT_ACCESS_SECRET, JWT_REFRESH_SECRET };
 
 test('applies defaults when only the required variables are supplied', () => {
   const parsed = EnvSchema.parse({ ...REQUIRED });
@@ -98,9 +106,69 @@ test('rejects a non-positive DATABASE_CONNECTION_TIMEOUT_MS', () => {
 });
 
 test('rejects a missing REDIS_URL and names it', () => {
-  const result = EnvSchema.safeParse({ DATABASE_URL });
+  const result = EnvSchema.safeParse({ DATABASE_URL, JWT_ACCESS_SECRET, JWT_REFRESH_SECRET });
   assert.ok(result.success === false);
   assert.match(formatEnvIssues(result.error), /REDIS_URL/);
+});
+
+// --- Authentication (US-14) ------------------------------------------------
+
+test('rejects a missing JWT_ACCESS_SECRET and names it', () => {
+  const result = EnvSchema.safeParse({ DATABASE_URL, REDIS_URL, JWT_REFRESH_SECRET });
+  assert.ok(result.success === false);
+  assert.match(formatEnvIssues(result.error), /JWT_ACCESS_SECRET/);
+});
+
+test('rejects a missing JWT_REFRESH_SECRET and names it', () => {
+  const result = EnvSchema.safeParse({ DATABASE_URL, REDIS_URL, JWT_ACCESS_SECRET });
+  assert.ok(result.success === false);
+  assert.match(formatEnvIssues(result.error), /JWT_REFRESH_SECRET/);
+});
+
+test('rejects a JWT secret that is too short to be worth signing with', () => {
+  const result = EnvSchema.safeParse({ ...REQUIRED, JWT_ACCESS_SECRET: 'too-short' });
+  assert.ok(result.success === false);
+  assert.match(formatEnvIssues(result.error), /at least 32 characters/);
+});
+
+test('neither JWT secret has a default — the service must not boot without one', () => {
+  // The whole point: a default here would be a shared secret published in the
+  // repository, and every token the platform ever issued would be forgeable.
+  const parsed = EnvSchema.parse({ ...REQUIRED });
+  assert.equal(parsed.JWT_ACCESS_SECRET, JWT_ACCESS_SECRET);
+  assert.equal(parsed.JWT_REFRESH_SECRET, JWT_REFRESH_SECRET);
+});
+
+test('applies the authentication defaults, including AC6 fifteen minutes', () => {
+  const parsed = EnvSchema.parse({ ...REQUIRED });
+
+  assert.equal(parsed.JWT_ACCESS_TTL_SECONDS, 900);
+  assert.equal(parsed.JWT_REFRESH_TTL_SECONDS, 2_592_000);
+  assert.equal(parsed.JWT_ISSUER, 'crm');
+  assert.equal(parsed.ARGON2_MEMORY_COST, 19_456);
+  assert.equal(parsed.ARGON2_TIME_COST, 2);
+  assert.equal(parsed.ARGON2_PARALLELISM, 1);
+  assert.equal(parsed.LOGIN_MAX_ATTEMPTS_PER_EMAIL, 5);
+  assert.equal(parsed.LOGIN_MAX_ATTEMPTS_PER_IP, 20);
+  assert.equal(parsed.LOGIN_THROTTLE_WINDOW_SECONDS, 900);
+});
+
+test('COOKIE_SECURE defaults to false and reads the string spellings', () => {
+  // Off by default only so a developer on plain http://localhost receives the
+  // cookie at all. `z.coerce.boolean()` would make the string "false" true,
+  // which is exactly the bug BooleanFromString exists to avoid.
+  assert.equal(EnvSchema.parse({ ...REQUIRED }).COOKIE_SECURE, false);
+  assert.equal(EnvSchema.parse({ ...REQUIRED, COOKIE_SECURE: 'false' }).COOKIE_SECURE, false);
+  assert.equal(EnvSchema.parse({ ...REQUIRED, COOKIE_SECURE: 'true' }).COOKIE_SECURE, true);
+});
+
+test('SEED_PASSWORD is optional, and short ones are refused', () => {
+  assert.equal(EnvSchema.parse({ ...REQUIRED }).SEED_PASSWORD, undefined);
+  assert.equal(EnvSchema.safeParse({ ...REQUIRED, SEED_PASSWORD: 'short' }).success, false);
+  assert.equal(
+    EnvSchema.parse({ ...REQUIRED, SEED_PASSWORD: 'DevPassw0rd!' }).SEED_PASSWORD,
+    'DevPassw0rd!',
+  );
 });
 
 test('rejects a REDIS_URL that is not a redis scheme', () => {

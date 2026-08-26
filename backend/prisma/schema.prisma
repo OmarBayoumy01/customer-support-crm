@@ -188,6 +188,7 @@ model User {
   branch       Branch?     @relation(fields: [branchId], references: [id], onDelete: SetNull)
 
   roles               UserRole[]
+  sessions            Session[]
   customerProfile     Customer?
   assignedTickets     Ticket[]           @relation("TicketAssignee")
   escalatedTickets    Ticket[]           @relation("TicketEscalatedTo")
@@ -276,6 +277,50 @@ model RolePermission {
 
   @@id([roleId, permissionId])
   @@index([permissionId])
+}
+
+/// One issued refresh token — US-14.
+///
+/// The access token is stateless and short-lived; this is the half that can be
+/// revoked. It is a table rather than a claim because US-16 ("sign out and
+/// revoke sessions") has to be able to end a session that has already been
+/// handed out, and you cannot un-issue a signed JWT.
+///
+/// Concurrent rows per user are normal and correct — a laptop and a phone are
+/// two sessions, not a conflict.
+model Session {
+  id String @id @default(uuid(7))
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// SHA-256 of the refresh token, never the token itself. A leaked database
+  /// backup must not hand out live sessions.
+  ///
+  /// SHA-256 rather than argon2 on purpose: this is 256 bits of `randomBytes`,
+  /// not a human-chosen password, so there is no dictionary to attack and a
+  /// deliberately slow hash would only tax every refresh. Passwords are a
+  /// different problem and get argon2id — see PasswordService.
+  refreshTokenHash String @unique
+
+  /// Which front door the session was opened at — `crm-staff` or `crm-portal`.
+  /// Stored so a portal refresh token can never mint a staff access token when
+  /// US-21 adds the second door.
+  audience String
+
+  expiresAt DateTime
+  revokedAt DateTime?
+
+  ipAddress String?
+  userAgent String?
+
+  createdAt  DateTime @default(now())
+  lastUsedAt DateTime @default(now())
+
+  /// Listing a user's live sessions — what US-16's UI reads.
+  @@index([userId, revokedAt])
+  /// Cleaning up expired rows. See SessionService.deleteExpired().
+  @@index([expiresAt])
 }
 
 // ============================================================================

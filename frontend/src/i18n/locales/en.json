@@ -1,0 +1,34 @@
+{
+  "common": {
+    "appName": "Customer Support CRM",
+    "languageName": "English",
+    "switchLanguage": "العربية",
+    "signOut": "Sign out"
+  },
+  "login": {
+    "title": "Sign in",
+    "subtitle": "Sign in to the staff workspace.",
+    "email": "Email",
+    "emailPlaceholder": "you@example.com",
+    "password": "Password",
+    "submit": "Sign in",
+    "submitting": "Signing in…",
+    "errors": {
+      "emailRequired": "Email is required",
+      "emailInvalid": "Enter a valid email address",
+      "passwordRequired": "Password is required",
+      "invalidCredentials": "Email or password is incorrect.",
+      "inactiveAccount": "This account has been deactivated. Please contact an administrator.",
+      "rateLimited": "Too many sign-in attempts. Please wait a few minutes and try again.",
+      "unexpected": "Something went wrong. Please try again.",
+      "offline": "Could not reach the server. Check your connection and try again."
+    }
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "greeting": "Signed in as {{name}}",
+    "rolesLabel": "Roles",
+    "noRoles": "No roles assigned",
+    "placeholder": "This is a placeholder. The real dashboard arrives with its own story."
+  }
+}

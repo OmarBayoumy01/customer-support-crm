@@ -61,6 +61,53 @@ test('AC1 — the schema contains all sixteen core entities', async () => {
   }
 });
 
+test('US-14 — the Session table exists with its unique hash and lookup indexes', async () => {
+  const rows = await prisma.$queryRaw<Array<{ table_name: string }>>`
+    SELECT table_name FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'Session'`;
+
+  assert.equal(rows.length, 1, 'US-14 added Session so US-16 has something to revoke');
+
+  const indexes = await prisma.$queryRaw<Array<{ indexname: string }>>`
+    SELECT indexname FROM pg_indexes WHERE schemaname = 'public' AND tablename = 'Session'`;
+
+  const names = indexes.map((row) => row.indexname);
+
+  // Unique, so the "impossible" collision of two 256-bit tokens is loud rather
+  // than silently authenticating the wrong person.
+  assert.ok(names.includes('Session_refreshTokenHash_key'));
+  // Listing a user's live sessions — what US-16's UI reads.
+  assert.ok(names.includes('Session_userId_revokedAt_idx'));
+  // Cleaning up expired rows.
+  assert.ok(names.includes('Session_expiresAt_idx'));
+});
+
+test('US-14 — deleting a user takes their sessions with them', async () => {
+  const user = await prisma.user.create({
+    data: {
+      email: `session-cascade-${run}@example.com`,
+      passwordHash: 'not-a-real-hash',
+      firstName: 'Session',
+      lastName: 'Cascade',
+    },
+    select: { id: true },
+  });
+
+  await prisma.session.create({
+    data: {
+      userId: user.id,
+      refreshTokenHash: `hash-${run}`,
+      audience: 'crm-staff',
+      expiresAt: new Date(Date.now() + 60_000),
+    },
+  });
+
+  await prisma.user.delete({ where: { id: user.id } });
+
+  // A hard-deleted user leaving live sessions behind would be a way back in.
+  assert.equal(await prisma.session.count({ where: { userId: user.id } }), 0);
+});
+
 test('AC1 — the temporary MigrationProbe from US-5 is gone', async () => {
   const rows = await prisma.$queryRaw<Array<{ table_name: string }>>`
     SELECT table_name FROM information_schema.tables
