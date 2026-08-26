@@ -118,7 +118,8 @@
     "assignee": "المسؤول",
     "unassigned": "غير مُسند",
     "resolveExample": "حل التذكرة",
-    "resolveExampleBody": "سيتم إبلاغ العميل بأن التذكرة قد حُلّت."
+    "resolveExampleBody": "سيتم إبلاغ العميل بأن التذكرة قد حُلّت.",
+    "dataTable": "جدول البيانات"
   },
   "admin": {
     "placeholder": "شاشات الإدارة تأتي مع قصصها الخاصة."
@@ -177,5 +178,12 @@
     "reporting": "التقارير",
     "publishing": "نشر المقالات",
     "auditTrail": "سجل التدقيق"
+  },
+  "table": {
+    "selectAll": "تحديد كل الصفوف في هذه الصفحة",
+    "selectRow": "تحديد الصف",
+    "clearSelection": "إلغاء التحديد",
+    "selectedCount_one": "تم تحديد واحد",
+    "selectedCount_other": "تم تحديد {{count}}"
   }
 }

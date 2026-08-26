@@ -5,6 +5,7 @@ import { Combobox } from '@/components/common/combobox';
 import { ConfirmDialog } from '@/components/common/confirm-dialog';
 import { FilterBar } from '@/components/common/filter-bar';
 import { ListPagination } from '@/components/common/list-pagination';
+import { DataTable, type ColumnDef } from '@/components/data-table/data-table';
 import { PriorityBadge, SlaMeter, slaEdgeClass, StatusBadge } from '@/components/domain/indicators';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,6 +14,51 @@ import { Separator } from '@/components/ui/separator';
 import { applyBrandAccent, DEFAULT_ACCENT, resetBrandAccent } from '@/lib/branding';
 import { TICKET_PRIORITIES, TICKET_STATUSES } from '@/lib/design-tokens';
 import { cn } from '@/lib/utils';
+
+interface DemoRow {
+  id: string;
+  subject: string;
+  target: number;
+  elapsed: number;
+  priority: 'LOW' | 'HIGH' | 'URGENT';
+}
+
+const DEMO_ROWS: DemoRow[] = [
+  {
+    id: 'TCK-10482',
+    subject: 'Cannot sign in after password change',
+    target: 14_400,
+    elapsed: 2_400,
+    priority: 'LOW',
+  },
+  {
+    id: 'TCK-10488',
+    subject: 'Invoice total does not match the order',
+    target: 14_400,
+    elapsed: 11_400,
+    priority: 'HIGH',
+  },
+  {
+    id: 'TCK-10491',
+    subject: 'Refund still not received',
+    target: 14_400,
+    elapsed: 16_800,
+    priority: 'URGENT',
+  },
+];
+
+const DEMO_COLUMNS: ColumnDef<DemoRow>[] = [
+  { key: 'id', header: 'Reference', cell: (row) => <span className="tabular">{row.id}</span> },
+  { key: 'subject', header: 'Subject', cell: (row) => row.subject, sortable: true },
+  { key: 'priority', header: 'Priority', cell: (row) => <PriorityBadge priority={row.priority} /> },
+  {
+    key: 'sla',
+    header: 'SLA',
+    sortable: true,
+    align: 'end',
+    cell: (row) => <SlaMeter targetSeconds={row.target} elapsedSeconds={row.elapsed} />,
+  },
+];
 
 /** One labelled block. Used often enough here to be worth naming. */
 function Section({
@@ -56,6 +102,9 @@ export function DesignSystemPage(): React.JSX.Element {
   const [accent, setAccent] = useState(DEFAULT_ACCENT);
   const [search, setSearch] = useState('');
   const [assignee, setAssignee] = useState<string | null>(null);
+  const [sort, setSort] = useState<string | null>('sla');
+  const [dir, setDir] = useState<'asc' | 'desc'>('asc');
+  const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [filters, setFilters] = useState<Record<string, string | null>>({
     status: null,
     priority: null,
@@ -240,6 +289,29 @@ export function DesignSystemPage(): React.JSX.Element {
 
           <ListPagination page={2} totalPages={5} total={91} onPageChange={() => undefined} />
         </div>
+      </Section>
+
+      <Section title={t('designSystem.dataTable')}>
+        {/*
+          The table with live sorting and selection. Sorting writes to the URL,
+          which is the point of it — a filtered view is something you can send.
+        */}
+        <DataTable
+          columns={DEMO_COLUMNS}
+          rows={DEMO_ROWS}
+          rowKey={(row) => row.id}
+          sort={sort}
+          dir={dir}
+          onSortChange={(column) => {
+            setDir(sort === column && dir === 'asc' ? 'desc' : 'asc');
+            setSort(column);
+          }}
+          selected={selectedRows}
+          onSelectedChange={setSelectedRows}
+          bulkActions={<Button size="sm">{t('designSystem.assignee')}</Button>}
+          emptyTitle={t('states.noResultsTitle')}
+          emptyDescription={t('states.noResultsBody')}
+        />
       </Section>
 
       {/* AC4, demonstrated rather than described. */}

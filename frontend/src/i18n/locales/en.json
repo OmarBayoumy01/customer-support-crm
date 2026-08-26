@@ -118,7 +118,8 @@
     "assignee": "Assignee",
     "unassigned": "Unassigned",
     "resolveExample": "Resolve ticket",
-    "resolveExampleBody": "The customer will be told the ticket is resolved."
+    "resolveExampleBody": "The customer will be told the ticket is resolved.",
+    "dataTable": "Data table"
   },
   "admin": {
     "placeholder": "Administration screens arrive with their own stories."
@@ -177,5 +178,12 @@
     "reporting": "Reporting",
     "publishing": "Article publishing",
     "auditTrail": "The audit trail"
+  },
+  "table": {
+    "selectAll": "Select all rows on this page",
+    "selectRow": "Select row",
+    "clearSelection": "Clear selection",
+    "selectedCount_one": "{{count}} selected",
+    "selectedCount_other": "{{count}} selected"
   }
 }
