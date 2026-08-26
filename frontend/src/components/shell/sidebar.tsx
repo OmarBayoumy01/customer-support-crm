@@ -67,7 +67,7 @@ function SidebarLink({
       ) : (
         <span className="truncate">{label}</span>
       )}
-      {!collapsed && item.badge === 'assignedTickets' && assigned.data !== undefined ? (
+      {!collapsed && item.badge === 'assignedTickets' && assigned.data != null ? (
         <CountBadge count={assigned.data.total} atRisk={assigned.data.atRisk > 0} />
       ) : null}
       {!collapsed && !allowed ? (

@@ -300,7 +300,7 @@ export function TicketsQueuePage(): React.JSX.Element {
         emptyDescription={t('ticket.queue.emptyDescription')}
       />
 
-      {list.data !== undefined && list.data.pagination.total > 0 && (
+      {list.data?.pagination !== undefined && list.data.pagination.total > 0 && (
         <ListPagination
           page={list.data.pagination.page}
           totalPages={list.data.pagination.totalPages}

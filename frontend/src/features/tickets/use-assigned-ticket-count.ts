@@ -30,14 +30,14 @@ export const ASSIGNED_TICKET_COUNT_KEY = ['tickets', 'assigned', 'count'] as con
  * `undefined` and the badge does not render, because a sidebar showing `0`
  * because nothing answered is worse than one showing nothing at all.
  */
-export function useAssignedTicketCount(): UseQueryResult<AssignedTicketCount | undefined> {
+export function useAssignedTicketCount(): UseQueryResult<AssignedTicketCount | null> {
   return useQuery({
     queryKey: ASSIGNED_TICKET_COUNT_KEY,
-    queryFn: async (): Promise<AssignedTicketCount | undefined> => {
+    queryFn: async (): Promise<AssignedTicketCount | null> => {
       try {
         return await apiGet<AssignedTicketCount>('/tickets/assigned/count');
       } catch {
-        return undefined;
+        return null;
       }
     },
     // A queue count that is a minute stale misleads in a way a list does not:

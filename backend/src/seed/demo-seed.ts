@@ -190,6 +190,29 @@ export async function seedDemoData(prisma: PrismaClient): Promise<void> {
     });
   }
 
+  /*
+   * The four generic development accounts get a department too.
+   *
+   * Without one they are useless for a demo, and in a way that looks like a
+   * bug rather than a setting: a manager's `ticket:view` is scoped to `TEAM`,
+   * so a manager belonging to no department correctly sees **nothing**, and an
+   * empty queue is indistinguishable from a broken one.
+   *
+   * It happens here rather than in `seedDevelopmentUsers` because departments
+   * are demo data — the reference seed must not depend on them existing.
+   */
+  const supportDepartmentId = departmentIdByCode.get('SUP');
+
+  if (supportDepartmentId !== undefined) {
+    await prisma.user.updateMany({
+      where: {
+        email: { in: ['manager@crm.local', 'agent@crm.local'] },
+        departmentId: null,
+      },
+      data: { departmentId: supportDepartmentId },
+    });
+  }
+
   // --- Customers -----------------------------------------------------------
   const customerIdByKey = new Map<string, string>();
 

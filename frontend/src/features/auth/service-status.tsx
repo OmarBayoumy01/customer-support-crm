@@ -54,7 +54,7 @@ export function ServiceStatus(): React.JSX.Element | null {
   const { t } = useTranslation();
   const { data } = useServiceHealth();
 
-  if (data === undefined) {
+  if (!data) {
     return null;
   }
 

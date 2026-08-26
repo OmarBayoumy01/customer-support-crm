@@ -34,7 +34,18 @@ export function useTicketList(search: string): UseQueryResult<TicketPage> {
         `/tickets${search}`,
       );
 
-      return { tickets: response.data.data, pagination: response.data.pagination };
+      const body = response.data as Partial<{ data: Ticket[]; pagination: PaginationMeta }>;
+
+      // Deliberately not defaulted to an empty page. A malformed envelope means
+      // something is wrong, and rendering "no tickets" would report that as an
+      // empty queue — the most reassuring possible way to show a failure, and
+      // the reason a dev-proxy misconfiguration went unnoticed for a whole
+      // story. Thrown, so the table shows its error state.
+      if (body.data === undefined || body.pagination === undefined) {
+        throw new Error(`/tickets${search} did not answer with a paginated envelope`);
+      }
+
+      return { tickets: body.data, pagination: body.pagination };
     },
     placeholderData: keepPreviousData,
     // A queue is read to decide what to do next, so a minute-old count is

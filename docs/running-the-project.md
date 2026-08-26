@@ -153,6 +153,13 @@ dashboard. The toggle in the corner of the login card switches to Arabic and mir
 whole layout — worth clicking, because RTL is a requirement from day one and it is easiest
 to catch a regression by eye.
 
+> **`agent@crm.local` has an empty ticket queue, and that is correct.** An agent's
+> `ticket:view` is scoped to `ASSIGNED`, and no demo ticket is assigned to that account.
+> To see a populated queue, sign in as **`admin@crm.local`** (sees everything),
+> **`manager@crm.local`** (their department), or one of the demo agents such as
+> **`priya.raman@crm.local`** (their own tickets). An empty queue on an `ASSIGNED`-scoped
+> account is the scope rule working, not a bug.
+
 From the command line:
 
 ```bash

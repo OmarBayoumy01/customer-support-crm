@@ -18,18 +18,18 @@ import { http } from '@/lib/api-client';
  * widget could not load would be worse than one that showed no widget: it would
  * tell the user their credentials were the problem when they are not.
  */
-export function useServiceHealth(): UseQueryResult<HealthStatus | undefined> {
+export function useServiceHealth(): UseQueryResult<HealthStatus | null> {
   return useQuery({
     queryKey: ['service-health'],
-    queryFn: async (): Promise<HealthStatus | undefined> => {
+    queryFn: async (): Promise<HealthStatus | null> => {
       try {
         const response = await http.get<{ data: unknown }>('/health');
 
         // Parsed, not cast. Anything unexpected — a proxy error page, a stub in
-        // a test — becomes `undefined` rather than a half-rendered strip.
+        // a test — becomes `null` rather than a half-rendered strip.
         return HealthStatusSchema.parse(response.data.data);
       } catch {
-        return undefined;
+        return null;
       }
     },
     // Someone staring at a sign-in screen because the platform is down wants to

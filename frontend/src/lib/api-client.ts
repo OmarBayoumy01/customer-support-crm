@@ -176,15 +176,41 @@ function rejectAsApiError(error: unknown): never {
   }
 }
 
-/** Unwraps US-7's `{ data }` success envelope. */
-export async function apiGet<T>(path: string): Promise<T> {
-  const response = await http.get<{ data: T }>(path);
+/**
+ * Unwraps US-7's `{ data }` success envelope, and refuses anything that is not
+ * one.
+ *
+ * The check is not paranoia about the API. It is about the **development
+ * proxy**: a path Vite does not forward is answered by Vite itself with
+ * `index.html`, so a 200 arrives carrying a string of markup. Without this,
+ * `body.data` is `undefined`, every caller returns `undefined`, and the symptom
+ * surfaces three layers away as TanStack Query's *"Query data cannot be
+ * undefined"* — which names neither the request nor the reason.
+ *
+ * That happened, cost an afternoon, and is why this throws with the path in the
+ * message instead.
+ */
+function unwrap<T>(path: string, body: unknown): T {
+  if (typeof body !== 'object' || body === null || !('data' in body)) {
+    throw new ApiRequestError(
+      'INTERNAL_ERROR',
+      `${path} did not answer with an API envelope. In development this usually means the ` +
+        `path is missing from the Vite proxy in frontend/vite.config.ts.`,
+      200,
+    );
+  }
 
-  return response.data.data;
+  return (body as { data: T }).data;
+}
+
+export async function apiGet<T>(path: string): Promise<T> {
+  const response = await http.get<unknown>(path);
+
+  return unwrap<T>(path, response.data);
 }
 
 export async function apiPost<T>(path: string, body: unknown): Promise<T> {
-  const response = await http.post<{ data: T }>(path, body);
+  const response = await http.post<unknown>(path, body);
 
-  return response.data.data;
+  return unwrap<T>(path, response.data);
 }

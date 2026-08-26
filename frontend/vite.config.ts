@@ -43,6 +43,24 @@ export default defineConfig({
     proxy: {
       '/auth': { target: apiTarget, changeOrigin: false },
       '/health': { target: apiTarget, changeOrigin: false },
+      '/tickets': {
+        target: apiTarget,
+        changeOrigin: false,
+        bypass(req) {
+          if (req.headers.accept?.includes('text/html')) {
+            return '/index.html';
+          }
+        },
+      },
+      '/customers': {
+        target: apiTarget,
+        changeOrigin: false,
+        bypass(req) {
+          if (req.headers.accept?.includes('text/html')) {
+            return '/index.html';
+          }
+        },
+      },
     },
     ...(usePolling ? { watch: { usePolling: true, interval: 300 } } : {}),
   },
