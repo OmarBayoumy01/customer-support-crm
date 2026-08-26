@@ -114,7 +114,10 @@
       "rateLimited": "Too many sign-in attempts. Please wait a few minutes and try again.",
       "unexpected": "Something went wrong. Please try again.",
       "offline": "Could not reach the server. Check your connection and try again."
-    }
+    },
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
+    "capsLock": "Caps Lock is on"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -122,5 +125,16 @@
     "rolesLabel": "Roles",
     "noRoles": "No roles assigned",
     "placeholder": "This is a placeholder. The real dashboard arrives with its own story."
+  },
+  "signIn": {
+    "headline": "The queue is waiting.",
+    "subhead": "Sign in to pick up where the desk left off.",
+    "status": {
+      "title": "Platform status",
+      "up": "Operational",
+      "down": "Down",
+      "database": "Database",
+      "redis": "Cache"
+    }
   }
 }

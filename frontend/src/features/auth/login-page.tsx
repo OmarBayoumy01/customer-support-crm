@@ -1,16 +1,17 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useForm, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslation } from 'react-i18next';
+import { AlertCircle, Eye, EyeOff, Headphones, LoaderCircle } from 'lucide-react';
 import { LoginRequestSchema, type LoginRequest } from '@crm/shared';
 
-import { Alert, AlertDescription } from '../../components/ui/alert';
-import { Button } from '../../components/ui/button';
-import { Input } from '../../components/ui/input';
-import { Label } from '../../components/ui/label';
-
-import { LanguageToggle } from '../../components/language-toggle';
-import type { ApiRequestError } from '../../lib/api-client';
+import { LanguageToggle } from '@/components/language-toggle';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import type { ApiRequestError } from '@/lib/api-client';
+import { cn } from '@/lib/utils';
+import { ServiceStatus } from './service-status';
 import { useLogin } from './use-login';
 
 /**
@@ -37,9 +38,47 @@ function messageKeyFor(error: ApiRequestError): string {
   }
 }
 
+/**
+ * The panel beside the form.
+ *
+ * A sign-in screen is usually where a product puts a stock illustration. This
+ * one puts the **desk's own operational state**, because that is what this
+ * product is about and because it answers the question somebody staring at a
+ * failed sign-in actually has: is it me, or is it the platform?
+ *
+ * Inverted graphite rather than the usual paper. It is not a dark theme — it is
+ * one deliberately heavy field, which is what gives the single indigo accent on
+ * the form beside it something to be bright against.
+ */
+function DeskPanel(): React.JSX.Element {
+  const { t } = useTranslation();
+
+  return (
+    <aside className="bg-ink hidden flex-col justify-between p-10 lg:flex">
+      <div className="flex items-center gap-2.5">
+        <Headphones aria-hidden="true" className="size-5 text-white/80" />
+        <span className="text-section font-semibold text-white">{t('common.appName')}</span>
+      </div>
+
+      <div className="max-w-xs">
+        {/*
+          The one large piece of type on the screen. Not a slogan — a plain
+          statement of what the person is about to open.
+        */}
+        <p className="text-[1.75rem] leading-9 font-semibold text-white">{t('signIn.headline')}</p>
+        <p className="text-body mt-3 text-white/55">{t('signIn.subhead')}</p>
+      </div>
+
+      <ServiceStatus />
+    </aside>
+  );
+}
+
 export function LoginPage(): React.JSX.Element {
   const { t } = useTranslation();
   const login = useLogin();
+  const [revealed, setRevealed] = useState(false);
+  const [capsLock, setCapsLock] = useState(false);
 
   /**
    * The **shared** schema supplies the rules; this supplies the words.
@@ -50,9 +89,9 @@ export function LoginPage(): React.JSX.Element {
    * replaced afterwards, keyed on the field and the Zod issue code that
    * `zodResolver` records as `type`.
    *
-   * Note it cannot be done with a Zod `errorMap`: an explicit message on the
-   * schema — and the shared schema has them, because they are also the API's
-   * own error text — takes precedence over any map.
+   * It cannot be done with a Zod `errorMap`: an explicit message on the schema
+   * — and the shared schema has them, because they are also the API's own error
+   * text — takes precedence over any map.
    */
   const resolver = useMemo<Resolver<LoginRequest>>(() => {
     const base = zodResolver(LoginRequestSchema);
@@ -98,76 +137,138 @@ export function LoginPage(): React.JSX.Element {
   const isSubmitting = login.isPending;
 
   return (
-    <main className="flex min-h-screen items-center justify-center p-4">
-      <div className="bg-card w-full max-w-sm rounded-lg border p-6 shadow-sm">
-        <div className="mb-6 flex items-start justify-between gap-2">
-          <div>
-            <h1 className="text-xl font-semibold">{t('login.title')}</h1>
-            <p className="text-muted-foreground mt-1 text-sm">{t('login.subtitle')}</p>
+    <div className="grid min-h-screen lg:grid-cols-[minmax(0,26rem)_1fr]">
+      <DeskPanel />
+
+      <main className="flex items-center justify-center p-6">
+        <div className="w-full max-w-sm">
+          <div className="mb-8 flex items-start justify-between gap-3">
+            <div>
+              {/* Shown only where the panel is not — no duplicate wordmark. */}
+              <div className="mb-5 flex items-center gap-2 lg:hidden">
+                <Headphones aria-hidden="true" className="text-ink size-5" />
+                <span className="text-section font-semibold">{t('common.appName')}</span>
+              </div>
+              <h1 className="text-page font-semibold">{t('login.title')}</h1>
+              <p className="text-ink-muted mt-1">{t('login.subtitle')}</p>
+            </div>
+            <LanguageToggle />
           </div>
-          <LanguageToggle />
+
+          {/*
+            One live region for the request-level error. `role="alert"` so a
+            screen reader announces it without the user having to go looking,
+            and it sits before the fields so tab order reaches it naturally.
+          */}
+          {login.isError ? (
+            <div
+              role="alert"
+              className="border-sla-breach/30 bg-sla-breach-soft text-sla-breach mb-5 flex items-start gap-2 rounded-md border px-3 py-2.5"
+            >
+              <AlertCircle aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+              <span className="text-body">{t(messageKeyFor(login.error))}</span>
+            </div>
+          ) : null}
+
+          <form onSubmit={(event) => void handleSubmit(onSubmit)(event)} noValidate>
+            <div className="mb-4">
+              <Label htmlFor="email" className="mb-1.5">
+                {t('login.email')}
+              </Label>
+              <Input
+                id="email"
+                type="email"
+                autoComplete="username"
+                autoFocus
+                // `text-start`, not `text-left` — the field aligns with the
+                // reading direction rather than to one fixed side.
+                className="text-start"
+                placeholder={t('login.emailPlaceholder')}
+                aria-invalid={errors.email === undefined ? undefined : true}
+                aria-describedby={errors.email === undefined ? undefined : 'email-error'}
+                {...register('email')}
+              />
+              {errors.email === undefined ? null : (
+                <p id="email-error" className="text-sla-breach text-meta mt-1.5">
+                  {errors.email.message}
+                </p>
+              )}
+            </div>
+
+            <div className="mb-6">
+              <Label htmlFor="password" className="mb-1.5">
+                {t('login.password')}
+              </Label>
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={revealed ? 'text' : 'password'}
+                  autoComplete="current-password"
+                  // Room for the reveal control, on whichever side the language
+                  // puts it.
+                  className="text-start pe-10"
+                  aria-invalid={errors.password === undefined ? undefined : true}
+                  aria-describedby={cn(
+                    errors.password === undefined ? '' : 'password-error',
+                    capsLock ? 'caps-warning' : '',
+                  ).trim()}
+                  onKeyUp={(event) => {
+                    setCapsLock(event.getModifierState('CapsLock'));
+                  }}
+                  {...register('password')}
+                />
+                {/*
+                  A reveal, not a "show password" checkbox below the field. On a
+                  shared support floor the ability to check what you typed
+                  without it staying on screen is the point.
+                */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRevealed((value) => !value);
+                  }}
+                  aria-label={t(revealed ? 'login.hidePassword' : 'login.showPassword')}
+                  aria-pressed={revealed}
+                  className="text-ink-muted hover:text-ink absolute inset-y-0 end-0 flex w-10 items-center justify-center rounded-md"
+                >
+                  {revealed ? (
+                    <EyeOff aria-hidden="true" className="size-4" />
+                  ) : (
+                    <Eye aria-hidden="true" className="size-4" />
+                  )}
+                </button>
+              </div>
+              {errors.password === undefined ? null : (
+                <p id="password-error" className="text-sla-breach text-meta mt-1.5">
+                  {errors.password.message}
+                </p>
+              )}
+              {/*
+                Caps Lock is the single most common cause of a password that
+                "should work". Cheap to detect, and it saves a support ticket
+                on a product whose whole job is support tickets.
+              */}
+              {capsLock ? (
+                <p id="caps-warning" className="text-sla-warn text-meta mt-1.5">
+                  {t('login.capsLock')}
+                </p>
+              ) : null}
+            </div>
+
+            <Button
+              type="submit"
+              disabled={isSubmitting}
+              aria-busy={isSubmitting}
+              className="w-full gap-2"
+            >
+              {isSubmitting ? (
+                <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />
+              ) : null}
+              {isSubmitting ? t('login.submitting') : t('login.submit')}
+            </Button>
+          </form>
         </div>
-
-        {/*
-          One live region for the request-level error. `role="alert"` so a
-          screen reader announces it without the user having to go looking, and
-          it is rendered *before* the fields so tab order reaches it naturally.
-        */}
-        {login.isError ? (
-          <Alert variant="destructive" role="alert" className="mb-4">
-            <AlertDescription>{t(messageKeyFor(login.error))}</AlertDescription>
-          </Alert>
-        ) : null}
-
-        <form onSubmit={(event) => void handleSubmit(onSubmit)(event)} noValidate>
-          <div className="mb-4">
-            <Label htmlFor="email" className="mb-1.5">
-              {t('login.email')}
-            </Label>
-            <Input
-              id="email"
-              type="email"
-              autoComplete="username"
-              // `text-start`, not `text-left` — the field aligns with the
-              // reading direction rather than to one fixed side.
-              className="text-start"
-              placeholder={t('login.emailPlaceholder')}
-              aria-invalid={errors.email === undefined ? undefined : true}
-              aria-describedby={errors.email === undefined ? undefined : 'email-error'}
-              {...register('email')}
-            />
-            {errors.email === undefined ? null : (
-              <p id="email-error" className="text-destructive mt-1 text-sm">
-                {errors.email.message}
-              </p>
-            )}
-          </div>
-
-          <div className="mb-6">
-            <Label htmlFor="password" className="mb-1.5">
-              {t('login.password')}
-            </Label>
-            <Input
-              id="password"
-              type="password"
-              autoComplete="current-password"
-              className="text-start"
-              aria-invalid={errors.password === undefined ? undefined : true}
-              aria-describedby={errors.password === undefined ? undefined : 'password-error'}
-              {...register('password')}
-            />
-            {errors.password === undefined ? null : (
-              <p id="password-error" className="text-destructive mt-1 text-sm">
-                {errors.password.message}
-              </p>
-            )}
-          </div>
-
-          <Button type="submit" disabled={isSubmitting} aria-busy={isSubmitting} className="w-full">
-            {isSubmitting ? t('login.submitting') : t('login.submit')}
-          </Button>
-        </form>
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }

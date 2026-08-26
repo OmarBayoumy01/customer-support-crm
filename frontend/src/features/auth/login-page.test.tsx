@@ -29,6 +29,15 @@ const realAdapter = http.defaults.adapter;
 /** Every request the component made, so a test can assert what was sent. */
 let sent: InternalAxiosRequestConfig[] = [];
 
+/**
+ * Login requests only.
+ *
+ * The screen also asks `/health` for the platform-status strip, through the
+ * same client — so 'nothing was sent' would be false even when no sign-in was
+ * attempted. These assertions are about the sign-in.
+ */
+const loginCalls = (): InternalAxiosRequestConfig[] => sent.filter((r) => r.url === '/auth/login');
+
 function respondWith(status: number, data: unknown): void {
   const adapter: AxiosAdapter = (config) => {
     sent.push(config);
@@ -116,8 +125,8 @@ function renderLogin(): void {
 async function submit(email = VALID_EMAIL, password = VALID_PASSWORD): Promise<void> {
   const user = userEvent.setup();
 
-  await user.type(screen.getByLabelText(/email|البريد/i), email);
-  await user.type(screen.getByLabelText(/password|كلمة المرور/i), password);
+  await user.type(screen.getByLabelText(/email|البريد/i, { selector: 'input' }), email);
+  await user.type(screen.getByLabelText(/password|كلمة المرور/i, { selector: 'input' }), password);
   await user.click(screen.getByRole('button', { name: /sign in|تسجيل الدخول/i }));
 }
 
@@ -157,7 +166,7 @@ describe('the form itself', () => {
 
     expect(await screen.findByText('Email is required')).toBeInTheDocument();
     expect(screen.getByText('Password is required')).toBeInTheDocument();
-    expect(sent).toHaveLength(0);
+    expect(loginCalls()).toHaveLength(0);
   });
 
   test('a malformed email is caught before the request', async () => {
@@ -167,7 +176,7 @@ describe('the form itself', () => {
     await submit('not-an-email', VALID_PASSWORD);
 
     expect(await screen.findByText('Enter a valid email address')).toBeInTheDocument();
-    expect(sent).toHaveLength(0);
+    expect(loginCalls()).toHaveLength(0);
   });
 });
 
@@ -188,10 +197,10 @@ describe('AC1 — successful login', () => {
     await submit();
 
     await waitFor(() => {
-      expect(sent).toHaveLength(1);
+      expect(loginCalls()).toHaveLength(1);
     });
 
-    const request = sent[0];
+    const request = loginCalls()[0];
     expect(request?.url).toBe('/auth/login');
     expect(request?.method).toBe('post');
     // Without this the httpOnly refresh cookie is never stored.
@@ -205,12 +214,12 @@ describe('AC1 — successful login', () => {
     await submit('  AGENT@CRM.LOCAL  ', VALID_PASSWORD);
 
     await waitFor(() => {
-      expect(sent).toHaveLength(1);
+      expect(loginCalls()).toHaveLength(1);
     });
 
     // The same shared schema normalises on the server, and the brute-force
     // counter is keyed on the normalised value — so both sides must agree.
-    expect(JSON.parse(String(sent[0]?.data))).toMatchObject({ email: VALID_EMAIL });
+    expect(JSON.parse(String(loginCalls()[0]?.data))).toMatchObject({ email: VALID_EMAIL });
   });
 });
 
@@ -346,5 +355,63 @@ describe('Arabic RTL', () => {
     expect(classNames).not.toMatch(/\b(ml|mr|pl|pr)-/);
     expect(classNames).not.toMatch(/\btext-(left|right)\b/);
     expect(classNames).not.toMatch(/\b(left|right)-\d/);
+  });
+});
+
+describe('the password field', () => {
+  test('the reveal toggles the field between hidden and visible', async () => {
+    respondWith(200, SUCCESS_ENVELOPE);
+    renderLogin();
+
+    const field = screen.getByLabelText('Password', { selector: 'input' });
+    expect(field).toHaveAttribute('type', 'password');
+
+    const reveal = screen.getByRole('button', { name: 'Show password' });
+    expect(reveal).toHaveAttribute('aria-pressed', 'false');
+
+    await userEvent.setup().click(reveal);
+
+    // On a shared support floor, being able to check what you typed without it
+    // staying on screen is the point.
+    expect(field).toHaveAttribute('type', 'text');
+    expect(screen.getByRole('button', { name: 'Hide password' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+  });
+
+  test('the reveal is a button, so it never submits the form', () => {
+    respondWith(200, SUCCESS_ENVELOPE);
+    renderLogin();
+
+    expect(screen.getByRole('button', { name: 'Show password' })).toHaveAttribute('type', 'button');
+  });
+
+  test('Caps Lock is warned about, since it is the usual cause of a password that should work', async () => {
+    respondWith(200, SUCCESS_ENVELOPE);
+    renderLogin();
+
+    const field = screen.getByLabelText('Password', { selector: 'input' });
+
+    expect(screen.queryByText('Caps Lock is on')).not.toBeInTheDocument();
+
+    await userEvent.setup({ document }).type(field, '{CapsLock}a');
+
+    expect(await screen.findByText('Caps Lock is on')).toBeInTheDocument();
+    // Described by it, so a screen reader hears the warning with the field.
+    expect(field.getAttribute('aria-describedby')).toContain('caps-warning');
+  });
+});
+
+describe('the platform status strip', () => {
+  test('renders nothing when the API cannot be reached', async () => {
+    // Absence is not a claim. A red "unreachable" badge here would tell someone
+    // their password was the problem when it was not.
+    respondWithNetworkFailure();
+    renderLogin();
+
+    await waitFor(() => {
+      expect(screen.queryByText('Platform status')).not.toBeInTheDocument();
+    });
   });
 });
