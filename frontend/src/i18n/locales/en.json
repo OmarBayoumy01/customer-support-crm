@@ -80,7 +80,15 @@
     }
   },
   "states": {
-    "loading": "Loading"
+    "loading": "Loading",
+    "noResultsTitle": "Nothing matches those filters",
+    "noResultsBody": "Try widening them, or clear them to see everything again.",
+    "errorTitle": "That did not load",
+    "errorBody": "The request did not complete. Trying again usually works.",
+    "errorOffline": "There is no connection right now. This will work again once you are back online.",
+    "retry": "Try again",
+    "reference": "Reference",
+    "offlineBanner": "You are offline. Changes will not be saved until you reconnect."
   },
   "errors": {
     "crashTitle": "This screen stopped working",
@@ -116,7 +124,11 @@
   },
   "permissions": {
     "deniedTitle": "You do not have access to this page",
-    "deniedBody": "Ask an administrator if you think you should."
+    "deniedBody": "Ask an administrator if you think you should.",
+    "deniedNamed": "This page needs {{capability}}, which your role does not include.",
+    "requestAccess": "Request access",
+    "requestSubject": "Access request — Support CRM",
+    "backToDashboard": "Go to the dashboard"
   },
   "login": {
     "title": "Sign in",
@@ -157,5 +169,12 @@
       "database": "Database",
       "redis": "Cache"
     }
+  },
+  "capability": {
+    "administration": "Administration",
+    "ticketAssignment": "Ticket assignment",
+    "reporting": "Reporting",
+    "publishing": "Article publishing",
+    "auditTrail": "The audit trail"
   }
 }

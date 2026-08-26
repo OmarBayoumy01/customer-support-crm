@@ -3,6 +3,7 @@ import { I18nextProvider } from 'react-i18next';
 import type { ReactNode } from 'react';
 
 import i18n from '../i18n';
+import { OfflineBanner } from '@/components/states/offline-banner';
 import { Toaster } from '@/components/ui/sonner';
 import { AuthProvider } from '../features/auth/auth-context';
 
@@ -72,6 +73,8 @@ export function AppProviders({
     <QueryClientProvider client={client}>
       <I18nextProvider i18n={i18n}>
         <AuthProvider>
+          {/* Above everything, so it is visible from any screen — US-31, AC5. */}
+          <OfflineBanner />
           {children}
           {/* One host for the whole app — US-32. */}
           <Toaster />
