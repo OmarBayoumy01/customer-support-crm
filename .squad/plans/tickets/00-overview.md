@@ -11,6 +11,7 @@ in [`../00-mvp-scope.md`](../00-mvp-scope.md) touch it.
 | 26  | `26-story-track-ticket-history.md` | Track ticket history | US-50      | US-40       |
 | 30  | `30-story-browse-and-filter-the-ticket-queue.md` | Browse and filter the ticket queue | US-42 | US-30, US-40 |
 | 31  | `31-story-work-a-ticket-in-the-detail-workspace.md` | Work a ticket in the detail workspace | US-45 | US-40 |
+| 32  | `32-story-read-the-ticket-conversation-timeline.md` | Read the ticket conversation timeline | US-46 | US-45 |
 
 ## No schema change
 

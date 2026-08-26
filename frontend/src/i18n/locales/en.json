@@ -167,7 +167,11 @@
       "conversation": {
         "title": "Conversation",
         "internalNote": "Internal note",
-        "unknownAuthor": "Unknown"
+        "unknownAuthor": "Unknown",
+        "notVisibleToCustomer": "Not visible to the customer",
+        "downloadPending": "Downloading files arrives with US-51.",
+        "loadEarlier_one": "Show 1 earlier message",
+        "loadEarlier_other": "Show {{count}} earlier messages"
       },
       "context": {
         "title": "Context",

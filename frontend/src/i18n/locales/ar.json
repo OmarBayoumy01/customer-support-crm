@@ -171,7 +171,15 @@
       "conversation": {
         "title": "المحادثة",
         "internalNote": "ملاحظة داخلية",
-        "unknownAuthor": "غير معروف"
+        "unknownAuthor": "غير معروف",
+        "notVisibleToCustomer": "غير مرئية للعميل",
+        "downloadPending": "تنزيل الملفات يأتي مع القصة US-51.",
+        "loadEarlier_zero": "عرض الرسائل السابقة",
+        "loadEarlier_one": "عرض رسالة سابقة واحدة",
+        "loadEarlier_two": "عرض رسالتين سابقتين",
+        "loadEarlier_few": "عرض {{count}} رسائل سابقة",
+        "loadEarlier_many": "عرض {{count}} رسالة سابقة",
+        "loadEarlier_other": "عرض {{count}} رسالة سابقة"
       },
       "context": {
         "title": "السياق",

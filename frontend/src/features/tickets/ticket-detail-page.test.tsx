@@ -63,6 +63,8 @@ function detail(overrides: Partial<TicketDetail> = {}): TicketDetail {
         authorName: 'Huda Mansour',
         body: 'I can see the refund was approved and left our side the same day.',
         isInternal: false,
+        channel: 'EMAIL',
+        attachments: [],
         createdAt: new Date(Date.now() - 5 * HOUR).toISOString(),
       },
       {
@@ -71,9 +73,12 @@ function detail(overrides: Partial<TicketDetail> = {}): TicketDetail {
         authorName: 'Huda Mansour',
         body: 'Payments confirm the batch failed to settle. Do not promise a date yet.',
         isInternal: true,
+        channel: null,
+        attachments: [],
         createdAt: new Date(Date.now() - 4 * HOUR).toISOString(),
       },
     ],
+    messageCount: 2,
     attachments: [],
     history: [
       {
@@ -183,7 +188,9 @@ describe('AC1 — header', () => {
     expect(screen.getAllByText('Huda Mansour').length).toBeGreaterThan(0);
 
     expect(screen.getByText('Refunds')).toBeInTheDocument();
-    expect(screen.getByText('Email')).toBeInTheDocument();
+    // US-46 also tags each message with its channel, so "Email" is on the page
+    // more than once now. The assertion is that the strip names it.
+    expect(screen.getAllByText('Email').length).toBeGreaterThan(0);
   });
 });
 
@@ -248,7 +255,7 @@ describe('AC3 — layout', () => {
 
     // The project's first non-negotiable rule lives on this distinction, so an
     // agent must be able to tell at a glance what the customer can see.
-    expect(screen.getByText('Internal note')).toBeInTheDocument();
+    expect(screen.getByText('Not visible to the customer')).toBeInTheDocument();
     expect(screen.getByText(/Payments confirm the batch failed/)).toBeInTheDocument();
   });
 });
@@ -363,6 +370,6 @@ describe('bilingual', () => {
     renderDetail();
 
     expect(await screen.findByRole('region', { name: 'المحادثة' })).toBeInTheDocument();
-    expect(screen.getByText('ملاحظة داخلية')).toBeInTheDocument();
+    expect(screen.getByText('غير مرئية للعميل')).toBeInTheDocument();
   });
 });

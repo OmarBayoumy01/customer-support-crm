@@ -12,7 +12,12 @@ import { cn } from '@/lib/utils';
 import { CustomerContextPanel } from './customer-context-panel';
 import { TicketConversation } from './ticket-conversation';
 import { TicketHeader } from './ticket-header';
-import { useCustomer, useCustomerTickets, useTicketDetail } from './use-ticket-detail';
+import {
+  useCustomer,
+  useCustomerTickets,
+  useEarlierMessages,
+  useTicketDetail,
+} from './use-ticket-detail';
 
 /**
  * The ticket workspace — US-45. The visual centrepiece of the product.
@@ -41,6 +46,7 @@ export function TicketDetailPage(): React.JSX.Element {
   const [collapsed, setCollapsed] = useAtom(ticketContextCollapsedAtom);
 
   const detail = useTicketDetail(id);
+  const earlier = useEarlierMessages(id, detail.data?.messages.length ?? 30);
   const customerId = detail.data?.customer.id;
   const customer = useCustomer(customerId);
   const recent = useCustomerTickets(customerId, id);
@@ -54,6 +60,21 @@ export function TicketDetailPage(): React.JSX.Element {
   }
 
   const ticket = detail.data;
+
+  /**
+   * The whole thread the reader has asked for, oldest first.
+   *
+   * Each earlier page arrives newest-first (it is a backwards page), so the
+   * pages are reversed and prepended: page 2 sits above page 1, and page 3
+   * above that.
+   */
+  const thread = [
+    ...(earlier.data?.pages ?? [])
+      .slice()
+      .reverse()
+      .flatMap((page) => [...page].reverse()),
+    ...ticket.messages,
+  ];
 
   return (
     <div className="space-y-4">
@@ -79,10 +100,15 @@ export function TicketDetailPage(): React.JSX.Element {
         >
           <div className="flex-1 overflow-y-auto p-4">
             <TicketConversation
-              messages={ticket.messages}
+              messages={thread}
               description={ticket.description}
               createdAt={ticket.createdAt}
               customerName={`${ticket.customer.firstName} ${ticket.customer.lastName}`}
+              messageCount={ticket.messageCount}
+              onLoadEarlier={() => {
+                void earlier.fetchNextPage();
+              }}
+              isLoadingEarlier={earlier.isFetching}
             />
           </div>
 

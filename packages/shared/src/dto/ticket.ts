@@ -148,6 +148,26 @@ export const TicketSchema = z.object({
 
 export type Ticket = z.infer<typeof TicketSchema>;
 
+/**
+ * A file on a message — US-46, AC4.
+ *
+ * `messageId` because attachments render **on the message that carried them**,
+ * not in a separate list. A file detached from the sentence explaining it is a
+ * file nobody opens.
+ *
+ * There is no download URL here on purpose: object storage arrives with US-51,
+ * and a link to a key with nothing behind it is worse than no link.
+ */
+export const TicketAttachmentSchema = z.object({
+  id: z.string().uuid(),
+  messageId: z.string().uuid(),
+  fileName: z.string(),
+  contentType: z.string(),
+  sizeBytes: z.number().int().nonnegative(),
+});
+
+export type TicketAttachment = z.infer<typeof TicketAttachmentSchema>;
+
 export const TicketMessageSchema = z.object({
   id: z.string().uuid(),
   senderType: z.enum(['AGENT', 'CUSTOMER', 'SYSTEM']),
@@ -161,6 +181,17 @@ export const TicketMessageSchema = z.object({
    * staff client, never a permission.
    */
   isInternal: z.boolean(),
+  /**
+   * How this message travelled — US-46, AC3.
+   *
+   * Per message rather than per ticket: a conversation that opened as an email
+   * and continued on WhatsApp is an ordinary support conversation, and an agent
+   * about to reply needs to know which one they are replying on.
+   *
+   * Null on a system event, which arrived by no channel at all.
+   */
+  channel: ChannelSchema.nullable(),
+  attachments: z.array(TicketAttachmentSchema),
   createdAt: z.string().datetime(),
 });
 
@@ -182,13 +213,6 @@ export const TicketHistoryEntrySchema = z.object({
   createdAt: z.string().datetime(),
 });
 
-export const TicketAttachmentSchema = z.object({
-  id: z.string().uuid(),
-  fileName: z.string(),
-  contentType: z.string(),
-  sizeBytes: z.number().int().nonnegative(),
-});
-
 /**
  * AC3 — the whole workspace in one response.
  *
@@ -204,7 +228,19 @@ export const TicketDetailSchema = TicketSchema.extend({
    * able to answer *why that number*, which means naming the policy.
    */
   slaPolicyName: z.string().nullable(),
+  /**
+   * The most recent slice of the conversation, oldest first — US-46, AC5.
+   *
+   * Not the whole thread. A ticket that has run three weeks has a hundred
+   * messages and an agent opens it to read the last three; sending all hundred
+   * to render three makes the workspace slowest for exactly the tickets that
+   * matter most.
+   *
+   * `messageCount` is the total, so the timeline knows whether to offer "load
+   * earlier" without a second request to find out.
+   */
   messages: z.array(TicketMessageSchema),
+  messageCount: z.number().int().nonnegative(),
   attachments: z.array(TicketAttachmentSchema),
   history: z.array(TicketHistoryEntrySchema),
   resolvedAt: z.string().datetime().nullable(),

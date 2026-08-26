@@ -25,7 +25,7 @@ One row per feature folder under `.squad/plans/`. `NN` continues as a global exe
 | `react-scaffold`      | [00-overview.md](./react-scaffold/00-overview.md)        | 17       |
 | `design-system`       | [00-overview.md](./design-system/00-overview.md)         | 18–23    |
 | `customers`           | [00-overview.md](./customers/00-overview.md)             | 24       |
-| `tickets`             | [00-overview.md](./tickets/00-overview.md)               | 25–26, 30–31 |
+| `tickets`             | [00-overview.md](./tickets/00-overview.md)               | 25–26, 30–32 |
 | `sla`                 | [00-overview.md](./sla/00-overview.md)                   | 27, 29   |
 | `administration`      | [00-overview.md](./administration/00-overview.md)        | 28       |
 

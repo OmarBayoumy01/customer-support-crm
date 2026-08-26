@@ -7,6 +7,7 @@ import {
   TicketCountsSchema,
   TicketDetailSchema,
   TicketHistoryEntrySchema,
+  TicketMessageSchema,
   TicketSchema,
   toSkipTake,
   type ApiPaginated,
@@ -15,6 +16,7 @@ import {
   type TicketCounts,
   type TicketDetail,
   type TicketHistoryEntry,
+  type TicketMessage,
 } from '@crm/shared';
 
 import { CurrentUser, type CurrentUserPayload } from '../auth/index.js';
@@ -139,6 +141,39 @@ export class TicketsController {
     @CurrentUser() user: CurrentUserPayload | undefined,
   ): Promise<TicketDetail> {
     return this.tickets.detail(id, await this.actorFrom(user));
+  }
+
+  /**
+   * Older messages, on demand — US-46, AC5.
+   *
+   * The detail already carries the most recent slice, so this is what the
+   * timeline calls when somebody scrolls back through a long thread. Newest
+   * first: page 2 is what came before page 1.
+   */
+  @Get(':id/messages')
+  @RequirePermission('ticket:view')
+  @ApiOperation({
+    summary: 'A page of the conversation, newest first',
+    description:
+      'The workspace opens with the most recent messages inline; this is how it pages ' +
+      'backwards. Internal notes are included — this is the staff API, and the portal is ' +
+      'a separate controller that filters them out in the query.',
+  })
+  @ApiZodQuery(PaginationQueryDto)
+  @ApiZodResponse(200, TicketMessageSchema, 'A page of messages')
+  async messages(
+    @Param('id') id: string,
+    @Query() query: PaginationQueryDto,
+    @CurrentUser() user: CurrentUserPayload | undefined,
+  ): Promise<ApiPaginated<TicketMessage>> {
+    const actor = await this.actorFrom(user);
+    const { skip, take } = toSkipTake(query);
+    const { messages, total } = await this.tickets.messages(id, actor, { skip, take });
+
+    return {
+      data: messages,
+      pagination: buildPaginationMeta({ page: query.page, pageSize: query.pageSize, total }),
+    };
   }
 
   /**

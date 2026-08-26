@@ -635,3 +635,117 @@ test('US-42 AC1 — a ticket carries its category as a name, not only an id', as
   // column of one row.
   assert.equal(ticket.categoryName, `Queue ${run}`);
 });
+
+// ---------------------------------------------------------------------------
+// US-46 — what the conversation timeline needs from the API
+// ---------------------------------------------------------------------------
+
+/** Writes straight to the database: the composer that would do this is US-1. */
+async function addMessage(
+  ticketId: string,
+  overrides: { body?: string; isInternal?: boolean; channel?: 'EMAIL' | 'WHATSAPP' } = {},
+): Promise<string> {
+  const row = await prisma.message.create({
+    data: {
+      ticketId,
+      senderType: 'AGENT',
+      body: overrides.body ?? `Reply ${randomUUID().slice(0, 6)}`,
+      isInternal: overrides.isInternal ?? false,
+      channel: overrides.channel ?? 'EMAIL',
+    },
+    select: { id: true },
+  });
+
+  return row.id;
+}
+
+test('US-46 AC3 — a message carries the channel it travelled on', async () => {
+  const ticket = await newTicket();
+  await addMessage(ticket.id, { channel: 'WHATSAPP' });
+
+  const detail = await call<TicketDetail>('GET', `/tickets/${ticket.id}`, { token: allToken });
+
+  assert.equal(detail.body.data!.messages[0]!.channel, 'WHATSAPP');
+});
+
+test('US-46 AC4 — attachments arrive on the message that carried them', async () => {
+  const ticket = await newTicket();
+  const messageId = await addMessage(ticket.id);
+
+  await prisma.attachment.create({
+    data: {
+      messageId,
+      ticketId: ticket.id,
+      fileName: 'statement.pdf',
+      contentType: 'application/pdf',
+      sizeBytes: 2048,
+      storageKey: `test/${messageId}/statement.pdf`,
+    },
+  });
+
+  const detail = await call<TicketDetail>('GET', `/tickets/${ticket.id}`, { token: allToken });
+  const message = detail.body.data!.messages.find((row) => row.id === messageId)!;
+
+  // On the message, not only in the ticket-wide list: a file detached from the
+  // sentence explaining it is a file nobody opens.
+  assert.equal(message.attachments.length, 1);
+  assert.equal(message.attachments[0]!.fileName, 'statement.pdf');
+  assert.equal(message.attachments[0]!.messageId, messageId);
+});
+
+test('US-46 AC5 — the detail carries the most recent slice and the total', async () => {
+  const ticket = await newTicket();
+
+  // Thirty-five is past the thirty the detail sends.
+  for (let index = 0; index < 35; index += 1) {
+    await addMessage(ticket.id, { body: `Message ${String(index)}` });
+  }
+
+  const detail = await call<TicketDetail>('GET', `/tickets/${ticket.id}`, { token: allToken });
+  const messages = detail.body.data!.messages;
+
+  assert.equal(messages.length, 30);
+  assert.equal(detail.body.data!.messageCount, 35);
+
+  // Oldest first within the page, and the page is the *most recent* thirty —
+  // so it ends on the last thing said, which is what an agent replies to.
+  assert.equal(messages.at(-1)!.body, 'Message 34');
+  assert.equal(messages[0]!.body, 'Message 5');
+});
+
+test('US-46 AC5 — older messages page backwards, newest first', async () => {
+  const ticket = await newTicket();
+
+  for (let index = 0; index < 5; index += 1) {
+    await addMessage(ticket.id, { body: `Older ${String(index)}` });
+  }
+
+  const page = await call<{ body: string }[]>(
+    'GET',
+    `/tickets/${ticket.id}/messages?page=1&pageSize=2`,
+    { token: allToken },
+  );
+
+  assert.equal(page.status, 200, JSON.stringify(page.body));
+  assert.equal(page.body.data!.length, 2);
+  assert.equal(page.body.pagination?.total, 5);
+  assert.equal(page.body.data![0]!.body, 'Older 4');
+});
+
+test('US-46 — the messages endpoint keeps the ticket’s scope', async () => {
+  const result = await call('GET', `/tickets/${randomUUID()}/messages`, { token: allToken });
+
+  assert.equal(result.status, 404);
+});
+
+test('US-46 — internal notes are on the staff timeline, which is what they are for', async () => {
+  const ticket = await newTicket();
+  await addMessage(ticket.id, { body: 'A note to the team.', isInternal: true });
+
+  const detail = await call<TicketDetail>('GET', `/tickets/${ticket.id}`, { token: allToken });
+
+  // The project's first rule is enforced in US-82's portal controller, which
+  // queries `isInternal: false`. Filtering here would break the agent's own
+  // timeline — the one place the note is supposed to appear.
+  assert.ok(detail.body.data!.messages.some((message) => message.isInternal));
+});

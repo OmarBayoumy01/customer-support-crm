@@ -1,5 +1,11 @@
-import { useQuery, type UseQueryResult } from '@tanstack/react-query';
-import type { Customer, PaginationMeta, Ticket, TicketDetail } from '@crm/shared';
+import {
+  useInfiniteQuery,
+  useQuery,
+  type InfiniteData,
+  type UseInfiniteQueryResult,
+  type UseQueryResult,
+} from '@tanstack/react-query';
+import type { Customer, PaginationMeta, Ticket, TicketDetail, TicketMessage } from '@crm/shared';
 
 import { apiGet, http } from '@/lib/api-client';
 
@@ -20,6 +26,36 @@ export function useTicketDetail(id: string): UseQueryResult<TicketDetail> {
     // Short: an agent works a ticket while a colleague may be changing it, and
     // a stale header is how two people overwrite each other.
     staleTime: 5_000,
+  });
+}
+
+/**
+ * Older messages, a page at a time — US-46, AC5.
+ *
+ * `useInfiniteQuery` rather than a growing list in component state, because the
+ * pages have to survive a refetch of the ticket: an agent who has scrolled back
+ * through three weeks of a thread should not lose their place because the
+ * detail query revalidated.
+ *
+ * Page 1 is the slice the detail already showed, so paging starts at 2.
+ */
+export function useEarlierMessages(
+  ticketId: string,
+  pageSize: number,
+): UseInfiniteQueryResult<InfiniteData<TicketMessage[]>> {
+  return useInfiniteQuery({
+    queryKey: ['tickets', 'messages', ticketId],
+    initialPageParam: 2,
+    queryFn: async ({ pageParam }): Promise<TicketMessage[]> => {
+      const response = await http.get<{ data: TicketMessage[]; pagination: PaginationMeta }>(
+        `/tickets/${ticketId}/messages?page=${String(pageParam)}&pageSize=${String(pageSize)}`,
+      );
+
+      return response.data.data;
+    },
+    getNextPageParam: (last, all) => (last.length < pageSize ? undefined : all.length + 2),
+    // Only fetched when somebody asks for it.
+    enabled: false,
   });
 }
 

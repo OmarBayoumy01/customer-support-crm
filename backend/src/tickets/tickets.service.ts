@@ -12,6 +12,7 @@ import {
   type Ticket,
   type TicketDetail,
   type TicketListQuery,
+  type TicketMessage,
   type UpdateTicket,
 } from '@crm/shared';
 
@@ -63,6 +64,58 @@ const TICKET_SELECT = {
 } as const;
 
 type TicketRow = Prisma.TicketGetPayload<{ select: typeof TICKET_SELECT }>;
+
+/**
+ * How many messages the workspace opens with — US-46, AC5.
+ *
+ * Enough that most tickets arrive whole and "load earlier" never appears, few
+ * enough that a three-week thread does not ship a hundred bodies to render the
+ * last three.
+ */
+const RECENT_MESSAGE_COUNT = 30;
+
+/** One message, everything the timeline renders. */
+const MESSAGE_SELECT = {
+  id: true,
+  senderType: true,
+  body: true,
+  isInternal: true,
+  channel: true,
+  createdAt: true,
+  authorUser: { select: { firstName: true, lastName: true } },
+  authorCustomer: { select: { firstName: true, lastName: true } },
+  attachments: {
+    orderBy: { createdAt: 'asc' },
+    select: { id: true, messageId: true, fileName: true, contentType: true, sizeBytes: true },
+  },
+} satisfies Prisma.MessageSelect;
+
+type MessageRow = Prisma.MessageGetPayload<{ select: typeof MESSAGE_SELECT }>;
+
+/**
+ * A message row as the API sends it.
+ *
+ * A free function rather than a method: the detail and the paged endpoint both
+ * map messages, and two copies of this would drift the moment one of them
+ * gained a field.
+ */
+function toMessage(row: MessageRow): TicketMessage {
+  return {
+    id: row.id,
+    senderType: row.senderType,
+    authorName:
+      row.authorUser !== null
+        ? `${row.authorUser.firstName} ${row.authorUser.lastName}`
+        : row.authorCustomer !== null
+          ? `${row.authorCustomer.firstName} ${row.authorCustomer.lastName}`
+          : null,
+    body: row.body,
+    isInternal: row.isInternal,
+    channel: row.channel,
+    attachments: row.attachments,
+    createdAt: row.createdAt.toISOString(),
+  };
+}
 
 @Injectable()
 export class TicketsService {
@@ -428,20 +481,16 @@ export class TicketsService {
         closedAt: true,
         reopenCount: true,
         slaPolicy: { select: { nameEn: true } },
+        // Newest first here, reversed below: "the most recent thirty" is a
+        // descending query, and the timeline reads oldest-to-newest.
         messages: {
-          orderBy: { createdAt: 'asc' },
-          select: {
-            id: true,
-            senderType: true,
-            body: true,
-            isInternal: true,
-            createdAt: true,
-            authorUser: { select: { firstName: true, lastName: true } },
-            authorCustomer: { select: { firstName: true, lastName: true } },
-          },
+          orderBy: { createdAt: 'desc' },
+          take: RECENT_MESSAGE_COUNT,
+          select: MESSAGE_SELECT,
         },
+        _count: { select: { messages: true } },
         attachments: {
-          select: { id: true, fileName: true, contentType: true, sizeBytes: true },
+          select: { id: true, messageId: true, fileName: true, contentType: true, sizeBytes: true },
         },
         history: {
           orderBy: { createdAt: 'desc' },
@@ -474,19 +523,8 @@ export class TicketsService {
       resolvedAt: row.resolvedAt?.toISOString() ?? null,
       closedAt: row.closedAt?.toISOString() ?? null,
       reopenCount: row.reopenCount,
-      messages: row.messages.map((message) => ({
-        id: message.id,
-        senderType: message.senderType,
-        authorName:
-          message.authorUser !== null
-            ? `${message.authorUser.firstName} ${message.authorUser.lastName}`
-            : message.authorCustomer !== null
-              ? `${message.authorCustomer.firstName} ${message.authorCustomer.lastName}`
-              : null,
-        body: message.body,
-        isInternal: message.isInternal,
-        createdAt: message.createdAt.toISOString(),
-      })),
+      messages: [...row.messages].reverse().map(toMessage),
+      messageCount: row._count.messages,
       attachments: row.attachments,
       history: row.history.map((entry) => ({
         id: entry.id,
@@ -556,6 +594,41 @@ export class TicketsService {
     });
 
     return this.toTicket(withSla);
+  }
+
+  /**
+   * Older messages, on demand — US-46, AC5.
+   *
+   * Newest first, because paging backwards through a conversation is how you
+   * read one: page 1 is the most recent slice the detail already showed, page 2
+   * is what came before it.
+   *
+   * Scope is enforced by loading the ticket through `detail` first, the same
+   * way the history endpoint does. One place decides who may see what.
+   *
+   * **Internal notes are included.** This is the staff API and an internal note
+   * is the thing they exist for; the portal (US-82) is a separate controller
+   * that queries `isInternal: false`.
+   */
+  async messages(
+    id: string,
+    actor: TicketActor,
+    options: { skip: number; take: number },
+  ): Promise<{ messages: TicketMessage[]; total: number }> {
+    await this.detail(id, actor);
+
+    const [rows, total] = await Promise.all([
+      this.prisma.notDeleted.message.findMany({
+        where: { ticketId: id },
+        orderBy: { createdAt: 'desc' },
+        skip: options.skip,
+        take: options.take,
+        select: MESSAGE_SELECT,
+      }),
+      this.prisma.notDeleted.message.count({ where: { ticketId: id } }),
+    ]);
+
+    return { messages: rows.map(toMessage), total };
   }
 
   /**

@@ -104,6 +104,7 @@ export {
   type Ticket,
   type TicketDetail,
   type TicketMessage,
+  type TicketAttachment,
   type TicketHistoryEntry,
 } from './dto/ticket.js';
 
