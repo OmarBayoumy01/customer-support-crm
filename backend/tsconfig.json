@@ -3,6 +3,12 @@
   "compilerOptions": {
     "composite": true,
     "outDir": "./dist",
+    // Kept inside outDir, not beside tsconfig.json. Under Compose, dist/ is a
+    // container-local volume while the source is a bind mount — leaving the
+    // build info on the mount lets the container watcher and a host `tsc`
+    // overwrite each other's state, so one of them believes it is up to date
+    // while its own dist/ is empty.
+    "tsBuildInfoFile": "./dist/tsconfig.tsbuildinfo",
     "rootDir": "./src",
     "types": ["node"],
     "emitDecoratorMetadata": true,

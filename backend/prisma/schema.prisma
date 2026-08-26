@@ -110,11 +110,24 @@ enum Locale {
 /// project rule that scoped permissions are applied *in the database query*:
 /// a guard reads the scope and the query adds the matching WHERE clause.
 /// Filtering after fetching everything is never correct.
+///
+/// These four come from US-13. US-6 originally had OWN / DEPARTMENT / BRANCH /
+/// ALL; `TEAM` replaces `DEPARTMENT` (same idea, the story's word) and
+/// `ASSIGNED` was missing entirely — a ticket assigned to an agent is not one
+/// that agent raised, and both need saying. `BRANCH` is gone; if branch-scoped
+/// access is ever needed it comes back with the story that needs it.
 enum PermissionScope {
-  OWN
-  DEPARTMENT
-  BRANCH
+  /// Everything. No filter is added.
   ALL
+
+  /// The user's own department.
+  TEAM
+
+  /// Records assigned to the user — their ticket queue.
+  ASSIGNED
+
+  /// Records belonging to the user. For a portal customer, their own tickets.
+  OWN
 }
 
 enum AuditAction {

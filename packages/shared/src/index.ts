@@ -22,6 +22,19 @@ export {
 } from './api/envelope.js';
 
 export {
+  PermissionScopeSchema,
+  PermissionKeySchema,
+  EffectivePermissionsSchema,
+  PERMISSION_KEYS,
+  SYSTEM_ROLE_KEYS,
+  splitPermissionKey,
+  type PermissionScope,
+  type PermissionKey,
+  type EffectivePermissions,
+  type SystemRoleKey,
+} from './auth/permissions.js';
+
+export {
   PaginationQuerySchema,
   toSkipTake,
   MAX_PAGE_SIZE,

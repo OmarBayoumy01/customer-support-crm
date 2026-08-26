@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { CommonModule } from './common/index.js';
 import { TypedConfigModule } from './config/index.js';
 import { HealthModule } from './health/health.module.js';
+import { PermissionsModule } from './permissions/index.js';
 import { PrismaModule } from './prisma/index.js';
 import { RedisModule } from './redis/index.js';
 
@@ -20,5 +21,15 @@ import { RedisModule } from './redis/index.js';
  * empty modules are cargo-cult structure that costs review time and hides which
  * parts of the system actually exist.
  */
-@Module({ imports: [TypedConfigModule, CommonModule, PrismaModule, RedisModule, HealthModule] })
+@Module({
+  imports: [
+    TypedConfigModule,
+    CommonModule,
+    PrismaModule,
+    RedisModule,
+    // After Prisma and Redis, both of which it depends on.
+    PermissionsModule,
+    HealthModule,
+  ],
+})
 export class AppModule {}
