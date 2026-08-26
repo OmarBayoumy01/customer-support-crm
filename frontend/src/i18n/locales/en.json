@@ -23,7 +23,8 @@
     "resultCount_one": "{{count}} result",
     "resultCount_other": "{{count}} results",
     "previous": "Previous",
-    "next": "Next"
+    "next": "Next",
+    "undo": "Undo"
   },
   "nav": {
     "label": "Main navigation",

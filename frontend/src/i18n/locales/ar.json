@@ -23,7 +23,8 @@
     "resultCount_one": "نتيجة واحدة",
     "resultCount_other": "{{count}} نتائج",
     "previous": "السابق",
-    "next": "التالي"
+    "next": "التالي",
+    "undo": "تراجع"
   },
   "nav": {
     "label": "التنقل الرئيسي",
