@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { AuthModule, TokenRevocationModule } from './auth/index.js';
 import { CommonModule } from './common/index.js';
 import { CustomersModule } from './customers/index.js';
+import { TicketsModule } from './tickets/index.js';
 import { TypedConfigModule } from './config/index.js';
 import { HealthModule } from './health/health.module.js';
 import { PermissionsModule } from './permissions/index.js';
@@ -42,6 +43,7 @@ import { RedisModule } from './redis/index.js';
     // After Permissions, whose resolved set the login response carries.
     AuthModule,
     CustomersModule,
+    TicketsModule,
     HealthModule,
   ],
 })
