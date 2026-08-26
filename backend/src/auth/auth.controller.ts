@@ -8,6 +8,7 @@ import { ApiZodBody, ApiZodResponse, zodToOpenApi } from '../openapi/index.js';
 import { AuthService, type RequestOrigin } from './auth.service.js';
 import { REFRESH_COOKIE, refreshCookieOptions } from './cookies.js';
 import { Public } from './decorators/public.decorator.js';
+import { RefreshService } from './refresh.service.js';
 import { LoginRequestDto } from './dto/login.dto.js';
 import { TokenService } from './token.service.js';
 
@@ -32,6 +33,7 @@ function originOf(request: Request): RequestOrigin {
 export class AuthController {
   constructor(
     private readonly auth: AuthService,
+    private readonly refreshService: RefreshService,
     private readonly tokens: TokenService,
     private readonly config: TypedConfigService,
   ) {}
@@ -79,12 +81,55 @@ export class AuthController {
   ): Promise<LoginResponse> {
     const { response: payload, refreshToken } = await this.auth.login(body, originOf(request));
 
+    this.setRefreshCookie(response, refreshToken);
+
+    return payload;
+  }
+
+  /**
+   * Exchanges the refresh cookie for a new pair — US-15.
+   *
+   * `@Public()` because the whole point is that it is reachable with an expired
+   * access token. The credential it checks is the httpOnly cookie, not a bearer
+   * header.
+   */
+  @Public()
+  @Post('refresh')
+  @HttpCode(200)
+  @ApiOperation({
+    summary: 'Renew the session',
+    description:
+      'Exchanges the httpOnly refresh cookie for a new access token and a new refresh ' +
+      'cookie. The presented token is retired in the same operation, so it works exactly ' +
+      'once — presenting it again revokes the whole session family.',
+  })
+  @ApiZodResponse(200, LoginResponseSchema, 'Renewed')
+  @ApiResponse({
+    status: 401,
+    description: 'Missing, expired, revoked, or replayed — the client should sign in again',
+    schema: zodToOpenApi(ApiErrorSchema),
+  })
+  async refresh(
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<LoginResponse> {
+    const presented = (request.cookies as Record<string, string> | undefined)?.[REFRESH_COOKIE];
+
+    const { response: payload, refreshToken } = await this.refreshService.refresh(
+      presented,
+      originOf(request),
+    );
+
+    this.setRefreshCookie(response, refreshToken);
+
+    return payload;
+  }
+
+  private setRefreshCookie(response: Response, refreshToken: string): void {
     response.cookie(
       REFRESH_COOKIE,
       refreshToken,
       refreshCookieOptions(this.config.get('COOKIE_SECURE'), this.tokens.refreshTokenTtlSeconds),
     );
-
-    return payload;
   }
 }

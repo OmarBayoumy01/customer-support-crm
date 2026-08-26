@@ -98,6 +98,7 @@ test('US-14 — deleting a user takes their sessions with them', async () => {
       userId: user.id,
       refreshTokenHash: `hash-${run}`,
       audience: 'crm-staff',
+      familyId: `family-${run}`,
       expiresAt: new Date(Date.now() + 60_000),
     },
   });

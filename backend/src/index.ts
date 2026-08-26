@@ -2,7 +2,6 @@ import 'reflect-metadata';
 
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
-import cookieParser from 'cookie-parser';
 
 import { AppModule } from './app.module.js';
 import { STRUCTURED_LOGGER, type StructuredLogger } from './common/index.js';
@@ -22,12 +21,6 @@ async function bootstrap(): Promise<void> {
   // this the database pool is never closed on Ctrl-C or on container stop, and
   // connections are left open server-side.
   app.enableShutdownHooks();
-
-  // US-14's refresh token arrives as an httpOnly cookie, and Express does not
-  // parse cookies on its own. Unsigned: the value is 256 bits of randomness
-  // checked against a stored hash, so a signature would add a second secret to
-  // manage and prove nothing the hash lookup does not already prove.
-  app.use(cookieParser());
 
   const config = app.get(TypedConfigService);
 

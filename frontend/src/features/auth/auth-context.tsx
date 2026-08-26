@@ -1,5 +1,15 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react';
 import type { AuthenticatedUser, EffectivePermissions, LoginResponse } from '@crm/shared';
+
+import { setAccessToken as storeAccessToken, subscribeToSession } from '../../lib/session-store';
 
 export interface AuthState {
   accessToken: string | null;
@@ -37,13 +47,35 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
     setAccessToken(response.accessToken);
     setUser(response.user);
     setPermissions(response.permissions);
+    // The axios interceptor is not a component and cannot read this state, so
+    // the token is mirrored where it can reach it. Still memory only.
+    storeAccessToken(response.accessToken);
   }, []);
 
   const signOut = useCallback(() => {
     setAccessToken(null);
     setUser(null);
     setPermissions(null);
+    storeAccessToken(null);
   }, []);
+
+  /**
+   * A silent refresh happens inside an interceptor, underneath React — US-15.
+   *
+   * Without this subscription the client would hold a new token while the UI
+   * went on rendering the old session, and a refresh that *failed* would leave
+   * the user looking at an application they could no longer make a request
+   * from. Both are the kind of bug that only shows up fifteen minutes in.
+   */
+  useEffect(
+    () =>
+      subscribeToSession((session) => {
+        setAccessToken(session?.accessToken ?? null);
+        setUser(session?.user ?? null);
+        setPermissions(session?.permissions ?? null);
+      }),
+    [],
+  );
 
   const value = useMemo<AuthState>(
     () => ({

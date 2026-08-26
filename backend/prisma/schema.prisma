@@ -308,6 +308,22 @@ model Session {
   /// US-21 adds the second door.
   audience String
 
+  /// Every session descended from one login shares this — US-15.
+  ///
+  /// Refreshing rotates the token, which means a new row; they are all the same
+  /// *family*. AC3 is the reason it exists: if an already-used refresh token is
+  /// presented again, the honest reading is that someone copied it, and the
+  /// whole family is revoked rather than just the row that was replayed.
+  ///
+  /// Set to the session's own id for the first session in a family.
+  familyId String
+
+  /// The session that superseded this one on refresh — US-15.
+  ///
+  /// Present only on a rotated row. A revoked row *with* a successor was
+  /// retired normally; a revoked row being presented again is a replay.
+  replacedById String? @unique
+
   expiresAt DateTime
   revokedAt DateTime?
 
@@ -321,6 +337,8 @@ model Session {
   @@index([userId, revokedAt])
   /// Cleaning up expired rows. See SessionService.deleteExpired().
   @@index([expiresAt])
+  /// Revoking a whole family at once when a replay is detected (US-15, AC3).
+  @@index([familyId])
 }
 
 // ============================================================================
