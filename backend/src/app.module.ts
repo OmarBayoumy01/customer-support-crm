@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 
-import { AuthModule } from './auth/index.js';
+import { AuthModule, TokenRevocationModule } from './auth/index.js';
 import { CommonModule } from './common/index.js';
 import { TypedConfigModule } from './config/index.js';
 import { HealthModule } from './health/health.module.js';
@@ -33,6 +33,9 @@ import { RedisModule } from './redis/index.js';
     CommonModule,
     PrismaModule,
     RedisModule,
+    // Before Permissions: RolesService revokes tokens on a role change (US-16,
+    // AC4), and this is global so it must be registered first.
+    TokenRevocationModule,
     // After Prisma and Redis, both of which it depends on.
     PermissionsModule,
     // After Permissions, whose resolved set the login response carries.

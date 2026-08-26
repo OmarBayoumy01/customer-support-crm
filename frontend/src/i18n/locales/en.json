@@ -3,7 +3,8 @@
     "appName": "Customer Support CRM",
     "languageName": "English",
     "switchLanguage": "العربية",
-    "signOut": "Sign out"
+    "signOut": "Sign out",
+    "signOutEverywhere": "Sign out everywhere"
   },
   "login": {
     "title": "Sign in",

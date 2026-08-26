@@ -3,6 +3,7 @@ import type { PermissionKey, PermissionScope } from '@crm/shared';
 
 import { ApiException } from '../common/index.js';
 import { PrismaService } from '../prisma/index.js';
+import { TokenRevocationService } from '../auth/token-revocation.service.js';
 import { PermissionsService } from './permissions.service.js';
 
 export interface RoleGrantInput {
@@ -35,6 +36,7 @@ export class RolesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly permissions: PermissionsService,
+    private readonly revocations: TokenRevocationService,
   ) {}
 
   /**
@@ -151,12 +153,20 @@ export class RolesService {
     });
 
     await this.permissions.invalidateUser(userId);
+    // US-16, AC4 — a token minted before this change still carries the old
+    // roles, and a signed token cannot be edited. Revoking is the only way the
+    // next request does not proceed on stale permissions.
+    await this.revocations.revokeUserTokens(userId);
   }
 
   /** Removes a role from a user. */
   async removeRole(userId: string, roleId: string): Promise<void> {
     await this.prisma.userRole.deleteMany({ where: { userId, roleId } });
     await this.permissions.invalidateUser(userId);
+    // US-16, AC4 — a token minted before this change still carries the old
+    // roles, and a signed token cannot be edited. Revoking is the only way the
+    // next request does not proceed on stale permissions.
+    await this.revocations.revokeUserTokens(userId);
   }
 
   /**
@@ -182,6 +192,10 @@ export class RolesService {
     ]);
 
     await this.permissions.invalidateUser(userId);
+    // US-16, AC4 — a token minted before this change still carries the old
+    // roles, and a signed token cannot be edited. Revoking is the only way the
+    // next request does not proceed on stale permissions.
+    await this.revocations.revokeUserTokens(userId);
   }
 
   /** A role and its grants, for the admin UI to render. */

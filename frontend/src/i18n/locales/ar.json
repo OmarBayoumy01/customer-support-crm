@@ -3,7 +3,8 @@
     "appName": "نظام دعم العملاء",
     "languageName": "العربية",
     "switchLanguage": "English",
-    "signOut": "تسجيل الخروج"
+    "signOut": "تسجيل الخروج",
+    "signOutEverywhere": "تسجيل الخروج من كل الأجهزة"
   },
   "login": {
     "title": "تسجيل الدخول",

@@ -4,6 +4,7 @@ import { Button } from '../../components/ui/button';
 
 import { LanguageToggle } from '../../components/language-toggle';
 import { useAuth } from '../auth/auth-context';
+import { useLogout } from '../auth/use-logout';
 
 /**
  * A placeholder.
@@ -15,7 +16,8 @@ import { useAuth } from '../auth/auth-context';
  */
 export function DashboardPage(): React.JSX.Element {
   const { t } = useTranslation();
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
+  const logout = useLogout();
 
   const name = user === null ? '' : `${user.firstName} ${user.lastName}`;
 
@@ -25,8 +27,32 @@ export function DashboardPage(): React.JSX.Element {
         <h1 className="text-xl font-semibold">{t('dashboard.title')}</h1>
         <div className="flex items-center gap-2">
           <LanguageToggle />
-          <Button type="button" variant="outline" size="sm" onClick={signOut}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={logout.isPending}
+            onClick={() => {
+              logout.mutate();
+            }}
+          >
             {t('common.signOut')}
+          </Button>
+          {/*
+            Separate control rather than a confirm dialog: signing out
+            everywhere is what someone reaches for after losing a laptop, and
+            burying it behind an extra click helps nobody at that moment.
+          */}
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={logout.isPending}
+            onClick={() => {
+              logout.mutate({ everywhere: true });
+            }}
+          >
+            {t('common.signOutEverywhere')}
           </Button>
         </div>
       </div>

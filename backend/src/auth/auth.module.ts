@@ -11,6 +11,7 @@ import { JwtAuthGuard } from './jwt-auth.guard.js';
 import { JwtStrategy } from './jwt.strategy.js';
 import { LoginThrottleService } from './login-throttle.service.js';
 import { PasswordService } from './password.service.js';
+import { TokenRevocationModule } from './token-revocation.module.js';
 import { RefreshService } from './refresh.service.js';
 import { SessionService } from './session.service.js';
 import { TokenService } from './token.service.js';
@@ -28,6 +29,7 @@ import { TokenService } from './token.service.js';
 @Module({
   imports: [
     PassportModule,
+    TokenRevocationModule,
     JwtModule.registerAsync({
       inject: [TypedConfigService],
       useFactory: (config: TypedConfigService) => ({

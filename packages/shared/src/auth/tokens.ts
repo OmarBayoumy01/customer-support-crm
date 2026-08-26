@@ -54,8 +54,29 @@ export const AccessTokenClaimsSchema = z.object({
    */
   sid: z.string().uuid(),
 
+  /**
+   * This token's own id — US-16.
+   *
+   * A signed JWT cannot be recalled, so signing out puts the `jti` on a Redis
+   * denylist for the remainder of its fifteen minutes. Without it the only
+   * options are keeping a database row per access token or accepting that
+   * "sign out" means "sign out in a quarter of an hour".
+   */
+  jti: z.string().uuid(),
+
   /** Issued at, seconds since the epoch. */
   iat: z.number().int(),
+
+  /**
+   * Issued at again, in milliseconds — US-16.
+   *
+   * `iat` is standard and has one-second resolution, which is too coarse for
+   * the per-user revocation cutoff: revoking a user's tokens and then signing
+   * them back in happens well inside one second, and the fresh token would be
+   * caught by the cutoff meant for the old one. Comparing milliseconds makes
+   * "issued before the revocation" an answerable question.
+   */
+  iatMs: z.number().int(),
 
   /** Expires at, seconds since the epoch. AC6 requires `exp - iat === 900`. */
   exp: z.number().int(),

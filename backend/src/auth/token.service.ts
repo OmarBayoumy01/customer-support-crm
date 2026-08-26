@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 
 import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
@@ -59,12 +59,19 @@ export class TokenService {
    */
   async signAccessToken(input: AccessTokenInput): Promise<string> {
     return this.jwt.signAsync(
-      { roles: input.roles, sid: input.sessionId },
+      // `iatMs` alongside the standard `iat` — see the note in the shared
+      // claims schema. One-second resolution is too coarse for the per-user
+      // revocation cutoff US-16 compares against.
+      { roles: input.roles, sid: input.sessionId, iatMs: Date.now() },
       {
         subject: input.userId,
         audience: input.audience,
         issuer: this.config.get('JWT_ISSUER'),
         expiresIn: this.accessTokenTtlSeconds,
+        // US-16 denylists this on sign-out. Generated per token rather than
+        // reusing the session id, because one session issues many access
+        // tokens as it refreshes and revoking one must not revoke the rest.
+        jwtid: randomUUID(),
       },
     );
   }

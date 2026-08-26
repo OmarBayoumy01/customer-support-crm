@@ -4,6 +4,8 @@ export { PasswordService } from './password.service.js';
 export { TokenService, type AccessTokenInput, type MintedRefreshToken } from './token.service.js';
 export { SessionService, type CreateSessionInput, type SessionRecord } from './session.service.js';
 export { RefreshService } from './refresh.service.js';
+export { TokenRevocationService } from './token-revocation.service.js';
+export { TokenRevocationModule } from './token-revocation.module.js';
 export { LoginThrottleService } from './login-throttle.service.js';
 export { JwtAuthGuard } from './jwt-auth.guard.js';
 export { JwtStrategy } from './jwt.strategy.js';

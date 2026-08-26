@@ -1,12 +1,15 @@
 import { Body, Controller, HttpCode, Post, Req, Res } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { ApiErrorSchema, LoginResponseSchema, type LoginResponse } from '@crm/shared';
 
 import { TypedConfigService } from '../config/index.js';
-import { ApiZodBody, ApiZodResponse, zodToOpenApi } from '../openapi/index.js';
+import { ApiZodBody, ApiZodResponse, BEARER_AUTH_NAME, zodToOpenApi } from '../openapi/index.js';
 import { AuthService, type RequestOrigin } from './auth.service.js';
-import { REFRESH_COOKIE, refreshCookieOptions } from './cookies.js';
+import { clearRefreshCookieOptions, REFRESH_COOKIE, refreshCookieOptions } from './cookies.js';
+import { CurrentUser, type CurrentUserPayload } from './decorators/current-user.decorator.js';
+import { SessionService } from './session.service.js';
+import { TokenRevocationService } from './token-revocation.service.js';
 import { Public } from './decorators/public.decorator.js';
 import { RefreshService } from './refresh.service.js';
 import { LoginRequestDto } from './dto/login.dto.js';
@@ -34,6 +37,8 @@ export class AuthController {
   constructor(
     private readonly auth: AuthService,
     private readonly refreshService: RefreshService,
+    private readonly sessions: SessionService,
+    private readonly revocations: TokenRevocationService,
     private readonly tokens: TokenService,
     private readonly config: TypedConfigService,
   ) {}
@@ -123,6 +128,71 @@ export class AuthController {
     this.setRefreshCookie(response, refreshToken);
 
     return payload;
+  }
+
+  /**
+   * Ends this session — US-16, AC1.
+   *
+   * Not `@Public()`: signing out is something an authenticated caller does, and
+   * the token being presented is the one being revoked.
+   */
+  @Post('logout')
+  @HttpCode(204)
+  @ApiBearerAuth(BEARER_AUTH_NAME)
+  @ApiOperation({
+    summary: 'Sign out of this session',
+    description:
+      'Revokes this session server-side, denies the presented access token for the ' +
+      'remainder of its life, and clears the refresh cookie.',
+  })
+  @ApiResponse({ status: 204, description: 'Signed out' })
+  async logout(
+    @CurrentUser() user: CurrentUserPayload | undefined,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<void> {
+    if (user !== undefined) {
+      await this.sessions.revoke(user.sessionId);
+      // The refresh token is gone the moment the row is revoked; this closes
+      // the remaining window on the *access* token, which is signed and cannot
+      // otherwise be recalled.
+      await this.revocations.denyToken(user.jti, user.issuedAt + this.tokens.accessTokenTtlSeconds);
+    }
+
+    response.clearCookie(
+      REFRESH_COOKIE,
+      clearRefreshCookieOptions(this.config.get('COOKIE_SECURE')),
+    );
+  }
+
+  /**
+   * Ends every session this account has — US-16, AC3.
+   *
+   * The one to reach for after losing a laptop, which is exactly when a
+   * per-device list is no use to anybody.
+   */
+  @Post('logout-all')
+  @HttpCode(204)
+  @ApiBearerAuth(BEARER_AUTH_NAME)
+  @ApiOperation({
+    summary: 'Sign out everywhere',
+    description:
+      'Revokes every session for the account and denies every access token issued to it ' +
+      'up to now, on every device.',
+  })
+  @ApiResponse({ status: 204, description: 'Signed out everywhere' })
+  async logoutAll(
+    @CurrentUser() user: CurrentUserPayload | undefined,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<void> {
+    if (user !== undefined) {
+      await this.sessions.revokeAllForUser(user.userId);
+      await this.revocations.revokeUserTokens(user.userId);
+    }
+
+    response.clearCookie(
+      REFRESH_COOKIE,
+      clearRefreshCookieOptions(this.config.get('COOKIE_SECURE')),
+    );
   }
 
   private setRefreshCookie(response: Response, refreshToken: string): void {

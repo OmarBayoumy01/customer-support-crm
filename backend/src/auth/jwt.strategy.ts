@@ -3,15 +3,19 @@ import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy, type StrategyOptionsWithoutRequest } from 'passport-jwt';
 import { TOKEN_AUDIENCES } from '@crm/shared';
 
-import { RequestContextService } from '../common/index.js';
+import { ApiException, RequestContextService } from '../common/index.js';
 import { TypedConfigService } from '../config/index.js';
 import type { CurrentUserPayload } from './decorators/current-user.decorator.js';
+import { TokenRevocationService } from './token-revocation.service.js';
 
 /** The claims as they come off the wire, before we trust anything about them. */
 interface RawClaims {
   sub: string;
   roles?: unknown;
   sid?: unknown;
+  jti?: unknown;
+  iat?: unknown;
+  iatMs?: unknown;
 }
 
 /**
@@ -25,6 +29,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   constructor(
     config: TypedConfigService,
     private readonly requestContext: RequestContextService,
+    private readonly revocations: TokenRevocationService,
   ) {
     const options: StrategyOptionsWithoutRequest = {
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
@@ -42,16 +47,35 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   }
 
   /**
-   * Runs after the signature checks pass.
+   * Runs after the signature, issuer, audience and expiry checks pass.
    *
-   * **No database read, and no session-revocation check.** Both would be a
-   * query on every authenticated request, and whether that cost is worth paying
-   * is US-16's decision to make — the `sid` claim is carried precisely so it
-   * can. Until then an access token stays valid for its fifteen minutes even if
-   * its session is revoked, which is the normal trade-off for stateless
-   * access tokens and is worth stating out loud.
+   * **One Redis lookup, no database read** — US-16. US-14 left this decision
+   * open; the answer is that revocation is checked (a signed-out token must
+   * stop working *now*, AC2) but the user row is not re-read, because the
+   * claims already carry everything a guard needs and a query per request would
+   * be paid on every endpoint forever.
+   *
+   * A role change does not have to re-read the user either: US-16 revokes that
+   * user's tokens at the moment the role changes, so the stale token is caught
+   * by the same lookup (AC4).
    */
-  validate(payload: RawClaims): CurrentUserPayload {
+  async validate(payload: RawClaims): Promise<CurrentUserPayload> {
+    const jti = typeof payload.jti === 'string' ? payload.jti : '';
+    const iat = typeof payload.iat === 'number' ? payload.iat : 0;
+    // Falls back to the standard second-resolution claim if `iatMs` is somehow
+    // absent — coarse, but never treats an old token as newer than it is.
+    const issuedAtMs = typeof payload.iatMs === 'number' ? payload.iatMs : iat * 1_000;
+
+    // A token with no `jti` cannot be revoked, so it is refused rather than
+    // trusted. In practice that means a token minted before US-16 shipped.
+    if (jti === '') {
+      throw new ApiException('UNAUTHENTICATED', 'This session is no longer valid.');
+    }
+
+    if (await this.revocations.isRevoked({ jti, sub: payload.sub, issuedAtMs })) {
+      throw new ApiException('UNAUTHENTICATED', 'This session is no longer valid.');
+    }
+
     // This is what `RequestContextService.setUserId`'s doc comment has been
     // waiting for since US-9: from here on every log line for this request
     // carries the user who made it.
@@ -61,6 +85,9 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       userId: payload.sub,
       roles: Array.isArray(payload.roles) ? payload.roles.filter((r) => typeof r === 'string') : [],
       sessionId: typeof payload.sid === 'string' ? payload.sid : '',
+      jti,
+      issuedAt: iat,
+      issuedAtMs,
     };
   }
 }

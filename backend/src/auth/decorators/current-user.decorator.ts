@@ -13,6 +13,12 @@ export interface CurrentUserPayload {
   userId: string;
   roles: string[];
   sessionId: string;
+  /** This token's id, so a handler can revoke exactly it — US-16. */
+  jti: string;
+  /** Seconds since the epoch, for the per-user revocation cutoff. */
+  issuedAt: number;
+  /** Milliseconds since the epoch — what the revocation cutoff compares. */
+  issuedAtMs: number;
 }
 
 /**
