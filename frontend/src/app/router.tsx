@@ -70,14 +70,13 @@ export function AppRoutes(): React.JSX.Element {
             <Route path="/dashboard" element={<DashboardPage />} />
 
             {/*
-              US-42. `/tickets/mine` is the same screen with the view tab
-              preselected — the sidebar links to it, and one screen answering
-              both is better than two that drift apart.
+              US-42. The queue's own view tabs carry the filter in the query
+              string, so `?view=mine` is the whole of "my tickets" — there is no
+              second route for it.
             */}
             <Route element={<RequirePermission permission="ticket:view" />}>
               <Route path="/tickets" element={<TicketsQueuePage />} />
               <Route path="/tickets/:id" element={<TicketDetailPage />} />
-              <Route path="/tickets/mine" element={<Navigate to="/tickets?view=mine" replace />} />
             </Route>
 
             <Route path="/design-system" element={<DesignSystemPage />} />

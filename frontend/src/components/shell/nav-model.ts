@@ -2,7 +2,6 @@ import {
   BarChart3,
   BookOpen,
   Building2,
-  Inbox,
   LayoutDashboard,
   LifeBuoy,
   Palette,
@@ -48,14 +47,22 @@ export const NAV_SECTIONS: NavSection[] = [
     labelKey: 'nav.section.workspace',
     items: [
       { to: '/dashboard', labelKey: 'nav.dashboard', icon: LayoutDashboard },
+      /*
+       * One entry, not two.
+       *
+       * "My tickets" and "All tickets" were the same screen reached with a
+       * different tab preselected, and the queue's own view tabs already switch
+       * between them — a second nav item for a filter is a menu that grows by
+       * one every time somebody adds a saved view. The badge stays here,
+       * because how much is on your plate is worth knowing before you click.
+       */
       {
-        to: '/tickets/mine',
-        labelKey: 'nav.myTickets',
-        icon: Inbox,
+        to: '/tickets',
+        labelKey: 'nav.tickets',
+        icon: Ticket,
         permission: 'ticket:view',
         badge: 'assignedTickets',
       },
-      { to: '/tickets', labelKey: 'nav.allTickets', icon: Ticket, permission: 'ticket:view' },
       { to: '/customers', labelKey: 'nav.customers', icon: Users, permission: 'customer:view' },
     ],
   },

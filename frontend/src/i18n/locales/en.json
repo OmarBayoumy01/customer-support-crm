@@ -44,8 +44,7 @@
       "account": "Account"
     },
     "dashboard": "Dashboard",
-    "myTickets": "My tickets",
-    "allTickets": "All tickets",
+    "tickets": "Tickets",
     "customers": "Customers",
     "articles": "Articles",
     "reports": "Reports",
