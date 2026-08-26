@@ -15,7 +15,7 @@ import { ApiException } from '../common/index.js';
 import { PermissionsService, ticketScopeWhere } from '../permissions/index.js';
 import { PrismaService } from '../prisma/index.js';
 import type { Prisma } from '../generated/prisma/client.js';
-import { TicketHistoryService } from './ticket-history.service.js';
+import { automationRuleOf, TicketHistoryService } from './ticket-history.service.js';
 
 /** Who is asking, and what they may see. */
 export interface TicketActor {
@@ -350,6 +350,7 @@ export class TicketsService {
             fromValue: true,
             toValue: true,
             createdAt: true,
+            metadata: true,
             actor: { select: { firstName: true, lastName: true } },
           },
         },
@@ -390,6 +391,7 @@ export class TicketsService {
         fromValue: entry.fromValue,
         toValue: entry.toValue,
         actorName: entry.actor === null ? null : `${entry.actor.firstName} ${entry.actor.lastName}`,
+        automationRule: automationRuleOf(entry.metadata),
         createdAt: entry.createdAt.toISOString(),
       })),
     };

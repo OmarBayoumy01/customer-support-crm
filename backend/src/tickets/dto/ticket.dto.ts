@@ -1,4 +1,9 @@
-import { CreateTicketSchema, TicketListQuerySchema, UpdateTicketSchema } from '@crm/shared';
+import {
+  CreateTicketSchema,
+  PaginationQuerySchema,
+  TicketListQuerySchema,
+  UpdateTicketSchema,
+} from '@crm/shared';
 
 import { createZodDto } from '../../common/index.js';
 
@@ -6,3 +11,6 @@ import { createZodDto } from '../../common/index.js';
 export class CreateTicketDto extends createZodDto(CreateTicketSchema) {}
 export class UpdateTicketDto extends createZodDto(UpdateTicketSchema) {}
 export class TicketListQueryDto extends createZodDto(TicketListQuerySchema) {}
+
+/** Paging for the history endpoint, which needs no filters of its own. */
+export class PaginationQueryDto extends createZodDto(PaginationQuerySchema) {}

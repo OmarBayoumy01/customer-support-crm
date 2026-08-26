@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 
 import { PrismaService } from '../prisma/index.js';
+import type { TicketHistoryEntry } from '@crm/shared';
 import type { Prisma, TicketEventType } from '../generated/prisma/client.js';
 
 /** One recorded change. */
@@ -11,17 +12,32 @@ export interface HistoryEntry {
   field?: string | undefined;
   fromValue?: string | undefined;
   toValue?: string | undefined;
+  /**
+   * The automation responsible, when nothing human was — US-50, AC3.
+   *
+   * Set this **instead of** `actorUserId`. An SLA escalation attributed to
+   * whoever last touched the ticket is a lie in the one record kept for
+   * settling disputes, and the person it names is the one who gets asked about
+   * it.
+   */
+  automationRule?: string | undefined;
   metadata?: Prisma.InputJsonValue | undefined;
 }
 
-/**
- * Which field change is which kind of event.
- *
- * A reassignment and a priority change are both "a column moved", but they read
- * completely differently in a timeline, and P11's reports count them
- * separately. Mapping here means the caller states the field and gets the right
- * event type without every call site remembering.
- */
+/** Where the rule name lives inside `metadata`. One place, so readers agree. */
+export const AUTOMATION_METADATA_KEY = 'automationRule';
+
+/** Pulls the rule name back out of a stored entry. */
+export function automationRuleOf(metadata: unknown): string | null {
+  if (typeof metadata !== 'object' || metadata === null) {
+    return null;
+  }
+
+  const value = (metadata as Record<string, unknown>)[AUTOMATION_METADATA_KEY];
+
+  return typeof value === 'string' ? value : null;
+}
+
 /**
  * A history value, as text.
  *
@@ -47,6 +63,14 @@ function asText(value: unknown): string | undefined {
   return undefined;
 }
 
+/**
+ * Which field change is which kind of event.
+ *
+ * A reassignment and a priority change are both "a column moved", but they read
+ * completely differently in a timeline, and P11's reports count them
+ * separately. Mapping here means the caller states the field and gets the right
+ * event type without every call site remembering.
+ */
 const EVENT_FOR_FIELD: Record<string, TicketEventType> = {
   status: 'STATUS_CHANGED',
   priority: 'PRIORITY_CHANGED',
@@ -72,16 +96,26 @@ export class TicketHistoryService {
   constructor(private readonly prisma: PrismaService) {}
 
   async record(entry: HistoryEntry): Promise<void> {
+    // Exactly one attribution. An automated change with an actor attached would
+    // read as a person having done it, which is the thing AC3 forbids.
+    const metadata =
+      entry.automationRule === undefined
+        ? entry.metadata
+        : {
+            ...(entry.metadata as object | undefined),
+            [AUTOMATION_METADATA_KEY]: entry.automationRule,
+          };
+
     try {
       await this.prisma.ticketHistory.create({
         data: {
           ticketId: entry.ticketId,
-          actorUserId: entry.actorUserId,
+          actorUserId: entry.automationRule === undefined ? entry.actorUserId : null,
           eventType: entry.eventType,
           field: entry.field ?? null,
           fromValue: entry.fromValue ?? null,
           toValue: entry.toValue ?? null,
-          ...(entry.metadata === undefined ? {} : { metadata: entry.metadata }),
+          ...(metadata === undefined ? {} : { metadata }),
         },
       });
     } catch (error: unknown) {
@@ -94,6 +128,57 @@ export class TicketHistoryService {
         }`,
       );
     }
+  }
+
+  /**
+   * A ticket's timeline, newest first — US-50, AC1 and AC2.
+   *
+   * Paginated because a long-running ticket accumulates hundreds of entries and
+   * the panel is collapsed by default (AC5) — loading all of them to render
+   * three is work nobody asked for.
+   *
+   * Scope is **not** applied here: the caller has already been through
+   * `TicketsService.detail`, which refuses a ticket outside their scope. Adding
+   * a second check would mean two places that have to agree about who may see
+   * what.
+   */
+  async forTicket(
+    ticketId: string,
+    options: { skip: number; take: number },
+  ): Promise<{ entries: TicketHistoryEntry[]; total: number }> {
+    const [rows, total] = await Promise.all([
+      this.prisma.ticketHistory.findMany({
+        where: { ticketId },
+        orderBy: { createdAt: 'desc' },
+        skip: options.skip,
+        take: options.take,
+        select: {
+          id: true,
+          eventType: true,
+          field: true,
+          fromValue: true,
+          toValue: true,
+          metadata: true,
+          createdAt: true,
+          actor: { select: { firstName: true, lastName: true } },
+        },
+      }),
+      this.prisma.ticketHistory.count({ where: { ticketId } }),
+    ]);
+
+    return {
+      entries: rows.map((row) => ({
+        id: row.id,
+        eventType: row.eventType,
+        field: row.field,
+        fromValue: row.fromValue,
+        toValue: row.toValue,
+        actorName: row.actor === null ? null : `${row.actor.firstName} ${row.actor.lastName}`,
+        automationRule: automationRuleOf(row.metadata),
+        createdAt: row.createdAt.toISOString(),
+      })),
+      total,
+    };
   }
 
   /**

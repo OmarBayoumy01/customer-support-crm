@@ -8,6 +8,7 @@ in [`../00-mvp-scope.md`](../00-mvp-scope.md) touch it.
 | NN  | File                               | Title                | Tracker id | Depends on  |
 | --- | ---------------------------------- | -------------------- | ---------- | ----------- |
 | 25  | `25-story-build-the-ticket-api.md` | Build the ticket API | US-40      | US-6, US-22 |
+| 26  | `26-story-track-ticket-history.md` | Track ticket history | US-50      | US-40       |
 
 ## No schema change
 
@@ -65,7 +66,10 @@ being wrong rather than the query.
 - **US-41** create screen · **US-42** queue · **US-45** workspace all read this contract.
 - **US-47, US-48, US-49** each add a guarded operation and must record through
   `TicketHistoryService` rather than writing their own entries.
-- **US-50** adds the history *endpoint*; the recording already happens here.
+- **US-50** ✅ added the history *endpoint*, the automation attribution, and the database
+  trigger that makes "append-only" true rather than intended. The recording already
+  happened here. Note the one thing it flagged: `TicketEventType` has no `RESOLVED`, so
+  US-47 records resolution as `STATUS_CHANGED` with `toValue: 'RESOLVED'`.
 - **US-68** fills `firstResponseDueAt` and `resolutionDueAt`; `slaFor` starts answering
   something other than `none` the moment it does, with no change here.
 - **US-82** is a separate controller. It must query `isInternal: false`, and that is where

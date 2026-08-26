@@ -78,6 +78,35 @@
       "breached": "Breached",
       "remaining": "{{time}} left",
       "overBy": "{{time}} over"
+    },
+    "history": {
+      "title": "History",
+      "empty": "Nothing has changed on this ticket yet.",
+      "showAll_one": "Show 1 earlier event",
+      "showAll_other": "Show {{count}} earlier events",
+      "showRecent": "Show recent only",
+      "automation": "Automation · {{rule}}",
+      "unknownActor": "Unknown",
+      "setTo": "{{field}} set to {{value}}",
+      "movedFromTo": "{{field}} changed from {{from}} to {{to}}",
+      "field": {
+        "status": "Status",
+        "priority": "Priority",
+        "assigneeId": "Assignee",
+        "categoryId": "Category",
+        "departmentId": "Department",
+        "branchId": "Branch",
+        "subject": "Subject",
+        "unknown": "Ticket"
+      },
+      "event": {
+        "created": "Ticket created",
+        "changed": "{{field}} changed",
+        "unassigned": "Assignee removed",
+        "slaBreached": "SLA target passed",
+        "reopened": "Ticket reopened",
+        "closed": "Ticket closed"
+      }
     }
   },
   "states": {

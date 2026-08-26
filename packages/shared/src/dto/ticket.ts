@@ -153,6 +153,14 @@ export const TicketHistoryEntrySchema = z.object({
   fromValue: z.string().nullable(),
   toValue: z.string().nullable(),
   actorName: z.string().nullable(),
+  /**
+   * The automation that caused this, when nothing human did — US-50, AC3.
+   *
+   * Exactly one of `actorName` and `automationRule` is set. Attributing an SLA
+   * escalation to whoever happened to touch the ticket last would be a lie in
+   * the one record kept for settling disputes.
+   */
+  automationRule: z.string().nullable(),
   createdAt: z.string().datetime(),
 });
 

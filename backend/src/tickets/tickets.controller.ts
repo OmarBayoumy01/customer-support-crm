@@ -2,11 +2,15 @@ import { Body, Controller, Get, HttpCode, Param, Patch, Post, Query } from '@nes
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorSchema,
+  buildPaginationMeta,
   TicketDetailSchema,
+  TicketHistoryEntrySchema,
   TicketSchema,
+  toSkipTake,
   type ApiPaginated,
   type Ticket,
   type TicketDetail,
+  type TicketHistoryEntry,
 } from '@crm/shared';
 
 import { CurrentUser, type CurrentUserPayload } from '../auth/index.js';
@@ -18,7 +22,13 @@ import {
   BEARER_AUTH_NAME,
   zodToOpenApi,
 } from '../openapi/index.js';
-import { CreateTicketDto, TicketListQueryDto, UpdateTicketDto } from './dto/ticket.dto.js';
+import {
+  CreateTicketDto,
+  PaginationQueryDto,
+  TicketListQueryDto,
+  UpdateTicketDto,
+} from './dto/ticket.dto.js';
+import { TicketHistoryService } from './ticket-history.service.js';
 import { TicketsService, type TicketActor } from './tickets.service.js';
 import { PrismaService } from '../prisma/index.js';
 
@@ -34,6 +44,7 @@ import { PrismaService } from '../prisma/index.js';
 export class TicketsController {
   constructor(
     private readonly tickets: TicketsService,
+    private readonly historyService: TicketHistoryService,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -89,6 +100,45 @@ export class TicketsController {
     @CurrentUser() user: CurrentUserPayload | undefined,
   ): Promise<TicketDetail> {
     return this.tickets.detail(id, await this.actorFrom(user));
+  }
+
+  /**
+   * The ticket's audit trail — US-50.
+   *
+   * Separate from the detail payload, which carries the most recent hundred
+   * entries so the workspace renders in one round trip. This is what the
+   * collapsed panel calls when somebody actually opens it and pages back.
+   *
+   * Scope is enforced by loading the ticket through `detail` first: one place
+   * decides who may see what, rather than two that have to agree.
+   */
+  @Get(':id/history')
+  @RequirePermission('ticket:view')
+  @ApiOperation({
+    summary: 'A ticket’s history, newest first',
+    description:
+      'Append-only, and enforced by the database rather than by convention — a trigger ' +
+      'refuses UPDATE and refuses DELETE while the ticket still exists.',
+  })
+  @ApiZodQuery(PaginationQueryDto)
+  @ApiZodResponse(200, TicketHistoryEntrySchema, 'A page of history')
+  async history(
+    @Param('id') id: string,
+    @Query() query: PaginationQueryDto,
+    @CurrentUser() user: CurrentUserPayload | undefined,
+  ): Promise<ApiPaginated<TicketHistoryEntry>> {
+    const actor = await this.actorFrom(user);
+
+    // Refuses a ticket outside the caller's scope before any history is read.
+    await this.tickets.detail(id, actor);
+
+    const { skip, take } = toSkipTake(query);
+    const { entries, total } = await this.historyService.forTicket(id, { skip, take });
+
+    return {
+      data: entries,
+      pagination: buildPaginationMeta({ page: query.page, pageSize: query.pageSize, total }),
+    };
   }
 
   @Post()

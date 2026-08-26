@@ -78,6 +78,39 @@
       "breached": "تجاوزت المدة",
       "remaining": "متبقٍ {{time}}",
       "overBy": "تجاوز {{time}}"
+    },
+    "history": {
+      "title": "السجل",
+      "empty": "لم يطرأ أي تغيير على هذه التذكرة بعد.",
+      "showAll_zero": "عرض الأحداث السابقة",
+      "showAll_one": "عرض حدث سابق واحد",
+      "showAll_two": "عرض حدثين سابقين",
+      "showAll_few": "عرض {{count}} أحداث سابقة",
+      "showAll_many": "عرض {{count}} حدثًا سابقًا",
+      "showAll_other": "عرض {{count}} حدث سابق",
+      "showRecent": "عرض الأحدث فقط",
+      "automation": "إجراء تلقائي · {{rule}}",
+      "unknownActor": "غير معروف",
+      "setTo": "تم ضبط {{field}} على {{value}}",
+      "movedFromTo": "تغيّر {{field}} من {{from}} إلى {{to}}",
+      "field": {
+        "status": "الحالة",
+        "priority": "الأولوية",
+        "assigneeId": "المسؤول",
+        "categoryId": "التصنيف",
+        "departmentId": "القسم",
+        "branchId": "الفرع",
+        "subject": "الموضوع",
+        "unknown": "التذكرة"
+      },
+      "event": {
+        "created": "تم إنشاء التذكرة",
+        "changed": "تغيّر {{field}}",
+        "unassigned": "تمت إزالة المسؤول",
+        "slaBreached": "تجاوزت التذكرة مدة الخدمة",
+        "reopened": "تمت إعادة فتح التذكرة",
+        "closed": "تم إغلاق التذكرة"
+      }
     }
   },
   "states": {
