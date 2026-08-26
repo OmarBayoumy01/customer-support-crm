@@ -10,6 +10,7 @@ for them.
 | NN  | File                             | Title              | Tracker id | Depends on |
 | --- | -------------------------------- | ------------------ | ---------- | ---------- |
 | 27  | `27-story-define-sla-policies.md` | Define SLA policies | US-67      | US-6       |
+| 29  | `29-story-calculate-sla-clocks-accurately.md` | Calculate SLA clocks accurately | US-68 | US-67, US-10 |
 
 ## The MVP simplification, stated once
 

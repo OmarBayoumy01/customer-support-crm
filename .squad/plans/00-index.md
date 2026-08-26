@@ -26,7 +26,7 @@ One row per feature folder under `.squad/plans/`. `NN` continues as a global exe
 | `design-system`       | [00-overview.md](./design-system/00-overview.md)         | 18–23    |
 | `customers`           | [00-overview.md](./customers/00-overview.md)             | 24       |
 | `tickets`             | [00-overview.md](./tickets/00-overview.md)               | 25–26    |
-| `sla`                 | [00-overview.md](./sla/00-overview.md)                   | 27       |
+| `sla`                 | [00-overview.md](./sla/00-overview.md)                   | 27, 29   |
 | `administration`      | [00-overview.md](./administration/00-overview.md)        | 28       |
 
 ## A note on 13–20

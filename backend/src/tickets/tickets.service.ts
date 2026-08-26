@@ -15,6 +15,7 @@ import { ApiException } from '../common/index.js';
 import { PermissionsService, ticketScopeWhere } from '../permissions/index.js';
 import { PrismaService } from '../prisma/index.js';
 import type { Prisma } from '../generated/prisma/client.js';
+import { SlaClockService } from '../sla/sla-clock.service.js';
 import { automationRuleOf, TicketHistoryService } from './ticket-history.service.js';
 
 /** Who is asking, and what they may see. */
@@ -66,6 +67,7 @@ export class TicketsService {
     private readonly prisma: PrismaService,
     private readonly permissions: PermissionsService,
     private readonly history: TicketHistoryService,
+    private readonly clock: SlaClockService,
   ) {}
 
   /**
@@ -436,9 +438,22 @@ export class TicketsService {
       eventType: 'CREATED',
     });
 
+    // US-68, AC1. After the insert rather than inside it, because the deadline
+    // is measured from the ticket's own `createdAt` and the policy is chosen
+    // from the values the database actually stored.
+    await this.clock.applyOnCreate(row.id);
+
     this.logger.log(`Created ticket #${String(row.number)}`);
 
-    return this.toTicket(row);
+    // Re-read so the caller sees the deadlines rather than the nulls the insert
+    // returned. One extra indexed read on a create is worth an API response
+    // that agrees with the database.
+    const withSla = await this.prisma.ticket.findUniqueOrThrow({
+      where: { id: row.id },
+      select: TICKET_SELECT,
+    });
+
+    return this.toTicket(withSla);
   }
 
   /**
@@ -483,6 +498,19 @@ export class TicketsService {
     });
 
     await this.history.recordChanges(id, actor.userId, before, data);
+
+    // US-68, AC6. Priority decides which policy applies, so changing it changes
+    // the targets — recomputed from the original start, never from now.
+    if (data['priority'] !== undefined && data['priority'] !== before.priority) {
+      await this.clock.onPriorityChange(id);
+
+      const recomputed = await this.prisma.ticket.findUniqueOrThrow({
+        where: { id },
+        select: TICKET_SELECT,
+      });
+
+      return this.toTicket(recomputed);
+    }
 
     return this.toTicket(row);
   }

@@ -558,6 +558,16 @@ model Ticket {
   resolutionDueAt       DateTime?
   resolutionBreached    Boolean   @default(false)
 
+  /// US-68, AC3 — set while the resolution clock is stopped, null while it runs.
+  slaPausedAt DateTime?
+
+  /// Everything the resolution clock has been paused for, in milliseconds.
+  ///
+  /// A deadline is always `start + target + this`. Keeping the total means AC6
+  /// can recompute from the original start under a new policy without losing
+  /// the days a ticket legitimately spent waiting on the customer.
+  slaPausedMs Int @default(0)
+
   resolvedAt DateTime?
   closedAt   DateTime?
 

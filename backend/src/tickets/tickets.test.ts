@@ -302,10 +302,32 @@ test('AC2 — paging happens in the database, not in memory', async () => {
 test('AC2 — a ticket with no SLA policy reports state "none", not "on track"', async () => {
   const ticket = await newTicket();
 
+  // Updated by US-68. When this was written no clock existed and every ticket
+  // had null deadlines, so a fresh ticket was the easiest way to reach the
+  // `none` branch. Now the seeded policies cover every priority and a created
+  // ticket has a real target — so the branch is reached by clearing the
+  // deadlines, which is the state it actually describes: a ticket nothing is
+  // tracking.
+  await prisma.ticket.update({
+    where: { id: ticket.id },
+    data: { slaPolicyId: null, firstResponseDueAt: null, resolutionDueAt: null },
+  });
+
+  const { body } = await call<TicketDetail>('GET', `/tickets/${ticket.id}`, { token: allToken });
+
   // Different answers to different questions: nothing is being tracked, which
   // is not the same as being comfortably within a target.
-  assert.equal(ticket.sla.state, 'none');
-  assert.equal(ticket.sla.secondsRemaining, null);
+  assert.equal(body.data?.sla.state, 'none');
+  assert.equal(body.data?.sla.secondsRemaining, null);
+});
+
+test('AC2 — a created ticket now carries the deadlines US-68 computes', async () => {
+  const ticket = await newTicket({ priority: 'URGENT' });
+
+  assert.notEqual(ticket.sla.state, 'none');
+  assert.ok(ticket.sla.resolutionDueAt !== null);
+  assert.ok(ticket.sla.firstResponseDueAt !== null);
+  assert.ok((ticket.sla.secondsRemaining ?? 0) > 0);
 });
 
 test('AC2 — a breached ticket is found by the SLA filter, as a column comparison', async () => {
