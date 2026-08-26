@@ -74,6 +74,10 @@ customer-support-crm/
 └── docs/               Notes and decisions
 ```
 
+**To run it:** `docs/running-the-project.md`. Read that rather than reconstructing the
+commands — it carries the two working setups, the seeded development accounts, and the
+failures that are environment rather than code.
+
 ---
 
 ## Tooling — Squad Kit

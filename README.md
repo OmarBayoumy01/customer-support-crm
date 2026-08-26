@@ -11,18 +11,23 @@ escalate → resolve → report**
 
 ## Getting started
 
-**You need Docker Desktop, and nothing else.** Not Node, not Postgres, not Redis.
+**→ [`docs/running-the-project.md`](./docs/running-the-project.md) is the full runbook** —
+both ways to run it, the development accounts, how to check it works, and what to do when
+it does not. What follows is the short version.
 
 ```
 git clone <repo>
 cd customer-support-crm
-docker compose up
+docker compose up -d --wait
+npm run db:seed --workspace @crm/backend     # roles, permissions, and dev users
 ```
 
-That is the whole setup. It starts Postgres, Redis, the API, and the frontend, creates
-the databases, applies every migration, and waits for each service to be healthy before
-starting the one that depends on it. The first run builds two images and takes a few
-minutes; afterwards it is seconds.
+That starts Postgres, Redis, the API, and the frontend, applies every migration, and waits
+for each service to be healthy before starting the one that depends on it. The first run
+builds two images and takes a few minutes; afterwards it is seconds.
+
+**The seed is not optional on a fresh database.** Without it there are no roles, no
+permissions, and no account anyone can sign in with. It is idempotent.
 
 | What              | Where                          |
 | ----------------- | ------------------------------ |
@@ -31,58 +36,24 @@ minutes; afterwards it is seconds.
 | Health            | http://localhost:3000/health   |
 | API documentation | http://localhost:3000/api/docs |
 
-`/health` is the one to check first: it reports the database and Redis, so if something is
-wrong it tells you which thing.
+Sign in as `agent@crm.local` with the password from `SEED_PASSWORD`
+(`DevPassw0rd!` in `backend/.env.example`). The other three accounts, one per role, are in
+the runbook.
+
+`/health` is the one to check first: it reports the database and Redis separately, so if
+something is wrong it tells you which thing.
 
 **Edit any file and it takes effect** — no rebuild, no restart. The backend takes a few
 seconds (TypeScript recompiles, then the process restarts); the frontend is near-instant.
 
-To change a port or a credential, `cp .env.example .env` and edit it. Every value has a
-working default, so the file is optional.
-
-```
-docker compose logs -f backend   # follow one service
-docker compose down              # stop; your data survives
-docker compose down -v           # stop and DELETE the database
-docker compose up --build        # after changing a Dockerfile or a dependency
-```
-
-### Working on the host instead
-
-If you would rather run Node directly — faster tests, a debugger attached — you still need
-the databases from Docker:
-
-```
-nvm use                                   # .nvmrc → Node 24.15.0
-npm install                               # installs every workspace
-docker compose up -d postgres redis       # just the data services
-cp backend/.env.example backend/.env
-npm run migrate:deploy --workspace @crm/backend
-npm run verify                            # type-check, lint, format check, tests
-```
-
-`npm install` is run **from the repository root only**. This is an npm workspaces
-monorepo — running `npm install` inside `frontend/` or `backend/` can produce a nested
-`node_modules` and a second lockfile. There is one lockfile, and it lives at the root.
-
-`npm install` also installs the Git hooks, via the `prepare` script. A fresh clone is
-gated from the first commit with no extra step.
+> **If the image build fails with npm's `Exit handler never called!`**, your machine is
+> probably intercepting TLS and the container does not trust the CA doing it. That message
+> is not the real error. The runbook has the diagnosis, the proper fix, and the workaround
+> — run the databases in Docker and the app on the host, which needs Node 24.15.0 and
+> `npm install` from the repository root.
 
 **The test suite needs Postgres and Redis running.** No test skips itself when they are
-absent — it fails loudly and tells you which command to run.
-
-### If something will not start
-
-- **A port is already in use.** Set `POSTGRES_PORT`, `REDIS_PORT`, `BACKEND_PORT`, or
-  `FRONTEND_PORT` in `.env`. The containers always talk to each other on the standard
-  ports regardless of what you map on the host.
-- **`docker compose up` hangs on `backend`.** It waits for Postgres and Redis to report
-  _healthy_, not merely started. `docker compose logs postgres` will say why.
-- **An edit does nothing.** Bind mounts from Windows and macOS do not deliver filesystem
-  events into Linux containers, so the watchers poll instead. If polling has been turned
-  off, this is the first thing that breaks.
-- **`Cannot find module '@crm/shared'`.** The shared package has not been built. Inside
-  Compose the entrypoint handles it; on the host, `npm run build --workspace @crm/shared`.
+absent — it fails loudly and names the command to run.
 
 ---
 

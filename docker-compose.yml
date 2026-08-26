@@ -126,6 +126,15 @@ services:
       # Read by the browser, so it is the HOST-side URL, not the service name —
       # the request is made by the user's browser, which is not on this network.
       VITE_API_URL: http://localhost:${BACKEND_PORT:-3000}
+      # Read by the Vite dev server, which IS on this network — so this one is
+      # the service name. Inside the container `127.0.0.1` is the frontend
+      # itself, and the proxy would answer its own requests.
+      #
+      # The API is proxied rather than called cross-origin so that US-14's
+      # refresh cookie is same-site. `SameSite=Strict` means a call from :5173
+      # straight to :3000 would not carry it, and login would appear to work
+      # while issuing no usable session.
+      VITE_API_PROXY_TARGET: http://backend:3000
       # A bind mount from Windows or macOS does not deliver filesystem events
       # into the container, so without polling HMR never fires (AC2).
       VITE_USE_POLLING: 'true'

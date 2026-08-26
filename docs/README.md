@@ -2,9 +2,10 @@
 
 Phase specifications and phase records live here.
 
-| Document                                             | What it is                                                  |
-| ---------------------------------------------------- | ----------------------------------------------------------- |
-| [`phase-01-foundation.md`](./phase-01-foundation.md) | Everything Phase 1 built, decided, and got wrong on the way |
+| Document                                             | What it is                                                                                       |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| [`running-the-project.md`](./running-the-project.md) | **Start here to get it running.** Both setups, the development accounts, and the troubleshooting |
+| [`phase-01-foundation.md`](./phase-01-foundation.md) | Everything Phase 1 built, decided, and got wrong on the way                                      |
 
 Start with the phase document if you are new. It explains the request lifecycle, the domain
 schema, the conventions every later story has to follow, and — usefully — the traps that
