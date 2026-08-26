@@ -5,6 +5,7 @@
  * account), AC4 (nothing leaks the hash), AC5 (brute-force lockout).
  */
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
 import { after, before, test } from 'node:test';
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -26,7 +27,7 @@ let passwords: PasswordService;
 let redis: RedisService;
 
 /** Namespaces this run's rows and cache keys — both databases persist. */
-const run = `${String(process.pid)}-${String(Math.floor(performance.now()))}`;
+const run = randomUUID().slice(0, 8);
 
 const PASSWORD = 'correct-horse-battery-staple';
 const WRONG_PASSWORD = 'incorrect-horse-battery-staple';

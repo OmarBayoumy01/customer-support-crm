@@ -6,6 +6,7 @@
  * depending on whatever `.env.test` happens to say.
  */
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
 import { after, before, test } from 'node:test';
 
 import type { INestApplication } from '@nestjs/common';
@@ -22,7 +23,7 @@ let app: INestApplication;
 let redis: RedisService;
 
 /** Namespaces this run, since the test Redis persists between runs. */
-const run = `${String(process.pid)}-${String(Math.floor(performance.now()))}`;
+const run = randomUUID().slice(0, 8);
 
 let counter = 0;
 

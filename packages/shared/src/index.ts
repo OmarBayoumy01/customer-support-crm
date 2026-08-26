@@ -61,3 +61,22 @@ export {
   type AuthenticatedUser,
   type LoginResponse,
 } from './auth/login.js';
+
+export {
+  CustomerTypeSchema,
+  ChannelSchema,
+  CreateCustomerSchema,
+  UpdateCustomerSchema,
+  CustomerListQuerySchema,
+  CustomerStatsSchema,
+  CustomerSchema,
+  DuplicateCustomerSchema,
+  type CustomerType,
+  type Channel,
+  type CreateCustomer,
+  type UpdateCustomer,
+  type CustomerListQuery,
+  type CustomerStats,
+  type Customer,
+  type DuplicateCustomer,
+} from './dto/customer.js';

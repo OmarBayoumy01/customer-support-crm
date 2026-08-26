@@ -130,6 +130,16 @@ enum PermissionScope {
   OWN
 }
 
+/// Whether a customer is a person or an organisation — US-33, AC1.
+///
+/// Explicit rather than derived from whether `companyName` is set: that rule is
+/// wrong the first time a sole trader gives a trading name, and it is the sort
+/// of implicit convention nobody remembers is load-bearing.
+enum CustomerType {
+  INDIVIDUAL
+  COMPANY
+}
+
 enum AuditAction {
   CREATE
   UPDATE
@@ -390,6 +400,8 @@ model Department {
   categories  Category[]
   tickets     Ticket[]
   slaPolicies SlaPolicy[]
+  /// Customers this department owns — US-33. Not customers who belong to it.
+  customers   Customer[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -417,8 +429,16 @@ model Customer {
   phone       String?
   companyName String?
 
+  /// US-33, AC1.
+  type CustomerType @default(INDIVIDUAL)
+
   preferredLocale  Locale   @default(EN)
   preferredChannel Channel?
+
+  /// Which support department owns this customer — NOT a department the
+  /// customer belongs to. Nullable because most customers have none.
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
 
   branchId String?
   branch   Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
@@ -438,6 +458,7 @@ model Customer {
   @@index([email])
   @@index([phone])
   @@index([branchId, isActive])
+  @@index([departmentId])
   @@index([lastName, firstName])
   @@index([externalRef])
 }

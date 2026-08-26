@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
 import { after, before, test } from 'node:test';
 
 import type { INestApplication } from '@nestjs/common';
@@ -10,7 +11,7 @@ import { PrismaService } from './prisma.service.js';
 let app: INestApplication;
 let prisma: PrismaService;
 
-const run = `${String(process.pid)}-${String(Math.floor(performance.now()))}`;
+const run = randomUUID().slice(0, 8);
 
 before(async () => {
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();

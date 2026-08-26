@@ -23,7 +23,8 @@ One row per feature folder under `.squad/plans/`. `NN` continues as a global exe
 | `session-lifecycle`   | [00-overview.md](./session-lifecycle/00-overview.md)     | 13–14    |
 | `authorisation`       | [00-overview.md](./authorisation/00-overview.md)         | 15–16    |
 | `react-scaffold`      | [00-overview.md](./react-scaffold/00-overview.md)        | 17       |
-| `design-system`       | [00-overview.md](./design-system/00-overview.md)         | 18–20    |
+| `design-system`       | [00-overview.md](./design-system/00-overview.md)         | 18–23    |
+| `customers`           | [00-overview.md](./customers/00-overview.md)             | 24       |
 
 ## A note on 13–20
 

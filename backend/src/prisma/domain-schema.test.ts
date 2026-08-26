@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
 import { after, before, test } from 'node:test';
 
 import type { INestApplication } from '@nestjs/common';
@@ -15,7 +16,7 @@ let prisma: PrismaService;
  * per-run suffix. Without it a second `npm run test` fails on constraints
  * rather than on behaviour.
  */
-const run = `${String(process.pid)}-${String(Math.floor(performance.now()))}`;
+const run = randomUUID().slice(0, 8);
 
 before(async () => {
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
