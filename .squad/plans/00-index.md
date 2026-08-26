@@ -1,5 +1,9 @@
 # Plans index
 
+> **Scope is set by [`00-mvp-scope.md`](./00-mvp-scope.md).** 28 stories, chosen to make one
+> complete customer-support journey work end to end rather than to finish every MVP story.
+> Read it before planning anything — several stories below the line were cut deliberately.
+
 One row per feature folder under `.squad/plans/`. `NN` continues as a global execution sequence across all features when `naming.globalSequence` is `true` in `config.yaml`.
 
 | Feature               | Overview                                                | NN range |
