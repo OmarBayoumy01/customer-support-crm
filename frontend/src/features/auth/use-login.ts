@@ -1,5 +1,5 @@
 import { useMutation, type UseMutationResult } from '@tanstack/react-query';
-import { useNavigate } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 import { LoginResponseSchema, type LoginRequest, type LoginResponse } from '@crm/shared';
 
 import { apiPost, type ApiRequestError } from '../../lib/api-client';
@@ -19,6 +19,16 @@ async function postLogin(credentials: LoginRequest): Promise<LoginResponse> {
 export function useLogin(): UseMutationResult<LoginResponse, ApiRequestError, LoginRequest> {
   const { signIn } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  /**
+   * Where the user was heading before they were sent to sign in — US-23, AC1.
+   *
+   * `RequireAuth` puts it in the route state. Someone who followed a link to a
+   * ticket and got a login screen expects to arrive at that ticket, not at a
+   * dashboard from which they have to find it again.
+   */
+  const intended = (location.state as { from?: string } | null)?.from;
 
   return useMutation<LoginResponse, ApiRequestError, LoginRequest>({
     mutationFn: postLogin,
@@ -26,7 +36,7 @@ export function useLogin(): UseMutationResult<LoginResponse, ApiRequestError, Lo
       signIn(response);
       // `replace`, so the back button does not return to a login form the user
       // has already used.
-      void navigate(AFTER_LOGIN_PATH, { replace: true });
+      void navigate(intended ?? AFTER_LOGIN_PATH, { replace: true });
     },
     // No retry. A 401 is an answer, not a failure to get one, and retrying
     // wrong credentials walks the account straight into AC5's lockout.

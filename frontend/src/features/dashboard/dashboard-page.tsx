@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 
 import { Button } from '../../components/ui/button';
 
+import { AppNav } from '../../components/app-nav';
 import { LanguageToggle } from '../../components/language-toggle';
 import { useAuth } from '../auth/auth-context';
 import { useLogout } from '../auth/use-logout';
@@ -25,6 +26,7 @@ export function DashboardPage(): React.JSX.Element {
     <main className="mx-auto max-w-2xl p-6">
       <div className="mb-4 flex items-center justify-between gap-2">
         <h1 className="text-xl font-semibold">{t('dashboard.title')}</h1>
+        <AppNav />
         <div className="flex items-center gap-2">
           <LanguageToggle />
           <Button

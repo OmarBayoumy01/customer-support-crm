@@ -17,7 +17,7 @@ export function RequireAuth(): React.JSX.Element {
   if (!isAuthenticated) {
     // The attempted path is carried along so US-15 can return the user to it
     // once a silent refresh has restored their session.
-    return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+    return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />;
   }
 
   return <Outlet />;

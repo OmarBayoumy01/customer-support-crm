@@ -31,5 +31,18 @@
     "rolesLabel": "Roles",
     "noRoles": "No roles assigned",
     "placeholder": "This is a placeholder. The real dashboard arrives with its own story."
+  },
+  "nav": {
+    "label": "Main",
+    "dashboard": "Dashboard",
+    "administration": "Administration",
+    "lockedHint": "You do not have permission for this"
+  },
+  "permissions": {
+    "deniedTitle": "You do not have access to this page",
+    "deniedBody": "Ask an administrator if you think you should."
+  },
+  "admin": {
+    "placeholder": "Administration screens arrive with their own stories."
   }
 }

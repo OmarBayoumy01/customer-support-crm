@@ -9,7 +9,11 @@ import {
 } from 'react';
 import type { AuthenticatedUser, EffectivePermissions, LoginResponse } from '@crm/shared';
 
-import { setAccessToken as storeAccessToken, subscribeToSession } from '../../lib/session-store';
+import {
+  getSession,
+  setSession as storeSession,
+  subscribeToSession,
+} from '../../lib/session-store';
 
 export interface AuthState {
   accessToken: string | null;
@@ -39,24 +43,31 @@ const AuthContext = createContext<AuthState | undefined>(undefined);
  * refresh behaviour cannot be "fixed" by reintroducing the vulnerability.
  */
 export function AuthProvider({ children }: { children: ReactNode }): React.JSX.Element {
-  const [accessToken, setAccessToken] = useState<string | null>(null);
-  const [user, setUser] = useState<AuthenticatedUser | null>(null);
-  const [permissions, setPermissions] = useState<EffectivePermissions | null>(null);
+  // Initialised **from the store**, not from null. A silent refresh that
+  // completes before this component mounts would otherwise have published to
+  // nobody, and the app would render signed out while holding a live session.
+  const [accessToken, setAccessToken] = useState<string | null>(
+    () => getSession()?.accessToken ?? null,
+  );
+  const [user, setUser] = useState<AuthenticatedUser | null>(() => getSession()?.user ?? null);
+  const [permissions, setPermissions] = useState<EffectivePermissions | null>(
+    () => getSession()?.permissions ?? null,
+  );
 
   const signIn = useCallback((response: LoginResponse) => {
     setAccessToken(response.accessToken);
     setUser(response.user);
     setPermissions(response.permissions);
     // The axios interceptor is not a component and cannot read this state, so
-    // the token is mirrored where it can reach it. Still memory only.
-    storeAccessToken(response.accessToken);
+    // the session is mirrored where it can reach it. Still memory only.
+    storeSession(response);
   }, []);
 
   const signOut = useCallback(() => {
     setAccessToken(null);
     setUser(null);
     setPermissions(null);
-    storeAccessToken(null);
+    storeSession(null);
   }, []);
 
   /**

@@ -14,6 +14,7 @@ import type { AddressInfo } from 'node:net';
 
 import { Controller, Get, type INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import type { PermissionKey, PermissionScope } from '@crm/shared';
 
 import { AppModule } from '../app.module.js';
 import { PasswordService, TokenService } from '../auth/index.js';
@@ -67,13 +68,36 @@ const run = `${String(process.pid)}-${String(Math.floor(performance.now()))}`;
 
 let created = 0;
 
-async function makeUser(roleKeys: string[]): Promise<{ id: string; token: string }> {
-  created += 1;
+let viewerRoleId: string;
+let assignerRoleId: string;
+let teamViewerRoleId: string;
 
-  const roleRows = await prisma.role.findMany({
-    where: { key: { in: roleKeys } },
+/** A role owned by this suite, with exactly the grants named. */
+async function makeRole(
+  name: string,
+  grants: readonly (readonly [PermissionKey, PermissionScope])[],
+): Promise<string> {
+  const role = await prisma.role.create({
+    data: { key: `${name}-${run}`, nameEn: name, nameAr: name, isSystem: false },
     select: { id: true },
   });
+
+  for (const [key, scope] of grants) {
+    const permission = await prisma.permission.findUniqueOrThrow({
+      where: { key },
+      select: { id: true },
+    });
+
+    await prisma.rolePermission.create({
+      data: { roleId: role.id, permissionId: permission.id, scope },
+    });
+  }
+
+  return role.id;
+}
+
+async function makeUser(roleIds: string[]): Promise<{ id: string; token: string }> {
+  created += 1;
 
   const user = await prisma.user.create({
     data: {
@@ -81,7 +105,7 @@ async function makeUser(roleKeys: string[]): Promise<{ id: string; token: string
       passwordHash: await passwords.hash('irrelevant-for-these-tests'),
       firstName: 'Perm',
       lastName: 'User',
-      roles: { create: roleRows.map((role) => ({ roleId: role.id })) },
+      roles: { create: roleIds.map((roleId) => ({ roleId })) },
     },
     select: { id: true },
   });
@@ -99,7 +123,7 @@ async function makeUser(roleKeys: string[]): Promise<{ id: string; token: string
 
   const token = await tokens.signAccessToken({
     userId: user.id,
-    roles: roleKeys,
+    roles: [],
     sessionId: session.id,
     audience: 'crm-staff',
   });
@@ -145,18 +169,29 @@ before(async () => {
   permissions = app.get(PermissionsService);
   roles = app.get(RolesService);
 
-  // The seeded system roles are what these assertions are about — an agent may
-  // view tickets but not assign them.
-  const { execFileSync } = await import('node:child_process');
-  const { fileURLToPath } = await import('node:url');
-  const path = await import('node:path');
+  // Roles of this suite's own, rather than the seeded system ones.
+  //
+  // `node --test` runs files in separate processes, concurrently, and the seed
+  // *replaces* every system role's grants inside a transaction. Two suites
+  // seeding at once fight over the same rows — which is exactly what happened
+  // the first time this file called the seed, and it broke `permissions.test.ts`
+  // rather than itself. Owning the fixtures removes the shared state entirely.
+  for (const key of ['ticket:view', 'ticket:assign'] as const) {
+    const [resource, action] = key.split(':') as [string, string];
 
-  execFileSync(process.execPath, ['dist/seed/seed.js'], {
-    cwd: path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..'),
-    env: { ...process.env },
-    stdio: 'pipe',
-    timeout: 60_000,
-  });
+    await prisma.permission.upsert({
+      where: { key },
+      create: { key, resource, action, description: key },
+      update: {},
+    });
+  }
+
+  viewerRoleId = await makeRole('viewer', [['ticket:view', 'ASSIGNED']]);
+  assignerRoleId = await makeRole('assigner', [
+    ['ticket:view', 'ASSIGNED'],
+    ['ticket:assign', 'ALL'],
+  ]);
+  teamViewerRoleId = await makeRole('team-viewer', [['ticket:view', 'TEAM']]);
 });
 
 after(async () => {
@@ -168,20 +203,20 @@ after(async () => {
 // ---------------------------------------------------------------------------
 
 test('AC1 — a user holding the permission is allowed through', async () => {
-  const agent = await makeUser(['agent']);
+  const agent = await makeUser([viewerRoleId]);
 
   assert.equal(await get('/guard-perms/read', agent.token), 200);
 });
 
 test('AC1 — a user lacking it is refused with 403, not 500 and not silently', async () => {
-  const agent = await makeUser(['agent']);
+  const agent = await makeUser([viewerRoleId]);
 
   // An agent may view tickets; assigning them is a manager's job.
   assert.equal(await get('/guard-perms/assign', agent.token), 403);
 });
 
 test('AC1 — a manager holding the same permission is allowed', async () => {
-  const manager = await makeUser(['manager']);
+  const manager = await makeUser([assignerRoleId]);
 
   assert.equal(await get('/guard-perms/assign', manager.token), 200);
 });
@@ -216,8 +251,8 @@ test('AC4 — a route with no @RequirePermission still requires authentication',
 // ---------------------------------------------------------------------------
 
 test('AC2 — an agent sees a ticket assigned to them and not one assigned to someone else', async () => {
-  const agent = await makeUser(['agent']);
-  const other = await makeUser(['agent']);
+  const agent = await makeUser([viewerRoleId]);
+  const other = await makeUser([viewerRoleId]);
 
   const scopes = await permissions.scopesFor(agent.id, 'ticket:view');
   const where = ticketScopeWhere(scopes, { userId: agent.id, departmentId: null });
@@ -231,7 +266,7 @@ test('AC2 — an agent sees a ticket assigned to them and not one assigned to so
 });
 
 test('AC3 — the scope is a WHERE clause, not a filter applied after fetching', async () => {
-  const agent = await makeUser(['agent']);
+  const agent = await makeUser([viewerRoleId]);
 
   const scopes = await permissions.scopesFor(agent.id, 'ticket:view');
   const where = ticketScopeWhere(scopes, { userId: agent.id, departmentId: null });
@@ -258,17 +293,12 @@ test('AC3 — no grant produces an impossible filter, never an empty one', async
 });
 
 test('AC2 — widening the role widens the scope, without a redeploy', async () => {
-  const user = await makeUser(['agent']);
+  const user = await makeUser([viewerRoleId]);
 
   const asAgent = await permissions.scopesFor(user.id, 'ticket:view');
   assert.deepEqual(asAgent, ['ASSIGNED']);
 
-  const manager = await prisma.role.findUniqueOrThrow({
-    where: { key: 'manager' },
-    select: { id: true },
-  });
-
-  await roles.setUserRoles(user.id, [manager.id]);
+  await roles.setUserRoles(user.id, [teamViewerRoleId]);
 
   const asManager = await permissions.scopesFor(user.id, 'ticket:view');
   assert.deepEqual(asManager, ['TEAM']);
@@ -279,7 +309,7 @@ test('AC2 — widening the role widens the scope, without a redeploy', async () 
 // ---------------------------------------------------------------------------
 
 test('AC5 — a denial names the user and the endpoint', async () => {
-  const agent = await makeUser(['agent']);
+  const agent = await makeUser([viewerRoleId]);
 
   assert.equal(await get('/guard-perms/assign', agent.token), 403);
 

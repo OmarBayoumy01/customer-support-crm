@@ -3,6 +3,8 @@ import { Navigate, Route, Routes } from 'react-router';
 import { useAuth } from '../features/auth/auth-context';
 import { LoginPage } from '../features/auth/login-page';
 import { RequireAuth } from '../features/auth/require-auth';
+import { RequirePermission } from '../features/auth/require-permission';
+import { AdminPage } from '../features/admin/admin-page';
 import { DashboardPage } from '../features/dashboard/dashboard-page';
 
 /**
@@ -21,6 +23,15 @@ export function AppRoutes(): React.JSX.Element {
 
       <Route element={<RequireAuth />}>
         <Route path="/dashboard" element={<DashboardPage />} />
+
+        {/*
+          Nested inside RequireAuth, so an unauthenticated visitor is sent to
+          sign in rather than told they lack a permission — they might well
+          have it. Only once we know who they are is "denied" the honest answer.
+        */}
+        <Route element={<RequirePermission permission="user:manage" />}>
+          <Route path="/admin" element={<AdminPage />} />
+        </Route>
       </Route>
 
       {/* Whichever of the two the visitor is entitled to. */}

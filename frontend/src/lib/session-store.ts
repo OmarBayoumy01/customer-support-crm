@@ -1,43 +1,51 @@
 import type { LoginResponse } from '@crm/shared';
 
 /**
- * The access token, outside React — US-15.
+ * The session, outside React — US-15 and US-23.
  *
  * Still **in memory only**; a module variable is no more persistent than React
  * state, and nothing here touches `localStorage`. What it buys is reachability:
  * the axios interceptor has to attach the token and replace it after a silent
  * refresh, and an interceptor is not a component, so it cannot read a hook.
  *
- * `AuthProvider` is the owner. It writes here on sign-in and sign-out, and
- * subscribes so a refresh that happens under an interceptor still moves React
- * state — otherwise the UI would keep rendering a session the client had
- * already replaced.
+ * It holds the whole session rather than just the token because `AuthProvider`
+ * **initialises from it**. A refresh that completes before the provider mounts
+ * — which is what a boot-time silent refresh is — would otherwise publish to
+ * nobody, and the app would render as signed out while holding a valid session.
  */
-let accessToken: string | null = null;
+let session: LoginResponse | null = null;
 
 type SessionListener = (session: LoginResponse | null) => void;
 
 const listeners = new Set<SessionListener>();
 
-export function getAccessToken(): string | null {
-  return accessToken;
+export function getSession(): LoginResponse | null {
+  return session;
 }
 
-/** Called by `AuthProvider`; does not notify, because the provider already knows. */
-export function setAccessToken(token: string | null): void {
-  accessToken = token;
+export function getAccessToken(): string | null {
+  return session?.accessToken ?? null;
 }
 
 /**
- * Publishes a session the interceptor obtained on its own — a silent refresh
- * (pass the new session) or a refresh that failed (pass `null`, meaning the
- * user has to sign in again).
+ * Records a session without notifying.
+ *
+ * Called by `AuthProvider` when *it* is the one that changed something, so it
+ * does not tell itself what it already knows.
  */
-export function publishSession(session: LoginResponse | null): void {
-  accessToken = session?.accessToken ?? null;
+export function setSession(next: LoginResponse | null): void {
+  session = next;
+}
+
+/**
+ * Publishes a session obtained outside React — a silent refresh (pass the new
+ * session) or a refresh that failed (pass `null`, meaning sign in again).
+ */
+export function publishSession(next: LoginResponse | null): void {
+  session = next;
 
   for (const listener of listeners) {
-    listener(session);
+    listener(next);
   }
 }
 
@@ -51,6 +59,6 @@ export function subscribeToSession(listener: SessionListener): () => void {
 
 /** Test seam. */
 export function resetSessionStore(): void {
-  accessToken = null;
+  session = null;
   listeners.clear();
 }
