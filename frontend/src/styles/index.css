@@ -1,132 +1,224 @@
 @import 'tailwindcss';
 
+/* Self-hosted. An internal helpdesk should not need a request to Google to
+   render its own text, and an air-gapped deployment is a real possibility. */
+@import '@fontsource/ibm-plex-sans/400.css';
+@import '@fontsource/ibm-plex-sans/500.css';
+@import '@fontsource/ibm-plex-sans/600.css';
+@import '@fontsource/ibm-plex-sans-arabic/400.css';
+@import '@fontsource/ibm-plex-sans-arabic/500.css';
+@import '@fontsource/ibm-plex-sans-arabic/600.css';
+@import '@fontsource/ibm-plex-mono/400.css';
+@import '@fontsource/ibm-plex-mono/500.css';
+
 /**
  * shadcn/ui emits `dark:` classes whether or not the app has a dark theme. The
- * variant has to exist for them to compile; with no `.dark` ancestor on the
- * page nothing matches, so this costs nothing until a theme story wants it.
+ * variant has to exist for them to compile; with no `.dark` ancestor nothing
+ * matches, so it costs nothing until dark mode arrives (V2, out of scope here).
  */
 @custom-variant dark (&:is(.dark *));
 
 /**
- * The palette — US-14.
+ * ═══════════════════════════════════════════════════════════════════════════
+ * Design tokens — US-26.
  *
- * **P03 Design System & Shell owns the real one.** This story needed a login
- * screen before that phase exists, so the rule here is: every colour and radius
- * goes through a token, and no component hard-codes a hex value. P03 replaces
- * the values in this block and every screen follows, rather than P03 having to
- * hunt hexes through markup.
+ * **The rule this system is built on: colour is rationed to urgency.**
  *
- * Two layers, deliberately:
+ * Most support tools colour everything — blue buttons, green chips, purple
+ * charts — and the result is that when a ticket is forty seconds from breaching
+ * its SLA, nothing on the screen says so louder than the "Export" button does.
+ * This product's spine is a countdown, so saturated colour is treated as a
+ * scarce signal rather than decoration:
  *
- *   1. **Role tokens** (`--brand`, `--danger`, `--surface`) — ours, named for
- *      what a colour *is for*. `--danger` survives a rebrand; `--red-600` does
- *      not.
- *   2. **shadcn tokens** (`--primary`, `--destructive`, `--card`) — the names
- *      every generated component in `src/components/ui/` expects. They are
- *      defined *from* layer 1 rather than beside it, so there is still exactly
- *      one place a colour is chosen.
+ *   - The chrome is near-monochrome, cool graphite.
+ *   - **One** accent (indigo) carries interactive intent — links, primary
+ *     actions, focus, selection. It is deliberately the only hue in the chrome.
+ *   - The **urgency ramp** (`--sla-*`, `--priority-*`) is reserved for SLA
+ *     state and ticket priority and **nothing else**. If a new feature wants a
+ *     green tick, it does not get one from this ramp.
+ *
+ * The indigo is chosen to be maximally distinguishable from the ramp: the one
+ * thing that must never happen is an agent mistaking a button for a breach.
+ *
+ * Three layers, and the order matters:
+ *   1. **Raw palette** — the only place a hex value appears in this codebase.
+ *   2. **Role tokens** — what a colour is *for*. Components use these.
+ *   3. **shadcn tokens** — the names the generated components in
+ *      `components/ui/` expect, mapped onto layer 2.
+ *
+ * AC4 (runtime branding) works because layer 2 is CSS custom properties: an
+ * administrator setting an accent writes `--accent-base` on `:root` at runtime
+ * and every derived surface follows, with no rebuild. See `applyBrandAccent`
+ * in `src/lib/branding.ts`.
+ * ═══════════════════════════════════════════════════════════════════════════
  */
 :root {
-  /* Layer 1 — ours. */
-  --surface: #ffffff;
-  --surface-muted: #f6f7f9;
-  --line: #d8dce3;
+  /* ── 1. Raw palette ─────────────────────────────────────────────────────
+     Cool greys, not warm. A helpdesk is an instrument, not a magazine. */
+  --graphite-950: #0f131a;
+  --graphite-900: #12161d;
+  --graphite-700: #3c4351;
+  --graphite-500: #565e6d;
+  --graphite-300: #9aa2b1;
+  --graphite-200: #d9dde5;
+  --graphite-100: #e8ebf0;
+  --graphite-50: #f2f4f7;
+  --white: #ffffff;
 
-  --content: #1a1d23;
-  --content-muted: #5b6472;
+  /* The single chrome hue. Indigo, not the blue every dashboard reaches for,
+     and far enough from the urgency ramp that the two can never be confused. */
+  --indigo-700: #2f2ba6;
+  --indigo-600: #3a36c4;
+  --indigo-500: #514ed6;
+  --indigo-100: #e6e5fa;
 
-  --brand: #1f5fd6;
-  --brand-strong: #17489f;
-  --brand-contrast: #ffffff;
+  /* ── The urgency ramp. Rationed. ───────────────────────────────────────
+     Darkened until each passes AA on both `--paper` and `--ground`, because
+     these are the values a tired agent reads at the end of a shift. */
+  --signal-green-700: #146b4f;
+  --signal-green-100: #dcf2e9;
+  --signal-amber-700: #8a5a08;
+  --signal-amber-100: #fbeed6;
+  --signal-red-700: #b02525;
+  --signal-red-100: #fbe3e3;
 
-  --danger: #b32020;
-  --danger-surface: #fdf0f0;
+  /* ── 2. Role tokens — what components actually use ─────────────────────── */
+  --ground: var(--graphite-50);
+  --paper: var(--white);
+  --paper-raised: var(--white);
+  --line: var(--graphite-200);
+  --line-strong: var(--graphite-300);
 
-  --radius: 0.5rem;
+  --ink: var(--graphite-900);
+  --ink-muted: var(--graphite-500);
+  --ink-faint: var(--graphite-300);
+  --ink-inverse: var(--white);
 
-  /* Layer 2 — what shadcn/ui components read. */
-  --background: var(--surface-muted);
-  --foreground: var(--content);
+  /* Overridable at runtime for AC4. Everything below derives from it. */
+  --accent-base: var(--indigo-600);
+  --accent: var(--accent-base);
+  --accent-strong: var(--indigo-700);
+  --accent-soft: var(--indigo-100);
+  --accent-contrast: var(--white);
 
-  --card: var(--surface);
-  --card-foreground: var(--content);
-  --popover: var(--surface);
-  --popover-foreground: var(--content);
+  /* SLA state. The only saturated colour in the product. */
+  --sla-ok: var(--signal-green-700);
+  --sla-ok-soft: var(--signal-green-100);
+  --sla-warn: var(--signal-amber-700);
+  --sla-warn-soft: var(--signal-amber-100);
+  --sla-breach: var(--signal-red-700);
+  --sla-breach-soft: var(--signal-red-100);
 
-  --primary: var(--brand);
-  --primary-foreground: var(--brand-contrast);
+  --radius: 0.375rem;
 
-  --secondary: var(--surface-muted);
-  --secondary-foreground: var(--content);
-
-  --muted: var(--surface-muted);
-  --muted-foreground: var(--content-muted);
-
-  --accent: var(--surface-muted);
-  --accent-foreground: var(--content);
-
-  --destructive: var(--danger);
-  --destructive-foreground: var(--brand-contrast);
-
+  /* ── 3. shadcn/ui token names, mapped onto the roles above ─────────────── */
+  --background: var(--ground);
+  --foreground: var(--ink);
+  --card: var(--paper);
+  --card-foreground: var(--ink);
+  --popover: var(--paper);
+  --popover-foreground: var(--ink);
+  --primary: var(--accent);
+  --primary-foreground: var(--accent-contrast);
+  --secondary: var(--graphite-100);
+  --secondary-foreground: var(--ink);
+  --muted: var(--graphite-100);
+  --muted-foreground: var(--ink-muted);
+  --accent-ui: var(--graphite-100);
+  --accent-ui-foreground: var(--ink);
+  --destructive: var(--sla-breach);
+  --destructive-foreground: var(--white);
   --border: var(--line);
-  --input: var(--line);
-  --ring: var(--brand);
+  --input: var(--line-strong);
+  --ring: var(--accent);
 }
 
 /**
  * `@theme inline` rather than `@theme`: it re-reads the `var()` at use time, so
- * a token overridden further down the tree (a themed panel, a preview pane)
- * actually takes effect instead of being frozen at its `:root` value.
+ * a token overridden further down the tree — a themed panel, a brand preview —
+ * actually takes effect instead of being frozen at its `:root` value. Runtime
+ * branding depends on this.
  */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
-
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent-ui);
+  --color-accent-foreground: var(--accent-ui-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
-
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
 
-  /* Ours, still reachable as `bg-surface`, `text-content-muted`, and so on. */
-  --color-surface: var(--surface);
-  --color-surface-muted: var(--surface-muted);
-  --color-content: var(--content);
-  --color-content-muted: var(--content-muted);
-  --color-brand: var(--brand);
-  --color-brand-strong: var(--brand-strong);
-  --color-danger: var(--danger);
-  --color-danger-surface: var(--danger-surface);
+  /* Ours, reachable as `bg-ground`, `text-ink-muted`, `border-line`. */
+  --color-ground: var(--ground);
+  --color-paper: var(--paper);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-faint: var(--ink-faint);
+  --color-brand: var(--accent);
+  --color-brand-strong: var(--accent-strong);
+  --color-brand-soft: var(--accent-soft);
 
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  /* Rationed. Reach for these only through StatusBadge, PriorityBadge or
+     SlaMeter — see the note at the top of this file. */
+  --color-sla-ok: var(--sla-ok);
+  --color-sla-ok-soft: var(--sla-ok-soft);
+  --color-sla-warn: var(--sla-warn);
+  --color-sla-warn-soft: var(--sla-warn-soft);
+  --color-sla-breach: var(--sla-breach);
+  --color-sla-breach-soft: var(--sla-breach-soft);
+
+  /* ── Type ───────────────────────────────────────────────────────────────
+     IBM Plex Sans with IBM Plex Sans Arabic. Not a default pairing: the Arabic
+     was drawn alongside the Latin by the same team, so the two share a
+     skeleton, weights and rhythm. Most bilingual products bolt an unrelated
+     Arabic face onto a Latin one and the page changes texture when you switch
+     language. This one does not.
+
+     Mono is for data — ticket ids, durations, counts — where tabular figures
+     make a queue scannable. That is function, not flavour. */
+  --font-sans:
+    'IBM Plex Sans', 'IBM Plex Sans Arabic', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Code', Menlo, monospace;
+
+  /* The scale is fixed by US-26 AC2. Four sizes, no more — a dense operational
+     UI gets its hierarchy from weight and colour, not from ten type sizes. */
+  --text-page: 1.375rem; /* 22px — page title */
+  --text-page--line-height: 1.75rem;
+  --text-section: 1rem; /* 16px — section title */
+  --text-section--line-height: 1.5rem;
+  --text-body: 0.875rem; /* 14px — body, and the default */
+  --text-body--line-height: 1.25rem;
+  --text-meta: 0.75rem; /* 12px — meta, labels, table headers */
+  --text-meta--line-height: 1rem;
+
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+  --radius-xl: calc(var(--radius) + 6px);
 }
 
 /**
- * The platform ships in English and Arabic from day one, so the document
- * direction is driven by the active locale (see `src/i18n/index.ts`) rather
- * than being an afterthought.
+ * The platform ships in English and Arabic from day one, so direction is driven
+ * by the active locale (see `src/i18n/index.ts`), not retrofitted.
  *
  * Components use **logical properties only** — `ms-*`, `me-*`, `ps-*`, `pe-*`,
- * `text-start`, `text-end`. Nothing uses `left` or `right`, which is what makes
- * the mirror a swap rather than a second stylesheet. There is a test asserting
- * it.
+ * `text-start`, `text-end`, `border-s-*`. Nothing uses `left` or `right`, which
+ * is what makes the mirror a swap rather than a second stylesheet. There is a
+ * test that fails if a physical direction appears in a rendered class.
  */
 html {
   color-scheme: light;
@@ -134,22 +226,46 @@ html {
 
 body {
   margin: 0;
-  background-color: var(--background);
-  color: var(--foreground);
-  font-family:
-    system-ui,
-    -apple-system,
-    'Segoe UI',
-    Roboto,
-    'Noto Sans Arabic',
-    sans-serif;
+  background-color: var(--ground);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  /* 14px body is the operational default — see AC2. */
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  -webkit-font-smoothing: antialiased;
 }
 
 /**
- * A visible focus ring everywhere, not just where someone remembered one.
- * Keyboard accessibility is in the definition of done for anything with a UI.
+ * Numbers that have to line up — durations, counts, ticket ids. Applied by the
+ * `Mono` helper and the data table's numeric cells.
+ */
+.tabular {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+/**
+ * A visible focus ring everywhere, not only where somebody remembered one.
+ * Keyboard access is in the definition of done for anything with a UI.
  */
 :focus-visible {
-  outline: 2px solid var(--ring);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+/**
+ * Motion is a courtesy, not a feature. Everything that moves in this app is a
+ * state change the user asked for — a drawer opening, a row settling — so all
+ * of it is safe to simply switch off.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

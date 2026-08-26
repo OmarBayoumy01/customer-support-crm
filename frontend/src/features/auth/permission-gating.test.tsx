@@ -15,7 +15,8 @@ import { beforeEach, describe, expect, test } from 'vitest';
 import type { EffectivePermissions, LoginResponse } from '@crm/shared';
 
 import i18n from '../../i18n';
-import { AppNav } from '../../components/app-nav';
+import { Sidebar } from '@/components/shell/sidebar';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import { AppProviders } from '../../app/providers';
 import { publishSession, resetSessionStore } from '../../lib/session-store';
 import { AdminPage } from '../admin/admin-page';
@@ -102,33 +103,69 @@ describe('AC1 — protected routes', () => {
   });
 });
 
+/** The sidebar on its own — it is where nav gating lives since US-28. */
+function renderSidebar(session: LoginResponse): void {
+  publishSession(session);
+
+  render(
+    <MemoryRouter initialEntries={['/dashboard']}>
+      <AppProviders>
+        <TooltipProvider>
+          <Sidebar />
+        </TooltipProvider>
+      </AppProviders>
+    </MemoryRouter>,
+  );
+}
+
 describe('AC2 — navigation gating', () => {
-  test('an agent sees Administration locked, not missing', () => {
-    renderAt('/dashboard', AGENT);
+  test('an agent sees the administration items locked, not missing', () => {
+    renderSidebar(AGENT);
 
-    const locked = screen.getByTitle('You do not have permission for this');
+    const locked = screen
+      .getAllByText('Users')
+      .map((node) => node.closest('[aria-disabled="true"]'))
+      .filter((node) => node !== null);
 
-    expect(locked).toHaveTextContent('Administration');
-    expect(locked).toHaveAttribute('aria-disabled', 'true');
-    // It is not a link, so there is nothing to click and be refused.
-    expect(screen.queryByRole('link', { name: 'Administration' })).not.toBeInTheDocument();
+    expect(locked.length).toBeGreaterThan(0);
+    // It is a span, not a link, so there is nothing to click and be refused by.
+    expect(screen.queryByRole('link', { name: 'Users' })).not.toBeInTheDocument();
   });
 
   test('the lock is conveyed by text as well as an icon, never colour alone', () => {
-    renderAt('/dashboard', AGENT);
+    renderSidebar(AGENT);
 
-    const locked = screen.getByTitle('You do not have permission for this');
+    const users = screen
+      .getAllByText('Users')
+      .map((node) => node.closest('[aria-disabled="true"]'))
+      .find((node) => node !== null);
 
+    expect(users).not.toBeNull();
     // A screen reader gets the explanation; so does anyone who cannot
     // distinguish the muted colour.
-    expect(locked.textContent).toContain('You do not have permission for this');
+    expect(users?.textContent).toContain('You do not have permission for this');
   });
 
   test('an administrator gets a real link', () => {
-    renderAt('/dashboard', ADMIN);
+    renderSidebar(ADMIN);
 
-    expect(screen.getByRole('link', { name: 'Administration' })).toBeInTheDocument();
-    expect(screen.queryByTitle('You do not have permission for this')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Users' })).toBeInTheDocument();
+  });
+
+  test('the sidebar shows the grouped sections the story asks for', () => {
+    // AC1 of US-28. Grouping is the structure, so it is asserted rather than
+    // left to look right.
+    renderSidebar(ADMIN);
+
+    for (const section of ['Workspace', 'Knowledge', 'Analytics', 'Administration', 'Account']) {
+      expect(screen.getByRole('heading', { name: section })).toBeInTheDocument();
+    }
+  });
+
+  test('an item everyone may reach is never locked', () => {
+    renderSidebar(sessionWith({}));
+
+    expect(screen.getByRole('link', { name: 'Dashboard' })).toBeInTheDocument();
   });
 });
 
@@ -167,33 +204,18 @@ describe('AC4 — typing the URL of a restricted page', () => {
 
 describe('AC5 — permissions travel with the session', () => {
   test('the set published with the session is what the gating reads', () => {
-    renderAt('/dashboard', ADMIN);
+    renderSidebar(ADMIN);
 
     // No separate fetch: the permissions arrived with the login (or refresh)
     // response and are held in memory.
-    expect(screen.getByRole('link', { name: 'Administration' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Users' })).toBeInTheDocument();
   });
 
-  test('a session with no permissions at all gates everything off', () => {
-    renderAt('/dashboard', sessionWith({}));
+  test('a session with no permissions at all gates every restricted item off', () => {
+    renderSidebar(sessionWith({}));
 
-    expect(screen.getByTitle('You do not have permission for this')).toBeInTheDocument();
-  });
-});
-
-describe('the nav in isolation', () => {
-  test('Dashboard needs no permission and is always a link', () => {
-    publishSession(sessionWith({}));
-
-    render(
-      <MemoryRouter>
-        <AppProviders>
-          <AppNav />
-        </AppProviders>
-      </MemoryRouter>,
-    );
-
-    expect(screen.getByRole('link', { name: 'Dashboard' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Users' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'All tickets' })).not.toBeInTheDocument();
   });
 });
 

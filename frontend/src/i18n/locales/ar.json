@@ -1,10 +1,101 @@
 {
   "common": {
-    "appName": "نظام دعم العملاء",
+    "appName": "دعم العملاء",
     "languageName": "العربية",
     "switchLanguage": "English",
     "signOut": "تسجيل الخروج",
-    "signOutEverywhere": "تسجيل الخروج من كل الأجهزة"
+    "signOutEverywhere": "تسجيل الخروج من كل الأجهزة",
+    "create": "إنشاء",
+    "createTicket": "تذكرة جديدة",
+    "createCustomer": "عميل جديد"
+  },
+  "nav": {
+    "label": "التنقل الرئيسي",
+    "breadcrumb": "مسار التنقل",
+    "toggleSidebar": "إظهار أو إخفاء الشريط الجانبي",
+    "search": "بحث",
+    "searchPlaceholder": "ابحث في التذاكر والعملاء…",
+    "notifications_one": "إشعار واحد غير مقروء",
+    "notifications_other": "{{count}} إشعارات غير مقروءة",
+    "account": "قائمة الحساب",
+    "lockedHint": "ليس لديك صلاحية لهذا",
+    "section": {
+      "workspace": "مساحة العمل",
+      "knowledge": "المعرفة",
+      "analytics": "التحليلات",
+      "administration": "الإدارة",
+      "account": "الحساب"
+    },
+    "dashboard": "لوحة التحكم",
+    "myTickets": "تذاكري",
+    "allTickets": "كل التذاكر",
+    "customers": "العملاء",
+    "articles": "المقالات",
+    "reports": "التقارير",
+    "users": "المستخدمون",
+    "departments": "الأقسام",
+    "slaPolicies": "سياسات مستوى الخدمة",
+    "settings": "الإعدادات",
+    "designSystem": "نظام التصميم",
+    "administration": "الإدارة"
+  },
+  "ticket": {
+    "status": {
+      "new": "جديدة",
+      "open": "مفتوحة",
+      "pendingCustomer": "بانتظار العميل",
+      "pendingInternal": "بانتظار الفريق",
+      "escalated": "مُصعّدة",
+      "resolved": "تم حلها",
+      "closed": "مغلقة"
+    },
+    "priority": {
+      "low": "منخفضة",
+      "medium": "متوسطة",
+      "high": "عالية",
+      "urgent": "عاجلة"
+    },
+    "sla": {
+      "onTrack": "ضمن المدة",
+      "dueSoon": "تقترب من الموعد",
+      "breached": "تجاوزت المدة",
+      "remaining": "متبقٍ {{time}}",
+      "overBy": "تجاوز {{time}}"
+    }
+  },
+  "states": {
+    "loading": "جارٍ التحميل"
+  },
+  "errors": {
+    "crashTitle": "توقفت هذه الشاشة عن العمل",
+    "crashBody": "حاول مرة أخرى. إذا تكرر الأمر، أبلغ المسؤول بما كنت تفعله.",
+    "tryAgain": "حاول مرة أخرى",
+    "notFoundTitle": "هذه الصفحة غير موجودة",
+    "notFoundBody": "قد يكون الرابط قديمًا أو نُقلت الصفحة.",
+    "backToDashboard": "الذهاب إلى لوحة التحكم"
+  },
+  "designSystem": {
+    "title": "نظام التصميم",
+    "subtitle": "الرموز والمكوّنات والقواعد التي تُبنى منها كل شاشة.",
+    "thesis": "اللون مخصّص للإلحاح",
+    "thesisBody": "الواجهة رمادية هادئة، ولون واحد يحمل التفاعل. أما الألوان القوية فهي لمستوى الخدمة والأولوية فقط، حتى لا ينافسها شيء عندما تقترب التذكرة من تجاوز مدتها.",
+    "palette": "الألوان",
+    "type": "مقياس الخط",
+    "statuses": "الحالة",
+    "priorities": "الأولوية",
+    "sla": "مستوى الخدمة",
+    "controls": "عناصر التحكم",
+    "feedback": "التنبيهات",
+    "accentLabel": "جرّب لون العلامة",
+    "accentHint": "يغيّر اللون فورًا دون إعادة بناء.",
+    "reset": "إعادة الضبط"
+  },
+  "admin": {
+    "placeholder": "شاشات الإدارة تأتي مع قصصها الخاصة."
+  },
+  "permissions": {
+    "deniedTitle": "ليس لديك صلاحية للوصول إلى هذه الصفحة",
+    "deniedBody": "تواصل مع المسؤول إذا كنت تعتقد أنه ينبغي لك ذلك."
   },
   "login": {
     "title": "تسجيل الدخول",
@@ -31,18 +122,5 @@
     "rolesLabel": "الأدوار",
     "noRoles": "لا توجد أدوار مُسندة",
     "placeholder": "هذه صفحة مؤقتة. لوحة التحكم الفعلية تأتي مع قصتها الخاصة."
-  },
-  "nav": {
-    "label": "الرئيسية",
-    "dashboard": "لوحة التحكم",
-    "administration": "الإدارة",
-    "lockedHint": "ليس لديك صلاحية لهذا"
-  },
-  "permissions": {
-    "deniedTitle": "ليس لديك صلاحية للوصول إلى هذه الصفحة",
-    "deniedBody": "تواصل مع المسؤول إذا كنت تعتقد أنه ينبغي لك ذلك."
-  },
-  "admin": {
-    "placeholder": "شاشات الإدارة تأتي مع قصصها الخاصة."
   }
 }

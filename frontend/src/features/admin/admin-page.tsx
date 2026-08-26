@@ -1,7 +1,5 @@
 import { useTranslation } from 'react-i18next';
 
-import { AppNav } from '../../components/app-nav';
-
 /**
  * A placeholder behind a permission — US-23, AC4.
  *
@@ -12,10 +10,9 @@ export function AdminPage(): React.JSX.Element {
   const { t } = useTranslation();
 
   return (
-    <main className="mx-auto max-w-2xl p-6">
-      <AppNav />
-      <h1 className="mt-4 text-xl font-semibold">{t('nav.administration')}</h1>
-      <p className="text-muted-foreground mt-2 text-sm">{t('admin.placeholder')}</p>
-    </main>
+    <div className="mx-auto max-w-4xl space-y-3 p-6">
+      <h1 className="text-page font-semibold">{t('nav.administration')}</h1>
+      <p className="text-ink-muted">{t('admin.placeholder')}</p>
+    </div>
   );
 }

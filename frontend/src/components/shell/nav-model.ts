@@ -1,0 +1,97 @@
+import {
+  BarChart3,
+  BookOpen,
+  Building2,
+  Inbox,
+  LayoutDashboard,
+  LifeBuoy,
+  Palette,
+  Settings,
+  Ticket,
+  UserRound,
+  Users,
+  type LucideIcon,
+} from 'lucide-react';
+import type { PermissionKey } from '@crm/shared';
+
+export interface NavItem {
+  to: string;
+  labelKey: string;
+  icon: LucideIcon;
+  /** Omitted for items every signed-in user may reach. */
+  permission?: PermissionKey;
+  /** Which live count, if any, this item shows. */
+  badge?: 'assignedTickets';
+}
+
+export interface NavSection {
+  labelKey: string;
+  items: NavItem[];
+}
+
+/**
+ * The sidebar, as data — US-28, AC1.
+ *
+ * The five groups are the story's, not invented: Workspace, Knowledge,
+ * Analytics, Administration, Account. Keeping the structure as data rather than
+ * markup is what lets the permission filter and the collapsed rendering both
+ * work from one source, and it is what a later story adds a section to without
+ * touching the component.
+ *
+ * Several destinations do not exist yet. They are listed anyway — the shell is
+ * the thing being built here, and a sidebar with two links in it would not
+ * demonstrate the grouping the criterion asks for. Each resolves to the 404,
+ * which is an honest answer, and the route arrives with the story that owns it.
+ */
+export const NAV_SECTIONS: NavSection[] = [
+  {
+    labelKey: 'nav.section.workspace',
+    items: [
+      { to: '/dashboard', labelKey: 'nav.dashboard', icon: LayoutDashboard },
+      {
+        to: '/tickets/mine',
+        labelKey: 'nav.myTickets',
+        icon: Inbox,
+        permission: 'ticket:view',
+        badge: 'assignedTickets',
+      },
+      { to: '/tickets', labelKey: 'nav.allTickets', icon: Ticket, permission: 'ticket:view' },
+      { to: '/customers', labelKey: 'nav.customers', icon: Users, permission: 'customer:view' },
+    ],
+  },
+  {
+    labelKey: 'nav.section.knowledge',
+    items: [
+      { to: '/articles', labelKey: 'nav.articles', icon: BookOpen, permission: 'article:view' },
+    ],
+  },
+  {
+    labelKey: 'nav.section.analytics',
+    items: [
+      { to: '/reports', labelKey: 'nav.reports', icon: BarChart3, permission: 'report:view' },
+    ],
+  },
+  {
+    labelKey: 'nav.section.administration',
+    items: [
+      { to: '/admin', labelKey: 'nav.users', icon: UserRound, permission: 'user:manage' },
+      {
+        to: '/admin/departments',
+        labelKey: 'nav.departments',
+        icon: Building2,
+        permission: 'department:manage',
+      },
+      { to: '/admin/sla', labelKey: 'nav.slaPolicies', icon: LifeBuoy, permission: 'sla:manage' },
+    ],
+  },
+  {
+    labelKey: 'nav.section.account',
+    items: [
+      { to: '/settings', labelKey: 'nav.settings', icon: Settings },
+      // Not a real product destination — the living reference for this design
+      // system, kept in the app so it cannot rot the way a static styleguide
+      // does. Under Account because it belongs to nobody's daily work.
+      { to: '/design-system', labelKey: 'nav.designSystem', icon: Palette },
+    ],
+  },
+];

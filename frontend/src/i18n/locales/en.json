@@ -1,10 +1,101 @@
 {
   "common": {
-    "appName": "Customer Support CRM",
+    "appName": "Support CRM",
     "languageName": "English",
     "switchLanguage": "العربية",
     "signOut": "Sign out",
-    "signOutEverywhere": "Sign out everywhere"
+    "signOutEverywhere": "Sign out everywhere",
+    "create": "Create",
+    "createTicket": "New ticket",
+    "createCustomer": "New customer"
+  },
+  "nav": {
+    "label": "Main navigation",
+    "breadcrumb": "Breadcrumb",
+    "toggleSidebar": "Toggle sidebar",
+    "search": "Search",
+    "searchPlaceholder": "Search tickets, customers…",
+    "notifications_one": "{{count}} unread notification",
+    "notifications_other": "{{count}} unread notifications",
+    "account": "Account menu",
+    "lockedHint": "You do not have permission for this",
+    "section": {
+      "workspace": "Workspace",
+      "knowledge": "Knowledge",
+      "analytics": "Analytics",
+      "administration": "Administration",
+      "account": "Account"
+    },
+    "dashboard": "Dashboard",
+    "myTickets": "My tickets",
+    "allTickets": "All tickets",
+    "customers": "Customers",
+    "articles": "Articles",
+    "reports": "Reports",
+    "users": "Users",
+    "departments": "Departments",
+    "slaPolicies": "SLA policies",
+    "settings": "Settings",
+    "designSystem": "Design system",
+    "administration": "Administration"
+  },
+  "ticket": {
+    "status": {
+      "new": "New",
+      "open": "Open",
+      "pendingCustomer": "Pending customer",
+      "pendingInternal": "Pending internal",
+      "escalated": "Escalated",
+      "resolved": "Resolved",
+      "closed": "Closed"
+    },
+    "priority": {
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High",
+      "urgent": "Urgent"
+    },
+    "sla": {
+      "onTrack": "On track",
+      "dueSoon": "Due soon",
+      "breached": "Breached",
+      "remaining": "{{time}} left",
+      "overBy": "{{time}} over"
+    }
+  },
+  "states": {
+    "loading": "Loading"
+  },
+  "errors": {
+    "crashTitle": "This screen stopped working",
+    "crashBody": "Try again. If it keeps happening, tell an administrator what you were doing.",
+    "tryAgain": "Try again",
+    "notFoundTitle": "That page does not exist",
+    "notFoundBody": "The link may be out of date, or the page may have moved.",
+    "backToDashboard": "Go to the dashboard"
+  },
+  "designSystem": {
+    "title": "Design system",
+    "subtitle": "The tokens, components and rules every screen is built from.",
+    "thesis": "Colour is rationed to urgency",
+    "thesisBody": "The chrome is monochrome and one indigo carries interactive intent. The saturated ramp belongs to SLA and priority alone, so that when a ticket is about to breach, nothing else on the screen competes with it.",
+    "palette": "Palette",
+    "type": "Type scale",
+    "statuses": "Status",
+    "priorities": "Priority",
+    "sla": "SLA",
+    "controls": "Controls",
+    "feedback": "Feedback",
+    "accentLabel": "Try a brand accent",
+    "accentHint": "Changes the accent at runtime, with no rebuild.",
+    "reset": "Reset"
+  },
+  "admin": {
+    "placeholder": "Administration screens arrive with their own stories."
+  },
+  "permissions": {
+    "deniedTitle": "You do not have access to this page",
+    "deniedBody": "Ask an administrator if you think you should."
   },
   "login": {
     "title": "Sign in",
@@ -31,18 +122,5 @@
     "rolesLabel": "Roles",
     "noRoles": "No roles assigned",
     "placeholder": "This is a placeholder. The real dashboard arrives with its own story."
-  },
-  "nav": {
-    "label": "Main",
-    "dashboard": "Dashboard",
-    "administration": "Administration",
-    "lockedHint": "You do not have permission for this"
-  },
-  "permissions": {
-    "deniedTitle": "You do not have access to this page",
-    "deniedBody": "Ask an administrator if you think you should."
-  },
-  "admin": {
-    "placeholder": "Administration screens arrive with their own stories."
   }
 }

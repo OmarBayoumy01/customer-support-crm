@@ -57,6 +57,9 @@ export default tseslint.config(
       'import/no-extraneous-dependencies': 'error',
       'import/no-unresolved': 'error',
 
+      // Note: `import/no-unresolved` is switched off for `frontend/src` further
+      // down. See the comment on that override for why.
+
       // Definition of done: TypeScript strict, no `any` without a written
       // justification. Error rather than warn — a warning is a rule nobody obeys.
       '@typescript-eslint/no-explicit-any': 'error',
@@ -105,7 +108,23 @@ export default tseslint.config(
     files: ['frontend/**/*.{ts,tsx}'],
     languageOptions: { globals: globals.browser },
     plugins: { 'react-hooks': reactHooks },
-    rules: reactHooks.configs.recommended.rules,
+    rules: {
+      ...reactHooks.configs.recommended.rules,
+
+      // The frontend imports through the `@/` alias, which shadcn/ui's
+      // generated components use and which `tsconfig.json` and `vite.config.ts`
+      // both resolve. `eslint-import-resolver-typescript` v4 does **not** read
+      // `paths` out of this project's config — verified directly against the
+      // resolver, not inferred — so the rule reports every aliased import as
+      // unresolved.
+      //
+      // Switched off here rather than rewriting every generated file on each
+      // `shadcn add`, because nothing is actually lost: `tsc -b` resolves these
+      // modules and runs in the same pipeline, so an import that does not exist
+      // is still a build failure. The rule keeps doing its job in `backend/`
+      // and `packages/shared/`, which use relative and package imports only.
+      'import/no-unresolved': 'off',
+    },
   },
 
   {
