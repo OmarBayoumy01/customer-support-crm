@@ -128,6 +128,10 @@ export {
   PortalUrgencySchema,
   PortalCategorySchema,
   SubmitPortalTicketSchema,
+  PortalEventSchema,
+  PortalEventKindSchema,
+  PortalReplySchema,
+  PORTAL_EVENT_KINDS,
   PORTAL_URGENCY,
   URGENCY_PRIORITY,
   PORTAL_STATUS,
@@ -142,6 +146,9 @@ export {
   type PortalUrgency,
   type PortalCategory,
   type SubmitPortalTicket,
+  type PortalEvent,
+  type PortalEventKind,
+  type PortalReply,
 } from './dto/portal.js';
 
 export {

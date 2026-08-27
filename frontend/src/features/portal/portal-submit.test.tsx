@@ -63,6 +63,7 @@ const CREATED: PortalTicketDetail = {
   messages: [],
   messageCount: 0,
   resolvedAt: null,
+  events: [],
 };
 
 let sent: InternalAxiosRequestConfig[] = [];

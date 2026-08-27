@@ -12,6 +12,7 @@ and together they close the loop: a customer raises a request and sees the answe
 | 40  | `40-story-sign-in-to-the-customer-portal.md` | Sign in to the customer portal | US-21 | US-14, US-82 |
 | 41  | `41-story-submit-a-support-request.md` | Submit a support request | US-86 | US-82 |
 | 42  | `42-story-track-my-requests.md` | Track my requests in the portal | US-84 | US-82 |
+| 43  | `43-story-read-and-reply-to-my-request.md` | Read and reply to my request | US-85 | US-82, US-47 |
 
 ## Why this feature exists as its own module
 
@@ -66,8 +67,11 @@ against the serialised JSON.
 - **US-84** ✅ is the list screen. It added `q`, `createdFrom` and `createdTo` to the list
   query — and nothing else, because AC2 says only search, status and date and the contract
   is how that becomes true. `q` searches the subject and number, never message bodies.
-- **US-85** is the last screen. If it needs a field, it is added to the allowlist
-  deliberately — which is the point of the allowlist.
+- **US-85** ✅ closed the loop. It added a customer reply, an event allowlist for AC6 that
+  returns a *kind* rather than a history entry, and the first caller for US-47's
+  `onCustomerReply` — which reopens a resolved request and deliberately not a closed one.
+- **The portal feature is complete for the MVP.** What remains behind it: US-88 rating,
+  US-90 customer reopen, US-83 a separate portal home, US-51 attachments, all deferred.
 - **US-21** ✅ built the sign-in over this boundary: `POST /auth/portal/login` issues the
   `crm-portal` token, and a staff account is refused 422 because it has no linked
   `Customer` row — the same fact this API scopes on.

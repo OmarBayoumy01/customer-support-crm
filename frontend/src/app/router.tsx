@@ -8,6 +8,7 @@ import { useAuth } from '@/features/auth/auth-context';
 import { RequireAuth } from '@/features/auth/require-auth';
 import { RequirePermission } from '@/features/auth/require-permission';
 import { PortalHomePage } from '@/features/portal/portal-home-page';
+import { PortalRequestPage } from '@/features/portal/portal-request-page';
 import { PortalSubmitPage } from '@/features/portal/portal-submit-page';
 
 /**
@@ -83,6 +84,7 @@ export function AppRoutes(): React.JSX.Element {
         <Route element={<RequireAuth loginPath="/portal/login" />}>
           <Route path="/portal" element={<PortalHomePage />} />
           <Route path="/portal/new" element={<PortalSubmitPage />} />
+          <Route path="/portal/requests/:id" element={<PortalRequestPage />} />
         </Route>
 
         <Route element={<RequireAuth />}>

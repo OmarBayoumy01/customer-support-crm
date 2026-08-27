@@ -442,6 +442,34 @@
         "RESOLVED": "Resolved",
         "CLOSED": "Closed"
       }
+    },
+    "request": {
+      "back": "All my requests",
+      "progress": "Progress",
+      "steps": {
+        "received": "Received",
+        "in_progress": "In progress",
+        "resolved": "Resolved"
+      },
+      "conversation": "Conversation",
+      "you": "You",
+      "support": "Support",
+      "replyLabel": "Add a reply",
+      "replyPlaceholder": "Anything else we should know?",
+      "send": "Send reply",
+      "sending": "Sending…",
+      "replyFailed": "We could not send that just now. Your message is still here — please try again.",
+      "notFound": "We could not find that request.",
+      "closedNotice": "This request is closed, so it no longer takes replies. If you still need help, raise a new one and we will pick it up.",
+      "events": {
+        "received": "We received your request",
+        "assigned": "Your request was assigned to a support agent",
+        "in_progress": "Support started working on your request",
+        "waiting_on_you": "Support is waiting for your reply",
+        "resolved": "Your request was marked resolved",
+        "closed": "Your request was closed",
+        "reopened": "Your request was reopened"
+      }
     }
   }
 }

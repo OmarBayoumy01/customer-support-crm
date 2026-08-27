@@ -33,12 +33,13 @@ The target flow, with the story that owns each step and its real state:
 | Agent *sees* the clock on a ticket | US-69 | ✅ in review |
 | Escalate on breach | US-71 | ✅ in review |
 | Resolve | US-47 | ✅ in review |
+| Customer reply reopens a resolved request | US-47 + US-85 | ✅ in review |
 | Customer-scoped portal API | US-82 | ✅ in review |
 | Customer sees the result | US-84 | ✅ in review |
-| Customer replies again | **US-85** | ❌ not started |
+| Customer replies again | US-85 | ✅ in review |
 | Manager reports on it | **US-55, US-58** | ❌ not started |
 
-**23 of 28 stories are done** (waves 0 and 1, eight of ten in wave 2, wave 3, and four of five in wave 4). Every finished story is
+**24 of 28 stories are done** (waves 0 and 1, eight of ten in wave 2, and all of waves 3 and 4). **The customer journey now runs end to end.** Every finished story is
 `In review` in Notion — never `Done`, which is the human's call.
 
 **What is demonstrable today:** sign in as a seeded agent → browse and filter the queue → open
@@ -65,9 +66,9 @@ report. Escalation happens but cannot notify anybody — see the flags.
 | **Communication** | Timeline, reply composer, internal-note mode, `Message.isInternal` written and the API filter written | Attachments (needs S3) | US-1, 46 ✅ · US-51 deferred | US-46 |
 | **SLA** | Policies seeded, clocks computed, pause/stop, breach sweep worker on the existing BullMQ/Redis, live ticking timers on the ticket with target, deadline and paused time | — | US-67, 68, 69 ✅ · US-70, 75 deferred | — |
 | **Escalation** | The seeded 75/90/100% ladder is read every minute inside the existing sweep; the breach rung moves the ticket to `ESCALATED`, stamps `escalatedAt`/`escalatedToId`, and records history attributed to the rule. Idempotent per rung | Notifications — **US-62**, deferred | US-71 ✅ | — |
-| **Resolution** | Validated transitions, `resolvedAt`/`closedAt`/`reopenCount`, reopen rule built | Reopen *trigger* — needs US-85 | US-47 ✅ | US-45 |
+| **Resolution** | Validated transitions, `resolvedAt`/`closedAt`/`reopenCount`, and the reopen rule now **called** — a customer reply to a resolved request reopens it | — | US-47 ✅ · trigger from US-85 ✅ | — |
 | **Ticket history** | Every mutation recorded, actor or automation attributed, names stored beside ids, append-only enforced by a trigger | — | US-50 ✅ | US-40 |
-| **Portal** | The boundary (own module, own `crm-portal` strategy, allowlist DTOs, rate limit, rule #1 in the query with its regression test), sign-in, a submit form, and **the request list** — cards, search/status/date filters applied in the scoped query, reply-needed marker | Reading and replying to a request | US-82, 21, 86, 84 ✅ · **US-85** ❌ | US-40, US-120 |
+| **Portal** | **Complete for the MVP**: the boundary (own module, own `crm-portal` strategy, allowlist DTOs, rate limit, rule #1 in the query with its regression test), sign-in, submit, the request list, and the thread with a customer reply that reopens a resolved request through US-47's rule | Rating (US-88), customer reopen of a closed request (US-90), attachments (US-51) — all deferred | US-82, 21, 86, 84, 85 ✅ | — |
 | **Dashboard** | Placeholder page, sidebar badge already live | **All metrics** | **US-55** ❌ | US-40 |
 | **Reports** | Nothing | **The manager dashboard** — this *is* the "Report" step | **US-58** ❌ | US-40 |
 
@@ -75,17 +76,16 @@ report. Escalation happens but cannot notify anybody — see the flags.
 
 ## What is left, in the order to do it
 
-Five stories. The order below is the critical path, not the story numbers.
+Four stories. The order below is the critical path, not the story numbers.
 
 | # | Story | Why here | Size |
 | - | ----- | -------- | ---- |
-| 1 | **US-85** Read and reply to my request | Closes the loop, and supplies US-47's reopen trigger | medium |
-| 2 | **US-55** Agent dashboard | First screen after sign-in; currently a placeholder | medium |
-| 3 | **US-58** Manager dashboard | **This is the "Report" step.** P11 Reports is entirely V2 | medium |
-| 4 | US-41 Create a ticket as an agent | Second entry point. **The loop closes without it** | medium |
-| 5 | US-35 View a customer profile | The customer as a thing you can open. **The loop closes without it** | medium |
+| 1 | **US-55** Agent dashboard | First screen after sign-in; currently a placeholder | medium |
+| 2 | **US-58** Manager dashboard | **This is the "Report" step.** P11 Reports is entirely V2 | medium |
+| 3 | US-41 Create a ticket as an agent | Second entry point. **The loop closes without it** | medium |
+| 4 | US-35 View a customer profile | The customer as a thing you can open. **The loop closes without it** | medium |
 
-**If credits are the binding constraint, stop after 3.** Items 4 and 5 are the two remaining
+**If credits are the binding constraint, stop after 2.** Items 3 and 4 are the two remaining
 wave-2 stories and both are genuine capabilities, but neither is on the critical path: tickets
 enter through the portal, and the customer is already visible from the ticket's context panel.
 That is a scope decision for the human, flagged rather than taken.
@@ -136,13 +136,14 @@ That is a scope decision for the human, flagged rather than taken.
 | US-49 | AC3 manage categories | `GET /categories` built; the screen is not | US-113 |
 | US-48 | AC1 agent is notified | No notification channel exists | US-62 |
 | US-48 | AC5 out of office | **Not modelled in the schema at all** | a story that owns agent availability |
-| US-47 | AC5 reopen trigger | `onCustomerReply` built and tested; nothing writes a customer message | US-85 |
 | US-71 | AC1, AC2 notifications | Each rung records history and logs its recipient; no channel exists | US-62 |
 | US-71 | AC4 Tickets Requiring Attention | Escalated tickets surface in the queue's `escalated` view | US-58 |
+| US-85 | AC5 attachment button | Object storage is US-51, deferred | US-51 |
+| US-85 | a reply does not clear `WAITING_ON_YOU` | `onCustomerReply` handles `RESOLVED` only; fixing it means adding a lifecycle rule, so it is reported rather than invented | whoever owns that rule |
 | US-84 | AC4 star rating | Rating is US-88, deferred — no column, no endpoint, nowhere to put a star | US-88 |
 | US-86 | AC1 attachments, AC6 limits | Object storage is US-51, deferred — no file picker that cannot upload | US-51 |
 | US-86 | AC3 article deflection | The knowledge base is all of P09, cut; US-76 is the story's own dependency | P09 |
-| US-86 | AC4 "view it" link | The request detail screen is US-85; the confirmation shows the number and links home | US-85 |
+| US-86 | AC4 "view it" link | Still absent from the confirmation, though the screen now exists — the list is one tap away and the confirmation links there | a cheap follow-up |
 | US-21 | AC3 guest browsing | The knowledge base is all of P09 (cut) and "register" is US-20 (deferred); there is no submit control to gate either | P09 and US-20 |
 | US-69 | AC6 "and dashboards" | Verified on the ticket and the queue; there are no dashboards yet | US-55, US-58 |
 | US-69 | AC4 paused *periods* | The schema banks a total plus the current pause, not a list of intervals | a schema change nobody needs yet |

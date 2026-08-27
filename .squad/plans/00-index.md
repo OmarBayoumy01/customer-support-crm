@@ -28,7 +28,7 @@ One row per feature folder under `.squad/plans/`. `NN` continues as a global exe
 | `tickets`             | [00-overview.md](./tickets/00-overview.md)               | 25–26, 30–37 |
 | `sla`                 | [00-overview.md](./sla/00-overview.md)                   | 27, 29, 38 |
 | `administration`      | [00-overview.md](./administration/00-overview.md)        | 28       |
-| `portal`              | [00-overview.md](./portal/00-overview.md)                | 39–42    |
+| `portal`              | [00-overview.md](./portal/00-overview.md)                | 39–43    |
 
 ## Where the workflow stands
 

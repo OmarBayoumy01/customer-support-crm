@@ -114,6 +114,40 @@ export const PortalTicketSchema = z.object({
 export type PortalTicket = z.infer<typeof PortalTicketSchema>;
 
 /**
+ * Something that happened to a request, as the customer is told it — US-85, AC6.
+ *
+ * **A closed set of kinds, not the ticket's history.** AC6 asks for status
+ * changes in plain language; US-82 requires that internal history never reaches
+ * a customer. Both hold because this carries a `kind` and a time and nothing
+ * else: no actor name (AC3 limits identity, and the story's own example sentence
+ * names nobody), no field, no from/to values, and no internal status string.
+ *
+ * The sentences live in the client's translations, so the API never sends prose
+ * that would then need translating.
+ */
+export const PORTAL_EVENT_KINDS = [
+  'received',
+  'assigned',
+  'in_progress',
+  'waiting_on_you',
+  'resolved',
+  'closed',
+  'reopened',
+] as const;
+
+export const PortalEventKindSchema = z.enum(PORTAL_EVENT_KINDS);
+
+export type PortalEventKind = z.infer<typeof PortalEventKindSchema>;
+
+export const PortalEventSchema = z.object({
+  id: z.string().uuid(),
+  kind: PortalEventKindSchema,
+  createdAt: z.string().datetime(),
+});
+
+export type PortalEvent = z.infer<typeof PortalEventSchema>;
+
+/**
  * One request, with its conversation.
  *
  * Extends the list shape with the description, the messages and the attachments
@@ -136,6 +170,13 @@ export const PortalTicketDetailSchema = PortalTicketSchema.extend({
    */
   messageCount: z.number().int().nonnegative(),
   resolvedAt: z.string().datetime().nullable(),
+  /**
+   * What has happened to the request, in customer-facing terms — US-85, AC6.
+   *
+   * Deliberately **not** the ticket's history: see the schema above. Only the
+   * kinds a customer has a stake in, with no actor and no internal values.
+   */
+  events: z.array(PortalEventSchema),
 });
 
 export type PortalTicketDetail = z.infer<typeof PortalTicketDetailSchema>;
@@ -247,3 +288,21 @@ export const SubmitPortalTicketSchema = z.object({
 });
 
 export type SubmitPortalTicket = z.infer<typeof SubmitPortalTicketSchema>;
+
+/**
+ * A customer's reply — US-85.
+ *
+ * **`isInternal` is absent, and that is the point.** It is not defaulted here
+ * and not read from the body anywhere: the portal hardcodes `false` on the
+ * insert. A customer-authored internal note is a contradiction, and the flag the
+ * whole of the project's first non-negotiable rule hangs on must not be
+ * reachable from a customer-facing request.
+ *
+ * No `ticketId` either — that is the path — and no `customerId`, which comes
+ * from the token.
+ */
+export const PortalReplySchema = z.object({
+  body: z.string().trim().min(1).max(20_000),
+});
+
+export type PortalReply = z.infer<typeof PortalReplySchema>;

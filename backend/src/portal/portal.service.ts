@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import {
+  PORTAL_STATUS,
   URGENCY_PRIORITY,
   internalStatusesFor,
   toPortalStatus,
@@ -7,6 +8,9 @@ import {
   type PortalTicket,
   type PortalTicketDetail,
   type PortalCategory,
+  type PortalEvent,
+  type PortalEventKind,
+  type PortalReply,
   type PortalTicketListQuery,
   type SubmitPortalTicket,
 } from '@crm/shared';
@@ -15,7 +19,7 @@ import { ApiException } from '../common/index.js';
 import { PrismaService } from '../prisma/index.js';
 import { CategoriesService } from '../categories/index.js';
 import { TicketsService } from '../tickets/index.js';
-import type { Prisma } from '../generated/prisma/client.js';
+import type { Prisma, TicketStatus } from '../generated/prisma/client.js';
 
 /**
  * Everything the portal may read about a ticket — US-82, AC2.
@@ -64,6 +68,67 @@ type PortalMessageRow = Prisma.MessageGetPayload<{ select: typeof PORTAL_MESSAGE
 
 /** How many messages a portal detail opens with. Older ones page separately. */
 const RECENT_MESSAGE_COUNT = 30;
+
+/**
+ * Which history entries a customer is told about — US-85, AC6.
+ *
+ * **An allowlist returning a kind, never the entry itself.** AC6 asks for
+ * status changes in plain language; US-82 requires that internal history never
+ * reaches a customer. Both hold because this returns one of seven kinds or
+ * `null`, and carries no actor, no field name, no from/to values and no
+ * internal status string.
+ *
+ * A `STATUS_CHANGED` entry is mapped **through `PORTAL_STATUS`** and emitted only
+ * when the customer-facing status actually moved. So `OPEN -> PENDING_INTERNAL`
+ * produces nothing — both read as "In Progress" — and an escalation produces
+ * nothing at all, which is what keeps AC6 from undoing US-82 AC2.
+ *
+ * Everything not named here is dropped: priority changes, category changes,
+ * department moves, escalations, SLA breaches and unassignments are the
+ * support desk talking to itself.
+ */
+export function portalEventKindFor(entry: {
+  eventType: string;
+  fromValue: string | null;
+  toValue: string | null;
+}): PortalEventKind | null {
+  switch (entry.eventType) {
+    case 'CREATED':
+      return 'received';
+
+    case 'ASSIGNED':
+      return 'assigned';
+
+    case 'REOPENED':
+      return 'reopened';
+
+    case 'CLOSED':
+      return 'closed';
+
+    case 'STATUS_CHANGED': {
+      const to = PORTAL_STATUS[entry.toValue as TicketStatus] ?? null;
+      const from =
+        entry.fromValue === null ? null : (PORTAL_STATUS[entry.fromValue as TicketStatus] ?? null);
+
+      // A move the customer cannot see is not an event they should be told
+      // about — and an unrecognised status is dropped rather than guessed at.
+      if (to === null || to === from) {
+        return null;
+      }
+
+      if (to === 'IN_PROGRESS') return 'in_progress';
+      if (to === 'WAITING_ON_YOU') return 'waiting_on_you';
+      if (to === 'RESOLVED') return 'resolved';
+      if (to === 'CLOSED') return 'closed';
+
+      // `OPEN` is only ever the starting state, which `CREATED` already covers.
+      return null;
+    }
+
+    default:
+      return null;
+  }
+}
 
 /**
  * The customer-scoped API — US-82.
@@ -267,6 +332,7 @@ export class PortalService {
 
     return {
       ...this.toTicket(row, locale),
+      events: await this.events(ticketId),
       description: row.description,
       // AC2 — a first name, or nothing.
       assigneeFirstName: row.assignee?.firstName ?? null,
@@ -417,5 +483,119 @@ export class PortalService {
      * with each other for as long as somebody keeps them in step.
      */
     return this.ticket(customerId, created.id, locale);
+  }
+
+  /**
+   * What has happened to the request, as the customer is told it — US-85, AC6.
+   *
+   * The **allowlist** is `portalEventKindFor`; anything it does not name is
+   * dropped. The rows are read oldest first because a customer reads a thread
+   * downwards, and the entry's id is reused so the client has a stable key
+   * without this inventing one.
+   *
+   * Ownership is not re-checked here: every caller has already been through
+   * `ticket()`, which refuses a request that is not the caller's. A second check
+   * would be a second place that has to agree about who may see what.
+   */
+  async events(ticketId: string): Promise<PortalEvent[]> {
+    const rows = await this.prisma.ticketHistory.findMany({
+      where: { ticketId },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true, eventType: true, fromValue: true, toValue: true, createdAt: true },
+    });
+
+    const events: PortalEvent[] = [];
+
+    for (const row of rows) {
+      const kind = portalEventKindFor(row);
+
+      if (kind !== null) {
+        events.push({ id: row.id, kind, createdAt: row.createdAt.toISOString() });
+      }
+    }
+
+    return events;
+  }
+
+  /**
+   * The customer replies — US-85.
+   *
+   * **`isInternal` is hardcoded `false` and appears nowhere in `PortalReply`.**
+   * Not defaulted, not read from the body: a customer-authored internal note is a
+   * contradiction, and the flag the whole of the project's first non-negotiable
+   * rule hangs on must not be reachable from a customer-facing request.
+   *
+   * Ownership is in the same query that finds the ticket, so there is no window
+   * between checking and writing.
+   */
+  async reply(
+    actor: { customerId: string; userId: string },
+    ticketId: string,
+    input: PortalReply,
+    locale: 'EN' | 'AR' = 'EN',
+  ): Promise<PortalTicketDetail> {
+    const ticket = await this.prisma.notDeleted.ticket.findFirst({
+      where: { id: ticketId, customerId: actor.customerId },
+      select: { id: true, status: true },
+    });
+
+    if (ticket === null) {
+      // 404, not 403 — a 403 would confirm the request exists.
+      throw ApiException.notFound('That request');
+    }
+
+    /**
+     * A closed request does not take replies — US-85, and an interpretation
+     * worth stating.
+     *
+     * **This is not a new lifecycle rule:** nothing transitions and nothing is
+     * added to the state machine. US-47 decided that a customer reply reopens a
+     * `RESOLVED` request and deliberately not a `CLOSED` one, so a reply here
+     * would sit in a ticket that is in no open queue — a message nobody is
+     * coming for, acknowledged with a success message. Refusing says so instead.
+     * US-90 is the story that gives a customer a way back into a closed request.
+     */
+    if (ticket.status === 'CLOSED') {
+      throw ApiException.unprocessable(
+        'This request is closed. Please raise a new one and we will pick it up.',
+      );
+    }
+
+    const message = await this.prisma.message.create({
+      data: {
+        ticketId,
+        senderType: 'CUSTOMER',
+        // Attribution from the token, never from the body.
+        authorCustomerId: actor.customerId,
+        body: input.body,
+        // Hardcoded. See the method comment.
+        isInternal: false,
+        channel: 'WEB',
+      },
+      select: { id: true, createdAt: true },
+    });
+
+    // Denormalisation US-6 added and nothing has written: "waiting on us" versus
+    // "waiting on them" is a column comparison rather than a subquery over
+    // messages. Not a lifecycle rule.
+    await this.prisma.ticket.update({
+      where: { id: ticketId },
+      data: { lastCustomerReplyAt: message.createdAt },
+    });
+
+    /**
+     * US-47's reopen rule, called for the first time.
+     *
+     * `onCustomerReply` reopens a `RESOLVED` request to `OPEN`, clears
+     * `resolvedAt`, increments `reopenCount`, writes a `REOPENED` entry with no
+     * actor and restarts the clock. Anything else it leaves alone. **That
+     * transition is used exactly as US-47 defined it** — this story adds no state
+     * and no rule of its own.
+     */
+    await this.ticketRules.onCustomerReply(ticketId);
+
+    this.logger.log(`Customer ${actor.customerId} replied to request ${ticketId}`);
+
+    return this.ticket(actor.customerId, ticketId, locale);
   }
 }

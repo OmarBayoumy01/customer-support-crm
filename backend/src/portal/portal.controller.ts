@@ -38,6 +38,7 @@ import { PortalService } from './portal.service.js';
 import {
   PortalPaginationQueryDto,
   PortalTicketListQueryDto,
+  PortalReplyDto,
   SubmitPortalTicketDto,
 } from './dto/portal.dto.js';
 
@@ -223,5 +224,41 @@ export class PortalController {
     const actor = await this.scopeFor(user, request);
 
     return this.portal.submit(actor, body);
+  }
+
+  /**
+   * The customer replies — US-85.
+   *
+   * The ticket is the path, the customer is the token, and the body is one field.
+   * **There is no `isInternal` in `PortalReplyDto`** — the service hardcodes
+   * `false`, so a customer-authored internal note is not something a request can
+   * ask for.
+   *
+   * A reply to a resolved request reopens it through US-47's
+   * `onCustomerReply`, used exactly as that story defined it. A reply to a closed
+   * request is refused: see the service.
+   */
+  @Post('tickets/:id/messages')
+  @HttpCode(201)
+  @ApiOperation({
+    summary: 'Reply to my request',
+    description:
+      'The reply is attributed to the signed-in customer and is never internal. Replying to ' +
+      'a resolved request reopens it; replying to a closed one is refused, because a closed ' +
+      'request is in no queue and the reply would go unread.',
+  })
+  @ApiZodBody(PortalReplyDto)
+  @ApiZodResponse(201, PortalTicketDetailSchema, 'The updated thread')
+  @ApiResponse({ status: 404, schema: zodToOpenApi(ApiErrorSchema) })
+  @ApiResponse({ status: 422, schema: zodToOpenApi(ApiErrorSchema) })
+  async reply(
+    @Param('id') id: string,
+    @Body() body: PortalReplyDto,
+    @CurrentUser() user: CurrentUserPayload | undefined,
+    @Req() request: Request,
+  ): Promise<PortalTicketDetail> {
+    const actor = await this.scopeFor(user, request);
+
+    return this.portal.reply(actor, id, body);
   }
 }

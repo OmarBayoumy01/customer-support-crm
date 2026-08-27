@@ -68,7 +68,18 @@ function RequestCard({ ticket }: { ticket: PortalTicket }): React.JSX.Element {
             <p className="tabular text-meta text-ink-muted">
               {t('portal.requests.number', { number: ticket.number })}
             </p>
-            <h2 className="text-section text-ink mt-0.5 font-semibold">{ticket.subject}</h2>
+            {/*
+              A link now that US-85 gives it somewhere to go. The whole heading
+              is the target rather than a "view" affordance elsewhere on the card.
+            */}
+            <h2 className="text-section mt-0.5 font-semibold">
+              <Link
+                to={`/portal/requests/${ticket.id}`}
+                className="text-ink hover:underline focus-visible:ring-ring rounded focus-visible:ring-2 focus-visible:outline-none"
+              >
+                {ticket.subject}
+              </Link>
+            </h2>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">

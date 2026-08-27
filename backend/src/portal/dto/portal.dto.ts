@@ -1,5 +1,6 @@
 import {
   PaginationQuerySchema,
+  PortalReplySchema,
   PortalTicketListQuerySchema,
   SubmitPortalTicketSchema,
 } from '@crm/shared';
@@ -14,3 +15,6 @@ export class PortalPaginationQueryDto extends createZodDto(PaginationQuerySchema
 
 /** What a customer may submit — US-86. Note what the schema has no room for. */
 export class SubmitPortalTicketDto extends createZodDto(SubmitPortalTicketSchema) {}
+
+/** A customer reply — US-85. No isInternal, deliberately: see the schema. */
+export class PortalReplyDto extends createZodDto(PortalReplySchema) {}

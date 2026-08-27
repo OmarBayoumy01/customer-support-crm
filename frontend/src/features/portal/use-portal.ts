@@ -1,12 +1,14 @@
 import {
   useMutation,
   useQuery,
+  useQueryClient,
   type UseMutationResult,
   type UseQueryResult,
 } from '@tanstack/react-query';
 import type {
   PaginationMeta,
   PortalCategory,
+  PortalReply,
   PortalTicket,
   PortalTicketDetail,
   PortalTicketListQuery,
@@ -85,5 +87,51 @@ export function usePortalTickets(
     // A customer refreshing to see whether support has replied should not be
     // served a minute-old answer.
     staleTime: 10_000,
+  });
+}
+
+/** The key one request subscribes to, so a reply can refresh it. */
+export const portalRequestKey = (id: string): readonly unknown[] => ['portal', 'request', id];
+
+/** One of the customer's own requests, with the thread they may see — US-85. */
+export function usePortalRequest(id: string): UseQueryResult<PortalTicketDetail> {
+  return useQuery({
+    queryKey: portalRequestKey(id),
+    queryFn: async () => apiGet<PortalTicketDetail>(`/portal/tickets/${id}`),
+    // A customer refreshing to see whether support has answered should not be
+    // served a stale thread.
+    staleTime: 5_000,
+  });
+}
+
+/**
+ * Reply to a request — US-85.
+ *
+ * The response is the updated thread, so the reply and the status it may have
+ * caused arrive together. There is no `isInternal` to send and no `customerId`:
+ * the contract has neither.
+ */
+export function usePortalReply(
+  id: string,
+): UseMutationResult<PortalTicketDetail, ApiRequestError, PortalReply> {
+  const queryClient = useQueryClient();
+
+  return useMutation<PortalTicketDetail, ApiRequestError, PortalReply>({
+    mutationFn: async (input) => {
+      const response = await http.post<{ data: PortalTicketDetail }>(
+        `/portal/tickets/${id}/messages`,
+        input,
+      );
+
+      return response.data.data;
+    },
+    onSuccess: (updated) => {
+      // The thread came back with the reply in it, so seed the cache rather than
+      // asking for it again — and refresh the list, whose status may have moved.
+      queryClient.setQueryData(portalRequestKey(id), updated);
+      void queryClient.invalidateQueries({ queryKey: PORTAL_TICKETS_KEY });
+    },
+    // No retry: a reply that may have been delivered must not be sent twice.
+    retry: false,
   });
 }
