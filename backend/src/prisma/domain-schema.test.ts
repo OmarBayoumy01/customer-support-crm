@@ -177,7 +177,7 @@ test('AC2 — a ticket resolves customer, agent, category, department, branch, m
       branchId: branch.id,
       slaPolicyId: sla.id,
       priority: 'HIGH',
-      status: 'OPEN',
+      status: 'WAITING_FOR_AGENT',
       channel: 'EMAIL',
       firstResponseDueAt: new Date(Date.now() + 30 * 60_000),
       resolutionDueAt: new Date(Date.now() + 480 * 60_000),
@@ -325,13 +325,10 @@ test('AC3 — every status and priority from the story is accepted', async () =>
     rows.filter((row) => row.typname === type).map((row) => row.enumlabel);
 
   assert.deepEqual(labels('TicketStatus').sort(), [
-    'CLOSED',
-    'ESCALATED',
     'NEW',
-    'OPEN',
-    'PENDING_CUSTOMER',
-    'PENDING_INTERNAL',
     'RESOLVED',
+    'WAITING_FOR_AGENT',
+    'WAITING_FOR_CUSTOMER',
   ]);
   assert.deepEqual(labels('TicketPriority').sort(), ['HIGH', 'LOW', 'MEDIUM', 'URGENT']);
   assert.deepEqual(labels('Channel').sort(), ['CHAT', 'EMAIL', 'SMS', 'WEB', 'WHATSAPP']);
@@ -382,7 +379,7 @@ test('AC5 — the agent queue and SLA sweep use indexes rather than sequential s
      SELECT
        gen_random_uuid()::text,
        'Perf ticket ' || i,
-       (ARRAY['NEW','OPEN','PENDING_CUSTOMER','RESOLVED','CLOSED']::"TicketStatus"[])[1 + (i % 5)],
+       (ARRAY['NEW','WAITING_FOR_AGENT','WAITING_FOR_CUSTOMER','RESOLVED']::"TicketStatus"[])[1 + (i % 4)],
        (ARRAY['LOW','MEDIUM','HIGH','URGENT']::"TicketPriority"[])[1 + (i % 4)],
        'WEB'::"Channel",
        $1,
@@ -403,7 +400,7 @@ test('AC5 — the agent queue and SLA sweep use indexes rather than sequential s
 
   const agentQueue = await explain(
     `SELECT id, subject FROM "Ticket"
-     WHERE "assigneeId" = $1 AND status = 'OPEN'
+     WHERE "assigneeId" = $1 AND status = 'WAITING_FOR_AGENT'
      ORDER BY "updatedAt" DESC LIMIT 25`,
     [agentIds[0]],
   );
@@ -417,7 +414,7 @@ test('AC5 — the agent queue and SLA sweep use indexes rather than sequential s
 
   const slaSweep = await explain(
     `SELECT id FROM "Ticket"
-     WHERE status = 'OPEN' AND "resolutionDueAt" < now()
+     WHERE status = 'WAITING_FOR_AGENT' AND "resolutionDueAt" < now()
      ORDER BY "resolutionDueAt" LIMIT 100`,
   );
 

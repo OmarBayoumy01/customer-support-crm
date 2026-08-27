@@ -112,7 +112,7 @@ async function makePortalCustomer(label: string): Promise<{ customerId: string; 
 async function makeTicket(overrides: {
   subject: string;
   customerId?: string;
-  status?: 'NEW' | 'OPEN' | 'PENDING_CUSTOMER' | 'ESCALATED' | 'RESOLVED';
+  status?: 'NEW' | 'WAITING_FOR_AGENT' | 'WAITING_FOR_CUSTOMER' | 'RESOLVED';
   description?: string;
   daysAgo?: number;
 }): Promise<{ id: string; number: number }> {
@@ -123,7 +123,7 @@ async function makeTicket(overrides: {
       subject: overrides.subject,
       description: overrides.description ?? 'Something happened.',
       customerId: overrides.customerId ?? customerId,
-      status: overrides.status ?? 'OPEN',
+      status: overrides.status ?? 'WAITING_FOR_AGENT',
       priority: 'MEDIUM',
       channel: 'WEB',
       createdAt: created,
@@ -193,12 +193,16 @@ before(async () => {
 
   const waiting = await makeTicket({
     subject: `${MINE} waiting on me`,
-    status: 'PENDING_CUSTOMER',
+    status: 'WAITING_FOR_CUSTOMER',
     daysAgo: 2,
   });
   waitingTicketId = waiting.id;
 
-  await makeTicket({ subject: `${MINE} escalated internally`, status: 'ESCALATED', daysAgo: 1 });
+  await makeTicket({
+    subject: `${MINE} escalated internally`,
+    status: 'WAITING_FOR_AGENT',
+    daysAgo: 1,
+  });
   await makeTicket({ subject: `${THEIRS} not yours`, customerId: otherCustomerId });
 });
 
@@ -293,21 +297,21 @@ test('AC2 — a search that matches nothing returns an empty list', async () => 
 // ---------------------------------------------------------------------------
 
 test('AC2 — the status filter uses the customer-facing name and hides the internal one', async () => {
-  const { body, raw } = await list('&status=WAITING_ON_YOU');
+  const { body, raw } = await list('&status=WAITING_FOR_CUSTOMER');
 
   assert.equal(body.data!.length, 1);
   assert.equal(body.data![0]?.id, waitingTicketId);
-  assert.equal(body.data![0]?.status, 'WAITING_ON_YOU');
+  assert.equal(body.data![0]?.status, 'WAITING_FOR_CUSTOMER');
 
   // The internal name never travels, even as a filter value's translation.
   assert.ok(!raw.includes('PENDING_CUSTOMER'));
 });
 
-test('AC2 — an escalated request reads as In Progress, never as escalated', async () => {
-  const { body, raw } = await list('&status=IN_PROGRESS');
+test('AC2 — an active request reads as WAITING_FOR_AGENT, never as escalated', async () => {
+  const { body, raw } = await list('&status=WAITING_FOR_AGENT');
 
   assert.ok(body.data!.some((ticket) => ticket.subject.includes('escalated internally')));
-  assert.ok(body.data!.every((ticket) => ticket.status === 'IN_PROGRESS'));
+  assert.ok(body.data!.every((ticket) => ticket.status === 'WAITING_FOR_AGENT'));
   assert.ok(!raw.includes('ESCALATED'));
 });
 

@@ -143,7 +143,7 @@ async function makeUser(
  */
 async function makeTicket(options: {
   assigneeId?: string | null;
-  status?: 'NEW' | 'OPEN' | 'PENDING_CUSTOMER' | 'PENDING_INTERNAL' | 'RESOLVED' | 'CLOSED';
+  status?: 'NEW' | 'WAITING_FOR_AGENT' | 'WAITING_FOR_CUSTOMER' | 'RESOLVED';
   hoursAgo?: number;
   withSla?: boolean;
   resolvedHoursAgo?: number;
@@ -157,7 +157,7 @@ async function makeTicket(options: {
       customerId,
       departmentId,
       priority: 'MEDIUM',
-      status: options.status ?? 'OPEN',
+      status: options.status ?? 'WAITING_FOR_AGENT',
       createdAt,
       updatedAt: createdAt,
       ...(options.assigneeId === undefined ? { assigneeId: agentId } : {}),
@@ -250,13 +250,12 @@ test('an agent with nothing assigned gets four zeros, not an error and not nulls
 // AC1 — open
 // ---------------------------------------------------------------------------
 
-test('AC1 — open counts my unfinished tickets and excludes resolved and closed ones', async () => {
+test('AC1 — open counts my unfinished tickets and excludes resolved ones', async () => {
   const before = (await summaryFor(agentToken)).body.data!.open.value;
 
   await makeTicket({ hoursAgo: 1 });
   await makeTicket({ status: 'NEW', hoursAgo: 1 });
   await makeTicket({ status: 'RESOLVED', hoursAgo: 1, resolvedHoursAgo: 1 });
-  await makeTicket({ status: 'CLOSED', hoursAgo: 1, closedHoursAgo: 1 });
 
   const summary = (await summaryFor(agentToken)).body.data!;
 
@@ -276,16 +275,16 @@ test('AC1 — another agent’s tickets and unassigned ones are not mine', async
 // AC1 — pending
 // ---------------------------------------------------------------------------
 
-test('AC1 — pending counts the two waiting statuses and nothing else', async () => {
+test('AC1 — pending counts WAITING_FOR_CUSTOMER and nothing else', async () => {
   const before = (await summaryFor(agentToken)).body.data!.pending.value;
 
-  await makeTicket({ status: 'PENDING_CUSTOMER', hoursAgo: 1 });
-  await makeTicket({ status: 'PENDING_INTERNAL', hoursAgo: 1 });
-  await makeTicket({ status: 'OPEN', hoursAgo: 1 });
+  await makeTicket({ status: 'WAITING_FOR_CUSTOMER', hoursAgo: 1 });
+  await makeTicket({ status: 'WAITING_FOR_AGENT', hoursAgo: 1 });
+  await makeTicket({ status: 'NEW', hoursAgo: 1 });
 
   const summary = (await summaryFor(agentToken)).body.data!;
 
-  assert.equal(summary.pending.value, before + 2);
+  assert.equal(summary.pending.value, before + 1);
   // A subset of open, deliberately — see the schema.
   assert.ok(summary.pending.value <= summary.open.value);
 });
@@ -418,13 +417,13 @@ test('the summary is the caller’s own workload and cannot be made to report an
   const mine = (await summaryFor(agentToken)).body.data!;
 
   const theirOpen = await prisma.notDeleted.ticket.count({
-    where: { assigneeId: otherAgentId, status: { notIn: ['RESOLVED', 'CLOSED'] } },
+    where: { assigneeId: otherAgentId, status: { not: 'RESOLVED' } },
   });
 
   assert.ok(theirOpen > 0);
 
   const myOpen = await prisma.notDeleted.ticket.count({
-    where: { assigneeId: agentId, status: { notIn: ['RESOLVED', 'CLOSED'] } },
+    where: { assigneeId: agentId, status: { not: 'RESOLVED' } },
   });
 
   // The endpoint takes no parameters at all, and the figure matches the caller's

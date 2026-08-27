@@ -35,7 +35,7 @@ function ticket(overrides: Partial<Ticket> = {}): Ticket {
     id: crypto.randomUUID(),
     number: 1041,
     subject: 'Refund approved but never arrived',
-    status: 'OPEN',
+    status: 'WAITING_FOR_AGENT',
     priority: 'HIGH',
     channel: 'EMAIL',
     customer: {
@@ -77,7 +77,7 @@ const COUNTS: TicketCounts = {
   mine: 5,
   escalated: 1,
   breached: 2,
-  closed: 7,
+  resolved: 7,
 };
 
 /** Answers `/tickets/counts` and `/tickets?…` from the given rows. */
@@ -187,7 +187,7 @@ describe('AC2 — scannability', () => {
     await screen.findByText('Refund approved but never arrived');
 
     expect(screen.getByText('High')).toBeInTheDocument();
-    expect(screen.getByText('Open')).toBeInTheDocument();
+    expect(screen.getByText('Waiting for agent')).toBeInTheDocument();
   });
 
   test('the SLA cell is a countdown with a state in words', async () => {

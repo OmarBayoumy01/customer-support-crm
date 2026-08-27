@@ -34,7 +34,7 @@ const patches = (): Record<string, unknown>[] =>
 function ticket(overrides: Partial<TicketDetail> = {}): TicketDetail {
   return {
     id: TICKET_ID,
-    status: 'OPEN',
+    status: 'WAITING_FOR_AGENT',
     sla: { firstRespondedAt: null },
     ...overrides,
   } as TicketDetail;
@@ -107,22 +107,14 @@ afterEach(() => {
 });
 
 describe('AC1 — the status set', () => {
-  test('all seven are offered, by name', async () => {
+  test('all four are offered, by name', async () => {
     const user = userEvent.setup();
 
     mount(FULL);
 
     await user.click(screen.getByRole('combobox', { name: 'Status' }));
 
-    for (const label of [
-      'New',
-      'Open',
-      'Pending customer',
-      'Pending internal',
-      'Escalated',
-      'Resolved',
-      'Closed',
-    ]) {
+    for (const label of ['New', 'Waiting for agent', 'Waiting for customer', 'Resolved']) {
       // AC6 — the label comes from STATUS_PRESENTATION, the same source the
       // badge in the queue reads.
       expect(await screen.findByRole('option', { name: new RegExp(label) })).toBeInTheDocument();
@@ -137,28 +129,27 @@ describe('AC2 — valid transitions', () => {
     mount(FULL);
 
     await user.click(screen.getByRole('combobox', { name: 'Status' }));
-    await user.click(await screen.findByRole('option', { name: /Pending customer/ }));
+    await user.click(await screen.findByRole('option', { name: /Waiting for customer/ }));
 
     await waitFor(() => {
-      expect(patches()).toEqual([{ status: 'PENDING_CUSTOMER' }]);
+      expect(patches()).toEqual([{ status: 'WAITING_FOR_CUSTOMER' }]);
     });
   });
 
   test('a move the state machine forbids is disabled, with the reason in words', async () => {
     const user = userEvent.setup();
 
-    mount(FULL, ticket({ status: 'RESOLVED' }));
+    mount(FULL, ticket({ status: 'WAITING_FOR_AGENT' }));
 
     await user.click(screen.getByRole('combobox', { name: 'Status' }));
 
-    // RESOLVED goes to OPEN or CLOSED. Listed but not selectable, so the agent
-    // learns the shape of the lifecycle rather than wondering where it went.
-    const pending = await screen.findByRole('option', { name: /Pending customer/ });
+    // NEW is never a target from WAITING_FOR_AGENT.
+    const newStatus = await screen.findByRole('option', { name: /^New/ });
 
-    expect(pending).toHaveAttribute('aria-disabled', 'true');
-    expect(pending).toHaveTextContent('Not available from here');
+    expect(newStatus).toHaveAttribute('aria-disabled', 'true');
+    expect(newStatus).toHaveTextContent('Not available from here');
 
-    await user.click(pending);
+    await user.click(newStatus);
 
     await waitFor(() => {
       expect(patches()).toEqual([]);

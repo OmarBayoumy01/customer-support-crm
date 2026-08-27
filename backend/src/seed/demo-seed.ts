@@ -438,10 +438,7 @@ async function createDemoTicket(
     .reverse()
     .find((message) => message.from === 'AGENT' && message.isInternal !== true);
 
-  const resolvedAt =
-    ticket.status === 'RESOLVED' || ticket.status === 'CLOSED'
-      ? new Date(createdAt.getTime() + 4 * HOUR)
-      : null;
+  const resolvedAt = ticket.status === 'RESOLVED' ? new Date(createdAt.getTime() + 4 * HOUR) : null;
 
   const created = await prisma.ticket.create({
     data: {
@@ -471,8 +468,8 @@ async function createDemoTicket(
         resolutionDueAt !== null &&
         (resolvedAt === null ? resolutionDueAt < new Date() : resolvedAt > resolutionDueAt),
       resolvedAt,
-      closedAt: ticket.status === 'CLOSED' ? new Date(createdAt.getTime() + 6 * HOUR) : null,
-      escalatedAt: ticket.status === 'ESCALATED' ? new Date(createdAt.getTime() + 48 * HOUR) : null,
+      closedAt: null,
+      escalatedAt: ticket.escalated === true ? new Date(createdAt.getTime() + 48 * HOUR) : null,
       lastCustomerReplyAt:
         lastCustomerMessage === undefined
           ? null

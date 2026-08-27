@@ -82,6 +82,7 @@ export {
 } from './dto/customer.js';
 
 export {
+  TICKET_STATUSES,
   TicketStatusSchema,
   TicketPrioritySchema,
   SlaStateSchema,
@@ -89,8 +90,10 @@ export {
   UpdateTicketSchema,
   AssignTicketSchema,
   ChangeTicketStatusSchema,
+  RETIRED_TICKET_STATUSES,
   TICKET_TRANSITIONS,
   STATUS_PERMISSION,
+  agentTransitionsFrom,
   canTransition,
   AssignableAgentSchema,
   TicketListQuerySchema,
@@ -102,6 +105,7 @@ export {
   TicketHistoryEntrySchema,
   TicketAttachmentSchema,
   TicketDetailSchema,
+  type RetiredTicketStatus,
   type TicketStatus,
   type TicketPriority,
   type SlaState,
@@ -119,7 +123,6 @@ export {
   type TicketHistoryEntry,
 } from './dto/ticket.js';
 export {
-  PortalTicketStatusSchema,
   PortalAttachmentSchema,
   PortalMessageSchema,
   PortalTicketSchema,
@@ -134,10 +137,6 @@ export {
   PORTAL_EVENT_KINDS,
   PORTAL_URGENCY,
   URGENCY_PRIORITY,
-  PORTAL_STATUS,
-  toPortalStatus,
-  internalStatusesFor,
-  type PortalTicketStatus,
   type PortalAttachment,
   type PortalMessage,
   type PortalTicket,

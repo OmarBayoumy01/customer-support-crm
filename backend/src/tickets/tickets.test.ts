@@ -606,7 +606,7 @@ test('AC5 — sending a field back unchanged records nothing', async () => {
 test('status cannot be changed through PATCH — that is US-47’s guarded transition', async () => {
   const ticket = await newTicket();
 
-  await call('PATCH', `/tickets/${ticket.id}`, { token: allToken, body: { status: 'CLOSED' } });
+  await call('PATCH', `/tickets/${ticket.id}`, { token: allToken, body: { status: 'RESOLVED' } });
 
   const row = await prisma.ticket.findUniqueOrThrow({
     where: { id: ticket.id },
@@ -631,7 +631,7 @@ test('US-42 AC4 — the counts endpoint answers all six views in one request', a
 
   assert.equal(status, 200, JSON.stringify(body));
 
-  for (const view of ['all', 'unassigned', 'mine', 'escalated', 'breached', 'closed']) {
+  for (const view of ['all', 'unassigned', 'mine', 'escalated', 'breached', 'resolved']) {
     assert.equal(typeof body.data?.[view], 'number', `${view} is missing`);
   }
 
@@ -1247,7 +1247,7 @@ test('US-48 AC2 — each candidate carries their open ticket count', async () =>
   const counted = await prisma.ticket.count({
     where: {
       assigneeId: assignedUserId,
-      status: { notIn: ['RESOLVED', 'CLOSED'] },
+      status: { not: 'RESOLVED' },
       deletedAt: null,
     },
   });
@@ -1386,15 +1386,15 @@ async function setStatus(
 test('US-47 AC2 — a legal transition saves; an illegal one is refused and nothing moves', async () => {
   const ticket = await newTicket();
 
-  const opened = await setStatus(ticket.id, 'OPEN');
+  const opened = await setStatus(ticket.id, 'WAITING_FOR_AGENT');
 
   assert.equal(opened.status, 200, JSON.stringify(opened.body));
-  assert.equal(opened.body.data?.status, 'OPEN');
+  assert.equal(opened.body.data?.status, 'WAITING_FOR_AGENT');
 
   await setStatus(ticket.id, 'RESOLVED');
 
-  // RESOLVED goes to OPEN or CLOSED and nowhere else.
-  const illegal = await setStatus(ticket.id, 'PENDING_CUSTOMER');
+  // RESOLVED cannot move to WAITING_FOR_CUSTOMER directly through agent transition.
+  const illegal = await setStatus(ticket.id, 'WAITING_FOR_CUSTOMER');
 
   assert.equal(illegal.status, 422);
   assert.equal(illegal.body.error?.code, 'UNPROCESSABLE');
@@ -1410,7 +1410,7 @@ test('US-47 AC2 — a legal transition saves; an illegal one is refused and noth
 test('US-47 AC2 — NEW is never a target', async () => {
   const ticket = await newTicket();
 
-  await setStatus(ticket.id, 'OPEN');
+  await setStatus(ticket.id, 'WAITING_FOR_AGENT');
 
   // "Nobody has looked at this yet" stops being true the moment somebody does.
   assert.equal((await setStatus(ticket.id, 'NEW')).status, 422);
@@ -1419,8 +1419,8 @@ test('US-47 AC2 — NEW is never a target', async () => {
 test('US-47 AC2 — re-sending the current status records nothing', async () => {
   const ticket = await newTicket();
 
-  await setStatus(ticket.id, 'OPEN');
-  await setStatus(ticket.id, 'OPEN');
+  await setStatus(ticket.id, 'WAITING_FOR_AGENT');
+  await setStatus(ticket.id, 'WAITING_FOR_AGENT');
 
   const entries = await prisma.ticketHistory.count({
     where: { ticketId: ticket.id, field: 'status' },
@@ -1436,7 +1436,7 @@ test('US-47 AC2 — resolving without ticket:close is refused', async () => {
   // this would answer 404 before the permission was ever considered, and the
   // test would pass for the wrong reason.
   await setAssignee(ticket.id, assignedUserId);
-  await setStatus(ticket.id, 'OPEN');
+  await setStatus(ticket.id, 'WAITING_FOR_AGENT');
 
   // The agent fixture holds ticket:update and not ticket:close.
   const refused = await setStatus(ticket.id, 'RESOLVED', assignedToken);
@@ -1447,11 +1447,11 @@ test('US-47 AC2 — resolving without ticket:close is refused', async () => {
   assert.equal((await setStatus(ticket.id, 'RESOLVED')).status, 200);
 });
 
-test('US-47 AC4 — Pending Customer pauses the clock and coming back resumes it', async () => {
+test('US-47 AC4 — Waiting for customer pauses the clock and coming back resumes it', async () => {
   const ticket = await newTicket({ priority: 'LOW' });
 
-  await setStatus(ticket.id, 'OPEN');
-  await setStatus(ticket.id, 'PENDING_CUSTOMER');
+  await setStatus(ticket.id, 'WAITING_FOR_AGENT');
+  await setStatus(ticket.id, 'WAITING_FOR_CUSTOMER');
 
   const paused = await prisma.ticket.findUniqueOrThrow({
     where: { id: ticket.id },
@@ -1460,15 +1460,14 @@ test('US-47 AC4 — Pending Customer pauses the clock and coming back resumes it
 
   assert.ok(paused.slaPausedAt !== null);
 
-  await setStatus(ticket.id, 'OPEN');
+  await setStatus(ticket.id, 'WAITING_FOR_AGENT');
 
   const resumed = await prisma.ticket.findUniqueOrThrow({
     where: { id: ticket.id },
     select: { slaPausedAt: true, resolutionDueAt: true },
   });
 
-  // US-68 wrote this arithmetic and had no caller until now. The deadline moves
-  // out by exactly what the clock was stopped for, so it is not re-derived here.
+  // The deadline moves out by exactly what the clock was stopped for, so it is not re-derived here.
   assert.equal(resumed.slaPausedAt, null);
 
   if (paused.resolutionDueAt !== null && resumed.resolutionDueAt !== null) {
@@ -1476,7 +1475,7 @@ test('US-47 AC4 — Pending Customer pauses the clock and coming back resumes it
   }
 });
 
-test('US-47 AC4 — resolving and closing write their timestamps', async () => {
+test('US-47 AC4 — resolving writes resolvedAt timestamp', async () => {
   const ticket = await newTicket();
 
   await setStatus(ticket.id, 'RESOLVED');
@@ -1487,61 +1486,56 @@ test('US-47 AC4 — resolving and closing write their timestamps', async () => {
   });
 
   assert.ok(resolved.resolvedAt !== null);
-
-  await setStatus(ticket.id, 'CLOSED');
-
-  const closed = await prisma.ticket.findUniqueOrThrow({
-    where: { id: ticket.id },
-    select: { closedAt: true },
-  });
-
-  // Read by the detail payload since US-40 and written by nothing until now.
-  assert.ok(closed.closedAt !== null);
 });
 
-test('US-47 AC4 — reopening clears the ending and counts it', async () => {
+test('US-47 AC4 — assignment moves NEW ticket to WAITING_FOR_AGENT', async () => {
   const ticket = await newTicket();
 
-  await setStatus(ticket.id, 'RESOLVED');
-  await setStatus(ticket.id, 'OPEN');
+  assert.equal(ticket.status, 'NEW');
+
+  await setAssignee(ticket.id, assignedUserId);
 
   const row = await prisma.ticket.findUniqueOrThrow({
     where: { id: ticket.id },
-    select: { resolvedAt: true, reopenCount: true },
+    select: { status: true, assigneeId: true },
   });
 
-  assert.equal(row.resolvedAt, null);
-  assert.equal(row.reopenCount, 1);
-
-  const entry = await prisma.ticketHistory.findFirstOrThrow({
-    where: { ticketId: ticket.id, eventType: 'REOPENED' },
-    select: { fromValue: true, toValue: true },
-  });
-
-  assert.equal(entry.fromValue, 'RESOLVED');
-  assert.equal(entry.toValue, 'OPEN');
+  assert.equal(row.status, 'WAITING_FOR_AGENT');
+  assert.equal(row.assigneeId, assignedUserId);
 });
 
-test('US-47 AC4 — closing and escalating write their own event types', async () => {
-  const closedTicket = await newTicket();
-  await setStatus(closedTicket.id, 'CLOSED');
+test('US-47 AC4 — agent reply moves ticket to WAITING_FOR_CUSTOMER', async () => {
+  const ticket = await newTicket();
+  await setStatus(ticket.id, 'WAITING_FOR_AGENT');
 
-  const escalatedTicket = await newTicket();
-  await setStatus(escalatedTicket.id, 'ESCALATED');
+  await call('POST', `/tickets/${ticket.id}/messages`, {
+    token: allToken,
+    body: { body: 'Here is an update for you.', isInternal: false },
+  });
 
-  // Both had been in TicketEventType since US-6 with nothing writing them.
-  assert.equal(
-    await prisma.ticketHistory.count({
-      where: { ticketId: closedTicket.id, eventType: 'CLOSED' },
-    }),
-    1,
-  );
-  assert.equal(
-    await prisma.ticketHistory.count({
-      where: { ticketId: escalatedTicket.id, eventType: 'ESCALATED' },
-    }),
-    1,
-  );
+  const row = await prisma.ticket.findUniqueOrThrow({
+    where: { id: ticket.id },
+    select: { status: true },
+  });
+
+  assert.equal(row.status, 'WAITING_FOR_CUSTOMER');
+});
+
+test('US-47 AC4 — internal note does not change status', async () => {
+  const ticket = await newTicket();
+  await setStatus(ticket.id, 'WAITING_FOR_AGENT');
+
+  await call('POST', `/tickets/${ticket.id}/messages`, {
+    token: allToken,
+    body: { body: 'Internal note for team.', isInternal: true },
+  });
+
+  const row = await prisma.ticket.findUniqueOrThrow({
+    where: { id: ticket.id },
+    select: { status: true },
+  });
+
+  assert.equal(row.status, 'WAITING_FOR_AGENT');
 });
 
 test('US-47 AC5 — a customer reply reopens a resolved ticket, with no actor', async () => {
@@ -1549,8 +1543,7 @@ test('US-47 AC5 — a customer reply reopens a resolved ticket, with no actor', 
 
   await setStatus(ticket.id, 'RESOLVED');
 
-  // Called directly: nothing writes a customer message yet — the portal reply
-  // endpoint is US-85, in wave 4. The rule is this story's; the trigger is not.
+  // Called directly: customer reply moves resolved ticket to WAITING_FOR_AGENT.
   await tickets.onCustomerReply(ticket.id);
 
   const row = await prisma.ticket.findUniqueOrThrow({
@@ -1558,7 +1551,7 @@ test('US-47 AC5 — a customer reply reopens a resolved ticket, with no actor', 
     select: { status: true, reopenCount: true, resolvedAt: true },
   });
 
-  assert.equal(row.status, 'OPEN');
+  assert.equal(row.status, 'WAITING_FOR_AGENT');
   assert.equal(row.reopenCount, 1);
   assert.equal(row.resolvedAt, null);
 
@@ -1567,31 +1560,21 @@ test('US-47 AC5 — a customer reply reopens a resolved ticket, with no actor', 
     select: { actorUserId: true },
   });
 
-  // No member of staff reopened it, and naming whoever last touched the ticket
-  // would be the lie US-50's AC3 exists to prevent.
+  // No member of staff reopened it.
   assert.equal(entry.actorUserId, null);
 });
 
-test('US-47 AC5 — a customer reply to an open or closed ticket changes nothing', async () => {
-  const open = await newTicket();
-  await setStatus(open.id, 'OPEN');
-  await tickets.onCustomerReply(open.id);
+test('US-47 AC5 — a customer reply to WAITING_FOR_CUSTOMER moves to WAITING_FOR_AGENT', async () => {
+  const ticket = await newTicket();
+  await setStatus(ticket.id, 'WAITING_FOR_CUSTOMER');
+  await tickets.onCustomerReply(ticket.id);
 
-  const closed = await newTicket();
-  await setStatus(closed.id, 'CLOSED');
-  await tickets.onCustomerReply(closed.id);
+  const row = await prisma.ticket.findUniqueOrThrow({
+    where: { id: ticket.id },
+    select: { status: true },
+  });
 
-  // A closed conversation is finished; what a customer may do to one is US-90.
-  assert.equal(
-    (await prisma.ticket.findUniqueOrThrow({ where: { id: open.id }, select: { status: true } }))
-      .status,
-    'OPEN',
-  );
-  assert.equal(
-    (await prisma.ticket.findUniqueOrThrow({ where: { id: closed.id }, select: { status: true } }))
-      .status,
-    'CLOSED',
-  );
+  assert.equal(row.status, 'WAITING_FOR_AGENT');
 });
 
 test('US-47 AC3 — firstRespondedAt is the fact the resolve warning reads', async () => {
@@ -1629,7 +1612,7 @@ test('US-69 AC4 — the SLA payload carries the target and the paused total', as
   assert.equal(sla.pausedAt, null);
   assert.equal(sla.pausedMs, 0);
 
-  await setStatus(ticket.id, 'PENDING_CUSTOMER');
+  await setStatus(ticket.id, 'WAITING_FOR_CUSTOMER');
 
   const paused = await call<TicketDetail>('GET', `/tickets/${ticket.id}`, { token: allToken });
 
@@ -1637,7 +1620,7 @@ test('US-69 AC4 — the SLA payload carries the target and the paused total', as
   // clock that is not running.
   assert.ok(paused.body.data!.sla.pausedAt !== null);
 
-  await setStatus(ticket.id, 'OPEN');
+  await setStatus(ticket.id, 'WAITING_FOR_AGENT');
 
   const resumed = await call<TicketDetail>('GET', `/tickets/${ticket.id}`, { token: allToken });
 

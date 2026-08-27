@@ -111,7 +111,7 @@ async function makePortalCustomer(label: string): Promise<{ customerId: string; 
 
 async function makeTicket(
   options: {
-    status?: 'NEW' | 'OPEN' | 'PENDING_CUSTOMER' | 'RESOLVED' | 'CLOSED';
+    status?: 'NEW' | 'WAITING_FOR_AGENT' | 'WAITING_FOR_CUSTOMER' | 'RESOLVED';
     customerId?: string;
   } = {},
 ): Promise<string> {
@@ -120,7 +120,7 @@ async function makeTicket(
       subject: `${SUBJECT_PREFIX} ${randomUUID().slice(0, 6)}`,
       description: 'The refund never arrived.',
       customerId: options.customerId ?? customerId,
-      status: options.status ?? 'OPEN',
+      status: options.status ?? 'WAITING_FOR_AGENT',
       priority: 'MEDIUM',
       channel: 'WEB',
       ...(options.status === 'RESOLVED' ? { resolvedAt: new Date() } : {}),
@@ -381,7 +381,7 @@ test('the reply response carries no internal fields', async () => {
 // US-47's reopen rule — the substance of this story
 // ---------------------------------------------------------------------------
 
-test('a reply to a RESOLVED request reopens it, exactly as US-47 defined', async () => {
+test('a reply to a RESOLVED request reopens it, moving to WAITING_FOR_AGENT', async () => {
   const ticketId = await makeTicket({ status: 'RESOLVED' });
 
   const { status, body } = await reply(ticketId, { body: 'This is not fixed.' });
@@ -393,9 +393,8 @@ test('a reply to a RESOLVED request reopens it, exactly as US-47 defined', async
     select: { status: true, resolvedAt: true, reopenCount: true },
   });
 
-  // The exact transition from US-47: RESOLVED -> OPEN, resolvedAt cleared,
-  // reopenCount incremented. No new state and no new rule.
-  assert.equal(row.status, 'OPEN');
+  // RESOLVED -> WAITING_FOR_AGENT, resolvedAt cleared, reopenCount incremented.
+  assert.equal(row.status, 'WAITING_FOR_AGENT');
   assert.equal(row.resolvedAt, null);
   assert.equal(row.reopenCount, 1);
 
@@ -407,14 +406,13 @@ test('a reply to a RESOLVED request reopens it, exactly as US-47 defined', async
   // Attributed to nobody: no member of staff reopened it.
   assert.equal(entry.actorUserId, null);
   assert.equal(entry.fromValue, 'RESOLVED');
-  assert.equal(entry.toValue, 'OPEN');
+  assert.equal(entry.toValue, 'WAITING_FOR_AGENT');
 
-  // And the customer is told, in the portal's own vocabulary.
-  assert.equal(body.data!.status, 'IN_PROGRESS');
+  assert.equal(body.data!.status, 'WAITING_FOR_AGENT');
 });
 
-test('a reply to an OPEN request changes its status not at all', async () => {
-  const ticketId = await makeTicket({ status: 'OPEN' });
+test('a reply to a WAITING_FOR_AGENT request changes its status not at all', async () => {
+  const ticketId = await makeTicket({ status: 'WAITING_FOR_AGENT' });
 
   await reply(ticketId, { body: 'One more thing.' });
 
@@ -423,28 +421,24 @@ test('a reply to an OPEN request changes its status not at all', async () => {
     select: { status: true, reopenCount: true },
   });
 
-  assert.equal(row.status, 'OPEN');
+  assert.equal(row.status, 'WAITING_FOR_AGENT');
   assert.equal(row.reopenCount, 0);
 });
 
-test('a reply to a CLOSED request is refused, and nothing is written', async () => {
-  const ticketId = await makeTicket({ status: 'CLOSED' });
+test('a reply to a WAITING_FOR_CUSTOMER request moves it to WAITING_FOR_AGENT', async () => {
+  const ticketId = await makeTicket({ status: 'WAITING_FOR_CUSTOMER' });
 
-  const { status, body } = await reply(ticketId, { body: 'Please look again.' });
+  const { status, body } = await reply(ticketId, { body: 'Here is the info you requested.' });
 
-  // US-47 deliberately does not reopen a closed request, so a reply would sit in
-  // a ticket that is in no queue. Refusing says so rather than accepting a
-  // message nobody is coming for. US-90 owns the customer's route back in.
-  assert.equal(status, 422);
-  assert.equal(body.error?.code, 'UNPROCESSABLE');
-  assert.equal(await prisma.message.count({ where: { ticketId } }), 0);
+  assert.equal(status, 201, JSON.stringify(body));
 
   const row = await prisma.ticket.findUniqueOrThrow({
     where: { id: ticketId },
     select: { status: true },
   });
 
-  assert.equal(row.status, 'CLOSED');
+  assert.equal(row.status, 'WAITING_FOR_AGENT');
+  assert.equal(body.data!.status, 'WAITING_FOR_AGENT');
 });
 
 test('a reply records when the customer last replied', async () => {

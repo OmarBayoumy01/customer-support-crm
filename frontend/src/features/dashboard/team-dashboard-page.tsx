@@ -300,7 +300,7 @@ export function TeamDashboardPage(): React.JSX.Element {
               variant="ghost"
               size="sm"
               className="gap-1.5"
-              disabled={ticket.status === 'ESCALATED'}
+              disabled={(ticket.status as string) === 'ESCALATED'}
               onClick={() => {
                 void escalate(ticket);
               }}

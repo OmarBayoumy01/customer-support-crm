@@ -63,7 +63,7 @@ const TICKET = {
   id: TICKET_ID,
   number: 1042,
   subject: 'Refund has not arrived',
-  status: 'OPEN',
+  status: 'WAITING_FOR_AGENT',
   priority: 'HIGH',
   channel: 'EMAIL',
   customer: {
@@ -368,7 +368,7 @@ describe('AC4 — row actions', () => {
     await screen.findByText('Refund has not arrived');
 
     await user.click(screen.getByRole('combobox', { name: 'Status' }));
-    await user.click(await screen.findByRole('option', { name: /Pending customer/ }));
+    await user.click(await screen.findByRole('option', { name: /Waiting for customer/ }));
 
     await waitFor(() => {
       expect(

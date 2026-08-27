@@ -36,7 +36,7 @@ const WAITING: PortalTicket = {
   id: '01923456-89ab-7cde-8f01-2345678900a1',
   number: 1042,
   subject: 'My refund has not arrived',
-  status: 'WAITING_ON_YOU',
+  status: 'WAITING_FOR_CUSTOMER',
   categoryName: 'Billing',
   createdAt: '2026-08-01T09:00:00.000Z',
   updatedAt: '2026-08-20T14:30:00.000Z',
@@ -162,7 +162,7 @@ describe('AC1 — card layout', () => {
   test('the status is a word, not only a colour', async () => {
     mount();
 
-    expect(await screen.findByText('Waiting on you')).toBeInTheDocument();
+    expect(await screen.findByText('Waiting for your reply')).toBeInTheDocument();
     expect(screen.getByText('Resolved')).toBeInTheDocument();
   });
 });
@@ -214,10 +214,10 @@ describe('AC2 — simple filters', () => {
     await screen.findByText('Request #1042');
 
     await user.click(screen.getByRole('combobox', { name: 'Status' }));
-    await user.click(await screen.findByRole('option', { name: 'Waiting on you' }));
+    await user.click(await screen.findByRole('option', { name: 'Waiting for your reply' }));
 
     await waitFor(() => {
-      expect(requested().some((url) => url.includes('status=WAITING_ON_YOU'))).toBe(true);
+      expect(requested().some((url) => url.includes('status=WAITING_FOR_CUSTOMER'))).toBe(true);
     });
 
     // The internal name is never sent, and never rendered.

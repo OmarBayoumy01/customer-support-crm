@@ -35,8 +35,8 @@ const CUSTOMER_SELECT = {
 
 type CustomerRow = Prisma.CustomerGetPayload<{ select: typeof CUSTOMER_SELECT }>;
 
-/** Statuses that mean "still someone's problem". */
-const OPEN_STATUSES = ['NEW', 'OPEN', 'PENDING_CUSTOMER', 'PENDING_INTERNAL', 'ESCALATED'] as const;
+/** The only status that means "done" — everything else is someone's problem. */
+const RESOLVED = 'RESOLVED' as const;
 
 @Injectable()
 export class CustomersService {
@@ -83,7 +83,7 @@ export class CustomersService {
         where: {
           customerId: { in: customerIds },
           deletedAt: null,
-          status: { in: [...OPEN_STATUSES] },
+          status: { not: RESOLVED },
         },
         _count: { _all: true },
       }),

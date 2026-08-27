@@ -37,7 +37,7 @@ function detail(overrides: Partial<PortalTicketDetail> = {}): PortalTicketDetail
     id: TICKET_ID,
     number: 1042,
     subject: 'My refund has not arrived',
-    status: 'IN_PROGRESS',
+    status: 'WAITING_FOR_AGENT',
     categoryName: 'Billing',
     createdAt: '2026-08-01T09:00:00.000Z',
     updatedAt: '2026-08-20T14:30:00.000Z',
@@ -332,15 +332,12 @@ describe('AC5 — a simple composer', () => {
     expect(screen.getByRole('button', { name: /Send reply/ })).toBeEnabled();
   });
 
-  test('a closed request shows the thread and no composer', async () => {
-    respondWith(detail({ status: 'CLOSED' }));
+  test('a resolved request allows reply to reopen it', async () => {
+    respondWith(detail({ status: 'RESOLVED' }));
 
     mount();
 
-    expect(await screen.findByText(/This request is closed/)).toBeInTheDocument();
-    // The server refuses a reply to a closed request, so offering a box that
-    // will be refused is worse than saying why.
-    expect(screen.queryByLabelText('Add a reply')).not.toBeInTheDocument();
+    expect(await screen.findByLabelText('Add a reply')).toBeInTheDocument();
     expect(screen.getByText('I am still waiting for my refund.')).toBeInTheDocument();
   });
 });

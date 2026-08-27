@@ -14,7 +14,7 @@ export const TICKET_VIEWS = [
   'mine',
   'escalated',
   'breached',
-  'closed',
+  'resolved',
 ] as const;
 
 export const TicketViewSchema = z.enum(TICKET_VIEWS);
@@ -26,7 +26,7 @@ export const TicketCountsSchema = z.object({
   mine: z.number().int().nonnegative(),
   escalated: z.number().int().nonnegative(),
   breached: z.number().int().nonnegative(),
-  closed: z.number().int().nonnegative(),
+  resolved: z.number().int().nonnegative(),
 });
 
 export type TicketCounts = z.infer<typeof TicketCountsSchema>;

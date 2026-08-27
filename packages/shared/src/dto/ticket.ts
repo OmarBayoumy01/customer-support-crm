@@ -9,72 +9,137 @@ import { ChannelSchema } from './customer.js';
 import { TicketViewSchema } from './ticket-counts.js';
 import { PaginationQuerySchema } from '../api/pagination.js';
 
-/** Matches `TicketStatus` in the Prisma schema. */
-export const TicketStatusSchema = z.enum([
+/**
+ * The four statuses, and there are no others — matches `TicketStatus` in Prisma.
+ *
+ * Each one answers exactly one question: **who is expected to act next?**
+ *
+ * - `NEW` — it has arrived and has not entered the response cycle yet.
+ * - `WAITING_FOR_AGENT` — the customer is waiting for us.
+ * - `WAITING_FOR_CUSTOMER` — we have replied and are waiting for them.
+ * - `RESOLVED` — an agent judged the problem solved.
+ *
+ * **Everything that is not that question lives elsewhere**, which is what makes
+ * four enough: who owns the ticket is `assigneeId`, whether it has been escalated
+ * is `escalatedAt` and `escalatedToId`, how it stands against its targets is
+ * derived from the due dates, and internal work is a message with
+ * `isInternal`. A ticket can be escalated, breached, assigned and
+ * `WAITING_FOR_CUSTOMER` all at once, and every one of those facts is readable.
+ *
+ * The retired values — `OPEN`, `PENDING_CUSTOMER`, `PENDING_INTERNAL`, `ESCALATED`,
+ * `CLOSED` — survive only as text in `TicketHistory`, which is append-only. See
+ * `RETIRED_TICKET_STATUSES` below.
+ */
+export const TICKET_STATUSES = [
   'NEW',
+  'WAITING_FOR_AGENT',
+  'WAITING_FOR_CUSTOMER',
+  'RESOLVED',
+] as const;
+
+export const TicketStatusSchema = z.enum(TICKET_STATUSES);
+export type TicketStatus = z.infer<typeof TicketStatusSchema>;
+
+/**
+ * Statuses that no longer exist, and are still readable.
+ *
+ * `TicketHistory` is append-only — enforced by a database trigger, US-50 AC4 —
+ * and it stores status names as text. Rows written before the four-status
+ * lifecycle say `OPEN` or `ESCALATED` and always will. Nothing may **write** these
+ * values; the timeline needs them to **render** what happened, and a label
+ * lookup that misses turns a 2026 audit entry into the string
+ * `ticket.status.open`.
+ */
+export const RETIRED_TICKET_STATUSES = [
   'OPEN',
   'PENDING_CUSTOMER',
   'PENDING_INTERNAL',
   'ESCALATED',
-  'RESOLVED',
   'CLOSED',
-]);
-export type TicketStatus = z.infer<typeof TicketStatusSchema>;
+] as const;
+
+export type RetiredTicketStatus = (typeof RETIRED_TICKET_STATUSES)[number];
 
 /**
- * Which statuses a ticket may move to from each status — US-47, AC2.
+ * Which statuses a ticket may move to from each status.
  *
- * **One map, shared.** AC2 asks for two things that must not disagree: the
- * control offers only valid moves, and the server rejects invalid ones. Two
- * lists would drift, and the failure is the worst kind — the screen invites a
- * move and the server answers with an error for doing what was offered.
+ * **One map, shared.** The control offers only valid moves and the server
+ * rejects invalid ones from the same source, because two lists drift — and that
+ * failure is the worst kind: the screen invites a move and the server refuses
+ * the thing it just offered.
  *
- * Three decisions worth stating:
+ * ```
+ * NEW ──────────────→ WAITING_FOR_AGENT
+ *                           │   ↑
+ *                           ↓   │
+ *                     WAITING_FOR_CUSTOMER
+ *                           │
+ *         both ─────────────┴──→ RESOLVED ──→ WAITING_FOR_AGENT (customer reply only)
+ * ```
  *
- * - **`NEW` is never a target.** It means "nobody has looked at this yet", which
- *   stops being true the moment somebody does. A ticket cannot become
- *   un-triaged.
- * - **`NEW` may go straight to `CLOSED`.** Spam and duplicates are closed, not
- *   resolved; routing them through `RESOLVED` would count them as work done.
- * - **`CLOSED` may reopen to `OPEN`.** A ticket closed by mistake has to be
- *   undoable, or an agent raises a duplicate to correct the record. This is
- *   staff only — what a *customer* may do to a closed ticket is US-90.
+ * Four decisions worth stating:
+ *
+ * - **`NEW` is never a target.** It means "this has not entered the cycle yet",
+ *   which stops being true the moment it does. A ticket cannot become un-triaged.
+ * - **`NEW` may go straight to `WAITING_FOR_CUSTOMER`.** An agent can reply to an
+ *   unassigned new ticket, and that reply is proof the team has it. Refusing
+ *   would leave a replied-to ticket sitting in `NEW`.
+ * - **`RESOLVED` → `WAITING_FOR_AGENT` is the reopen rule**, and it belongs to a
+ *   customer reply and to nothing else. US-47 decided it and US-85 calls it: a
+ *   customer whose problem was not actually fixed must have a way back in. It is
+ *   in this map because the map is the state machine, but no UI offers it —
+ *   `onCustomerReply` is the only caller.
+ * - **There is no `CLOSED`.** Resolution is terminal for staff. Whether a customer
+ *   confirms it is a separate action on a separate field, not a fifth status.
  */
 export const TICKET_TRANSITIONS: Record<TicketStatus, readonly TicketStatus[]> = {
-  NEW: ['OPEN', 'PENDING_CUSTOMER', 'PENDING_INTERNAL', 'ESCALATED', 'RESOLVED', 'CLOSED'],
-  OPEN: ['PENDING_CUSTOMER', 'PENDING_INTERNAL', 'ESCALATED', 'RESOLVED', 'CLOSED'],
-  PENDING_CUSTOMER: ['OPEN', 'PENDING_INTERNAL', 'ESCALATED', 'RESOLVED', 'CLOSED'],
-  PENDING_INTERNAL: ['OPEN', 'PENDING_CUSTOMER', 'ESCALATED', 'RESOLVED', 'CLOSED'],
-  ESCALATED: ['OPEN', 'PENDING_CUSTOMER', 'PENDING_INTERNAL', 'RESOLVED', 'CLOSED'],
-  RESOLVED: ['OPEN', 'CLOSED'],
-  CLOSED: ['OPEN'],
+  NEW: ['WAITING_FOR_AGENT', 'WAITING_FOR_CUSTOMER', 'RESOLVED'],
+  WAITING_FOR_AGENT: ['WAITING_FOR_CUSTOMER', 'RESOLVED'],
+  WAITING_FOR_CUSTOMER: ['WAITING_FOR_AGENT', 'RESOLVED'],
+  RESOLVED: ['WAITING_FOR_AGENT'],
 };
 
 /** Whether one status may become another. */
 export function canTransition(from: TicketStatus, to: TicketStatus): boolean {
-  return TICKET_TRANSITIONS[from].includes(to);
+  return TICKET_TRANSITIONS[from]?.includes(to) ?? false;
+}
+
+/**
+ * Statuses an **agent** may choose, per source status.
+ *
+ * The same map minus the reopen edge. `canTransition` answers "is this move legal
+ * at all", which the automatic transitions need; this answers "may a person pick
+ * it from a menu", which the control needs. Reopening is a consequence of a
+ * customer replying, never a button.
+ */
+export function agentTransitionsFrom(from: TicketStatus): readonly TicketStatus[] {
+  return from === 'RESOLVED' ? [] : (TICKET_TRANSITIONS[from] ?? []);
 }
 
 /**
  * The permission a destination needs **on top of** `ticket:update` — US-47.
  *
- * Every status change requires `ticket:update`, which is a floor the route's
- * guard states declaratively. Two destinations require more than that, and the
- * catalogue already names them. Because it is a property of the *destination*
- * rather than of the action, it is checked with the rest of the transition rules
- * rather than by a second guard — splitting `/resolve` and `/escalate` into
- * endpoints of their own would scatter one state machine across three doors.
+ * Every status change an agent makes requires `ticket:update`, a floor the route
+ * states declaratively. Resolution requires more, and the catalogue already
+ * names it. Because it is a property of the *destination* rather than of the
+ * action, it is checked with the rest of the transition rules rather than by a
+ * second guard — splitting `/resolve` into an endpoint of its own would scatter
+ * one state machine across two doors.
+ *
+ * `ESCALATED` has gone from here with the status: escalation is data the sweep
+ * writes, and `ticket:escalate` now gates nothing on this path.
+ *
+ * **The event-driven transitions do not consult this map**, and that is
+ * deliberate: assignment is gated by `ticket:assign` and a reply by
+ * `message:create`, and requiring `ticket:update` on top would refuse an agent
+ * who legitimately holds one but not the other.
  *
  * Typed as a plain record of strings rather than importing `PermissionKey`, to
- * keep the ticket contract from depending on the authorisation one. The backend
- * narrows it where it reads it.
+ * keep the ticket contract from depending on the authorisation one.
  */
 export const STATUS_PERMISSION: Partial<Record<TicketStatus, string>> = {
   RESOLVED: 'ticket:close',
-  CLOSED: 'ticket:close',
-  ESCALATED: 'ticket:escalate',
 };
-
 /** Moving a ticket through its lifecycle — US-47. */
 export const ChangeTicketStatusSchema = z.object({
   status: TicketStatusSchema,

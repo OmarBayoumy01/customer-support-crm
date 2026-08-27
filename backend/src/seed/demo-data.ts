@@ -68,8 +68,7 @@ export interface DemoMessage {
 export interface DemoTicket {
   subject: string;
   description: string;
-  status:
-    'NEW' | 'OPEN' | 'PENDING_CUSTOMER' | 'PENDING_INTERNAL' | 'ESCALATED' | 'RESOLVED' | 'CLOSED';
+  status: 'NEW' | 'WAITING_FOR_AGENT' | 'WAITING_FOR_CUSTOMER' | 'RESOLVED';
   priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
   channel: 'EMAIL' | 'WHATSAPP' | 'CHAT' | 'SMS' | 'WEB';
   customer: string;
@@ -81,6 +80,8 @@ export interface DemoTicket {
   tags: string[];
   messages: DemoMessage[];
   tasks?: { title: string; status: 'TODO' | 'IN_PROGRESS' | 'DONE' }[];
+  /** Mark tickets that should be seeded with escalation data. */
+  escalated?: boolean;
 }
 
 export interface DemoArticle {
@@ -250,7 +251,7 @@ export const DEMO_CUSTOMERS: readonly DemoCustomer[] = [
 // ---------------------------------------------------------------------------
 
 /**
- * Fourteen cases, chosen to cover the seven statuses, the four priorities, and
+ * Fourteen cases, chosen to cover the four statuses, the four priorities, and
  * the edge cases AC4 names — a breach, an unassigned ticket, a long
  * conversation, and attachments.
  *
@@ -263,7 +264,8 @@ export const DEMO_TICKETS: readonly DemoTicket[] = [
     subject: 'Refund approved on the 3rd, still not showing in my account',
     description:
       'Your team approved a refund of SAR 420 for order 44-99213 on the 3rd. It is the 9th and nothing has arrived. My bank says they have had nothing from you.',
-    status: 'ESCALATED',
+    status: 'WAITING_FOR_AGENT',
+    escalated: true,
     priority: 'URGENT',
     channel: 'EMAIL',
     customer: 'northgate',
@@ -300,7 +302,7 @@ export const DEMO_TICKETS: readonly DemoTicket[] = [
     subject: 'لا أستطيع تسجيل الدخول بعد تغيير رقم الجوال',
     description:
       'غيّرت رقم جوالي الأسبوع الماضي، والآن رمز التحقق يصل إلى الرقم القديم. لا أستطيع الدخول إلى حسابي منذ يومين.',
-    status: 'PENDING_CUSTOMER',
+    status: 'WAITING_FOR_CUSTOMER',
     priority: 'HIGH',
     channel: 'WEB',
     customer: 'hadid',
@@ -331,7 +333,7 @@ export const DEMO_TICKETS: readonly DemoTicket[] = [
     subject: 'API returns 401 for every request since this morning',
     description:
       'All of our integration calls started failing at 06:40 UTC with 401. The key has not changed and it worked yesterday. This is blocking order sync for the whole warehouse.',
-    status: 'OPEN',
+    status: 'WAITING_FOR_AGENT',
     priority: 'URGENT',
     channel: 'WEB',
     customer: 'meridian',
@@ -363,7 +365,7 @@ export const DEMO_TICKETS: readonly DemoTicket[] = [
     subject: 'Invoice 2026-0441 charges for two seats we cancelled in June',
     description:
       'We cancelled two of the five seats on 14 June and had it confirmed by email. The July invoice still bills for five.',
-    status: 'OPEN',
+    status: 'WAITING_FOR_AGENT',
     priority: 'MEDIUM',
     channel: 'EMAIL',
     customer: 'northgate',
@@ -415,7 +417,7 @@ export const DEMO_TICKETS: readonly DemoTicket[] = [
     subject: 'Order 44-10188 delivered to the wrong branch',
     description:
       'Three boxes meant for Riyadh went to Jeddah. The courier says they cannot redirect without your authorisation.',
-    status: 'PENDING_INTERNAL',
+    status: 'WAITING_FOR_AGENT',
     priority: 'HIGH',
     channel: 'CHAT',
     customer: 'meridian',
@@ -442,7 +444,7 @@ export const DEMO_TICKETS: readonly DemoTicket[] = [
     subject: 'Can I change the billing email on the account?',
     description:
       'Our finance contact has left. What is the process for changing the address invoices go to?',
-    status: 'CLOSED',
+    status: 'RESOLVED',
     priority: 'LOW',
     channel: 'WEB',
     customer: 'meridian',
@@ -476,7 +478,7 @@ export const DEMO_TICKETS: readonly DemoTicket[] = [
     subject: 'Two-factor codes arriving several minutes late',
     description:
       'Codes take four or five minutes to arrive, by which time they have expired. Started on Monday.',
-    status: 'OPEN',
+    status: 'WAITING_FOR_AGENT',
     priority: 'MEDIUM',
     channel: 'EMAIL',
     customer: 'meridian',
@@ -497,7 +499,7 @@ export const DEMO_TICKETS: readonly DemoTicket[] = [
     subject: 'Weekly export has been empty since the schema change',
     description:
       'The Monday export file arrives but contains only headers. It was fine until the release on the 1st.',
-    status: 'PENDING_CUSTOMER',
+    status: 'WAITING_FOR_CUSTOMER',
     priority: 'MEDIUM',
     channel: 'EMAIL',
     customer: 'northgate',
@@ -539,7 +541,7 @@ export const DEMO_TICKETS: readonly DemoTicket[] = [
   {
     subject: 'Duplicate charge on card ending 4417',
     description: 'Charged twice for the same order, ten seconds apart. Order 44-10402.',
-    status: 'OPEN',
+    status: 'WAITING_FOR_AGENT',
     priority: 'HIGH',
     channel: 'WEB',
     customer: 'rashed',
@@ -559,7 +561,7 @@ export const DEMO_TICKETS: readonly DemoTicket[] = [
     subject: 'Long-running: warehouse scanner disconnects every few minutes',
     description:
       'Handheld scanners drop off the network every three to five minutes across the whole warehouse floor. Started after the site move.',
-    status: 'PENDING_INTERNAL',
+    status: 'WAITING_FOR_AGENT',
     priority: 'HIGH',
     channel: 'EMAIL',
     customer: 'northgate',

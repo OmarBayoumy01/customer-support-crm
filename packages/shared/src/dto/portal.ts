@@ -20,50 +20,33 @@
 import { z } from 'zod';
 
 import { ChannelSchema } from './customer.js';
-import { TicketStatusSchema, type TicketPriority, type TicketStatus } from './ticket.js';
+import { TicketStatusSchema, type TicketPriority } from './ticket.js';
 
 /**
  * What a customer is told about where their request stands — US-82, AC3.
  *
- * Five values, and deliberately fewer than the internal seven. `PENDING_INTERNAL`
- * and `ESCALATED` describe what the support team is doing among themselves; AC2
- * requires their absence, and this set is where that happens.
- */
-export const PortalTicketStatusSchema = z.enum([
-  'OPEN',
-  'IN_PROGRESS',
-  'WAITING_ON_YOU',
-  'RESOLVED',
-  'CLOSED',
-]);
-
-export type PortalTicketStatus = z.infer<typeof PortalTicketStatusSchema>;
-
-/**
- * Internal status to customer-facing status.
+ * **There is no mapping any more, and that is the point of four statuses.**
+ * This used to be its own five-value enum plus a `Record` translating seven
+ * internal states into it, because the internal vocabulary said things a
+ * customer must not hear — `PENDING_INTERNAL` and `ESCALATED` described what the
+ * team was doing among itself.
  *
- * Exhaustive over `TicketStatus` by construction — a `Record`, not a lookup with
- * a fallback — so a status added to the enum later is a **compile error** rather
- * than a value that leaks through a default branch.
+ * The four canonical statuses say only *whose turn it is*, which is exactly
+ * what a customer is entitled to know. So the portal reports the canonical
+ * status, and the customer-facing wording lives in the portal i18n:
  *
- * `ESCALATED` reads as "In Progress": true from the customer's point of view, and
- * it tells them nothing about an internal escalation.
+ * | Status | Customer sees |
+ * | ------ | ------------- |
+ * | `NEW` | Received |
+ * | `WAITING_FOR_AGENT` | Waiting for support |
+ * | `WAITING_FOR_CUSTOMER` | Waiting for your reply |
+ * | `RESOLVED` | Resolved |
+ *
+ * **Sharing the status enum is not sharing the ticket DTO.** Every portal
+ * schema below is still hand-built from what a customer may see, and the five
+ * leak protections US-82 put in place are untouched. What has gone is a
+ * translation layer whose only job was hiding values that no longer exist.
  */
-export const PORTAL_STATUS: Record<TicketStatus, PortalTicketStatus> = {
-  NEW: 'OPEN',
-  OPEN: 'IN_PROGRESS',
-  PENDING_INTERNAL: 'IN_PROGRESS',
-  ESCALATED: 'IN_PROGRESS',
-  PENDING_CUSTOMER: 'WAITING_ON_YOU',
-  RESOLVED: 'RESOLVED',
-  CLOSED: 'CLOSED',
-};
-
-/** The mapping as a function, for callers that have a value rather than a key. */
-export function toPortalStatus(status: TicketStatus): PortalTicketStatus {
-  return PORTAL_STATUS[status];
-}
-
 /** Only what a customer needs to recognise their own file on a request. */
 export const PortalAttachmentSchema = z.object({
   id: z.string().uuid(),
@@ -104,7 +87,7 @@ export const PortalTicketSchema = z.object({
   /** The reference a customer quotes on the phone. */
   number: z.number().int().positive(),
   subject: z.string(),
-  status: PortalTicketStatusSchema,
+  status: TicketStatusSchema,
   /** What the customer chose when they raised it, if anything. */
   categoryName: z.string().nullable(),
   createdAt: z.string().datetime(),
@@ -197,24 +180,13 @@ export type PortalTicketDetail = z.infer<typeof PortalTicketDetailSchema>;
 export const PortalTicketListQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
   pageSize: z.coerce.number().int().positive().max(50).default(20),
-  status: PortalTicketStatusSchema.optional(),
+  status: TicketStatusSchema.optional(),
   q: z.string().trim().max(200).optional(),
   createdFrom: z.string().datetime().optional(),
   createdTo: z.string().datetime().optional(),
 });
 
 export type PortalTicketListQuery = z.infer<typeof PortalTicketListQuerySchema>;
-
-/**
- * Which internal statuses a customer-facing filter value covers.
- *
- * The inverse of `PORTAL_STATUS`, so filtering by "In Progress" in the portal
- * becomes an `IN` clause over the internal statuses **in the query** rather than
- * a pass over fetched rows.
- */
-export function internalStatusesFor(status: PortalTicketStatus): TicketStatus[] {
-  return TicketStatusSchema.options.filter((internal) => PORTAL_STATUS[internal] === status);
-}
 
 /**
  * How urgent the customer says it is — US-86, AC2.

@@ -55,7 +55,7 @@ const CREATED: PortalTicketDetail = {
   id: '01923456-89ab-7cde-8f01-2345678900t1',
   number: 1042,
   subject: 'My refund has not arrived',
-  status: 'OPEN',
+  status: 'NEW',
   categoryName: 'Billing',
   createdAt: '2026-08-27T10:00:00.000Z',
   updatedAt: '2026-08-27T10:00:00.000Z',

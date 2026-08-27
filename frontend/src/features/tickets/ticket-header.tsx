@@ -86,7 +86,7 @@ export function TicketHeader({ ticket, className }: TicketHeaderProps): React.JS
             kind="resolution"
             dueAt={ticket.sla.resolutionDueAt}
             breached={ticket.sla.resolutionBreached}
-            met={ticket.status === 'RESOLVED' || ticket.status === 'CLOSED'}
+            met={ticket.status === 'RESOLVED'}
             startedAt={ticket.createdAt}
             policyName={ticket.slaPolicyName}
             targetMinutes={ticket.sla.resolutionTargetMinutes}

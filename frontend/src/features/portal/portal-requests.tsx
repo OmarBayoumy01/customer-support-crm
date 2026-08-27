@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
 import { CalendarDays, Inbox, MessageSquareReply, Plus, Search, Tag } from 'lucide-react';
-import type { PortalTicket, PortalTicketListQuery, PortalTicketStatus } from '@crm/shared';
+import type { PortalTicket, PortalTicketListQuery, TicketStatus } from '@crm/shared';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -24,16 +24,14 @@ import { usePortalTickets } from './use-portal';
 const ANY_STATUS = '__any__';
 
 /**
- * The five customer-facing statuses — US-82's set, in the order a request moves
- * through them. `PortalTicketStatusSchema.options` would do, but the enum's order
- * is alphabetical-by-accident and this is a menu somebody reads.
+ * The customer-facing statuses in the order a request moves
+ * through them.
  */
-const STATUS_ORDER: PortalTicketStatus[] = [
-  'OPEN',
-  'IN_PROGRESS',
-  'WAITING_ON_YOU',
+const STATUS_ORDER: TicketStatus[] = [
+  'NEW',
+  'WAITING_FOR_AGENT',
+  'WAITING_FOR_CUSTOMER',
   'RESOLVED',
-  'CLOSED',
 ];
 
 /** How many cards a page holds. Generous rows, so fewer of them. */
@@ -50,8 +48,8 @@ const PAGE_SIZE = 10;
 function RequestCard({ ticket }: { ticket: PortalTicket }): React.JSX.Element {
   const { t, i18n } = useTranslation();
 
-  /** AC3 — awaiting my reply. `WAITING_ON_YOU` already means exactly that. */
-  const needsReply = ticket.status === 'WAITING_ON_YOU';
+  /** AC3 — awaiting my reply. */
+  const needsReply = ticket.status === 'WAITING_FOR_CUSTOMER';
 
   const date = (iso: string): string =>
     new Intl.DateTimeFormat(i18n.language, { dateStyle: 'medium' }).format(new Date(iso));
@@ -150,7 +148,7 @@ export function PortalRequests(): React.JSX.Element {
     page,
     pageSize: PAGE_SIZE,
     ...(search === '' ? {} : { q: search }),
-    ...(status === ANY_STATUS ? {} : { status: status as PortalTicketStatus }),
+    ...(status === ANY_STATUS ? {} : { status: status as TicketStatus }),
     ...(from === '' ? {} : { createdFrom: new Date(from).toISOString() }),
   };
 

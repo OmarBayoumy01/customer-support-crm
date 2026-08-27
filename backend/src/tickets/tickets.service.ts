@@ -158,13 +158,9 @@ function statusTimestamps(from: TicketStatus, to: TicketStatus): Prisma.TicketUp
     return { resolvedAt: new Date() };
   }
 
-  if (to === 'CLOSED') {
-    return { closedAt: new Date() };
-  }
-
   // Coming back from a finished state is a reopen, and the timestamps of the
   // ending that has just been undone must not survive it.
-  if (to === 'OPEN' && (from === 'RESOLVED' || from === 'CLOSED')) {
+  if (to === 'WAITING_FOR_AGENT' && from === 'RESOLVED') {
     return { resolvedAt: null, closedAt: null, reopenCount: { increment: 1 } };
   }
 
@@ -416,12 +412,12 @@ export class TicketsService {
     if (query.attention === 'true') {
       groups.push({
         AND: [
-          { status: { notIn: ['RESOLVED', 'CLOSED'] } },
+          { status: { not: 'RESOLVED' } },
           {
             OR: [
               { firstResponseBreached: true },
               { resolutionBreached: true },
-              { status: 'ESCALATED' },
+              { escalatedAt: { not: null } },
               { resolutionDueAt: { lt: now } },
             ],
           },
@@ -472,7 +468,7 @@ export class TicketsService {
    * SLA" is the failure mode a live count invites.
    */
   private viewWhere(view: TicketView, actor: TicketActor): Prisma.TicketWhereInput {
-    const open: Prisma.TicketWhereInput = { status: { notIn: ['RESOLVED', 'CLOSED'] } };
+    const open: Prisma.TicketWhereInput = { status: { not: 'RESOLVED' } };
 
     switch (view) {
       case 'unassigned':
@@ -482,7 +478,7 @@ export class TicketsService {
         return { ...open, assigneeId: actor.userId };
 
       case 'escalated':
-        return { status: 'ESCALATED' };
+        return { escalatedAt: { not: null }, status: { not: 'RESOLVED' } };
 
       case 'breached':
         // Both clocks. A response target missed is a broken promise even if the
@@ -493,8 +489,8 @@ export class TicketsService {
           OR: [{ resolutionBreached: true }, { firstResponseBreached: true }],
         };
 
-      case 'closed':
-        return { status: { in: ['RESOLVED', 'CLOSED'] } };
+      case 'resolved':
+        return { status: 'RESOLVED' };
 
       case 'all':
       default:
@@ -537,7 +533,7 @@ export class TicketsService {
   async assignedCount(actor: TicketActor): Promise<AssignedTicketCount> {
     const where: Prisma.TicketWhereInput = {
       assigneeId: actor.userId,
-      status: { notIn: ['RESOLVED', 'CLOSED'] },
+      status: { not: 'RESOLVED' },
     };
 
     const rows = await this.prisma.notDeleted.ticket.findMany({
@@ -573,7 +569,7 @@ export class TicketsService {
     const mine: Prisma.TicketWhereInput = { AND: [{ assigneeId: actor.userId }, scope] };
 
     const rows = await this.prisma.notDeleted.ticket.findMany({
-      where: { AND: [mine, { status: { notIn: ['RESOLVED', 'CLOSED'] } }] },
+      where: { AND: [mine, { status: { not: 'RESOLVED' } }] },
       select: TICKET_SELECT,
       take: 500,
     });
@@ -583,7 +579,7 @@ export class TicketsService {
     let breached = 0;
 
     for (const row of rows) {
-      if (row.status === 'PENDING_CUSTOMER' || row.status === 'PENDING_INTERNAL') {
+      if (row.status === 'WAITING_FOR_CUSTOMER') {
         pending += 1;
       }
 
@@ -667,7 +663,7 @@ export class TicketsService {
     };
 
     const openWhere: Prisma.TicketWhereInput = {
-      AND: [inScope, { status: { notIn: ['RESOLVED', 'CLOSED'] } }],
+      AND: [inScope, { status: { not: 'RESOLVED' } }],
     };
 
     /** The averages and the daily buckets read one bounded window. */
@@ -1121,6 +1117,25 @@ export class TicketsService {
         where: { id },
         data: { lastAgentReplyAt: row.createdAt },
       });
+
+      if (ticket.status === 'NEW' || ticket.status === 'WAITING_FOR_AGENT') {
+        await this.prisma.ticket.update({
+          where: { id },
+          data: {
+            status: 'WAITING_FOR_CUSTOMER',
+            ...statusTimestamps(ticket.status, 'WAITING_FOR_CUSTOMER'),
+          },
+        });
+        await this.clock.onStatusChange(id, ticket.status, 'WAITING_FOR_CUSTOMER');
+        await this.history.record({
+          ticketId: id,
+          actorUserId: actor.userId,
+          eventType: 'STATUS_CHANGED',
+          field: 'status',
+          fromValue: ticket.status,
+          toValue: 'WAITING_FOR_CUSTOMER',
+        });
+      }
     }
 
     await this.clock.onAgentReply(id, { isInternal: input.isInternal, at: row.createdAt });
@@ -1299,7 +1314,7 @@ export class TicketsService {
       where: {
         assigneeId: { in: rows.map((row) => row.id) },
         // The same definition of "open" the queue's views use.
-        status: { notIn: ['RESOLVED', 'CLOSED'] },
+        status: { not: 'RESOLVED' },
       },
       _count: { _all: true },
     });
@@ -1338,6 +1353,7 @@ export class TicketsService {
     const before = await this.prisma.notDeleted.ticket.findFirst({
       where: { AND: [{ id }, scope] },
       select: {
+        status: true,
         assigneeId: true,
         assignee: { select: { firstName: true, lastName: true } },
       },
@@ -1380,9 +1396,20 @@ export class TicketsService {
       return this.toTicket(unchanged);
     }
 
+    let newStatus: 'WAITING_FOR_AGENT' | undefined = undefined;
+    if (before.status === 'NEW' && assigneeId !== null) {
+      newStatus = 'WAITING_FOR_AGENT';
+    }
+
+    const data: Prisma.TicketUncheckedUpdateInput = { assigneeId };
+    if (newStatus) {
+      data.status = newStatus;
+      Object.assign(data, statusTimestamps(before.status, newStatus));
+    }
+
     const row = await this.prisma.ticket.update({
       where: { id },
-      data: { assigneeId },
+      data,
       select: TICKET_SELECT,
     });
 
@@ -1406,6 +1433,18 @@ export class TicketsService {
           : `${before.assignee.firstName} ${before.assignee.lastName}`,
       toLabel: assigneeName,
     });
+
+    if (newStatus) {
+      await this.clock.onStatusChange(id, before.status, newStatus);
+      await this.history.record({
+        ticketId: id,
+        actorUserId: actor.userId,
+        eventType: 'STATUS_CHANGED',
+        field: 'status',
+        fromValue: before.status,
+        toValue: newStatus,
+      });
+    }
 
     /**
      * AC1's "the agent is notified" — as far as it can go today.
@@ -1485,8 +1524,8 @@ export class TicketsService {
      * AC4 — the clock reacts.
      *
      * `SlaClockService.onStatusChange` was written by US-68 and has had no
-     * caller until now: it pauses the resolution clock on `PENDING_CUSTOMER`,
-     * stops it on `RESOLVED` / `CLOSED`, and adds the banked pause back to the
+     * caller until now: it pauses the resolution clock on `WAITING_FOR_CUSTOMER`,
+     * stops it on `RESOLVED`, and adds the banked pause back to the
      * deadline on the way out. Nothing about that arithmetic is repeated here.
      */
     await this.clock.onStatusChange(id, from, to);
@@ -1515,10 +1554,6 @@ export class TicketsService {
    * Attributed to **no actor**: no member of staff reopened it. The customer is
    * not a `User` in the sense `actorUserId` means, and naming whoever last
    * touched the ticket would be the lie US-50's AC3 exists to prevent.
-   *
-   * A `CLOSED` ticket deliberately does not reopen this way. A closed
-   * conversation is finished, and what a customer may do to one is US-90's
-   * decision, not this method's.
    */
   async onCustomerReply(ticketId: string): Promise<void> {
     const ticket = await this.prisma.notDeleted.ticket.findFirst({
@@ -1526,36 +1561,54 @@ export class TicketsService {
       select: { id: true, status: true, assigneeId: true },
     });
 
-    if (ticket === null || ticket.status !== 'RESOLVED') {
+    if (ticket === null) {
       return;
     }
 
-    await this.prisma.ticket.update({
-      where: { id: ticketId },
-      data: { status: 'OPEN', ...statusTimestamps('RESOLVED', 'OPEN') },
-    });
+    if (ticket.status === 'RESOLVED') {
+      await this.prisma.ticket.update({
+        where: { id: ticketId },
+        data: { status: 'WAITING_FOR_AGENT', ...statusTimestamps('RESOLVED', 'WAITING_FOR_AGENT') },
+      });
 
-    // Restarts the resolution clock the same way an agent's move would.
-    await this.clock.onStatusChange(ticketId, 'RESOLVED', 'OPEN');
+      // Restarts the resolution clock the same way an agent's move would.
+      await this.clock.onStatusChange(ticketId, 'RESOLVED', 'WAITING_FOR_AGENT');
 
-    await this.history.record({
-      ticketId,
-      actorUserId: null,
-      eventType: 'REOPENED',
-      field: 'status',
-      fromValue: 'RESOLVED',
-      toValue: 'OPEN',
-    });
+      await this.history.record({
+        ticketId,
+        actorUserId: null,
+        eventType: 'REOPENED',
+        field: 'status',
+        fromValue: 'RESOLVED',
+        toValue: 'WAITING_FOR_AGENT',
+      });
 
-    /**
-     * AC5's "the assigned agent is notified" — as far as it goes today.
-     *
-     * P07 is deferred, so there is no channel. The reopen shows up in the
-     * agent's queue and sidebar badge, and this line is the traceable record
-     * until US-62 has something to send.
-     */
-    this.logger.log(
-      `Ticket ${ticketId} reopened by a customer reply (assignee ${ticket.assigneeId ?? 'none'})`,
-    );
+      /**
+       * AC5's "the assigned agent is notified" — as far as it goes today.
+       *
+       * P07 is deferred, so there is no channel. The reopen shows up in the
+       * agent's queue and sidebar badge, and this line is the traceable record
+       * until US-62 has something to send.
+       */
+      this.logger.log(
+        `Ticket ${ticketId} reopened by a customer reply (assignee ${ticket.assigneeId ?? 'none'})`,
+      );
+    } else if (ticket.status === 'WAITING_FOR_CUSTOMER') {
+      await this.prisma.ticket.update({
+        where: { id: ticketId },
+        data: { status: 'WAITING_FOR_AGENT' },
+      });
+      await this.clock.onStatusChange(ticketId, 'WAITING_FOR_CUSTOMER', 'WAITING_FOR_AGENT');
+      await this.history.record({
+        ticketId,
+        actorUserId: null,
+        eventType: 'STATUS_CHANGED',
+        field: 'status',
+        fromValue: 'WAITING_FOR_CUSTOMER',
+        toValue: 'WAITING_FOR_AGENT',
+      });
+    } else {
+      return;
+    }
   }
 }

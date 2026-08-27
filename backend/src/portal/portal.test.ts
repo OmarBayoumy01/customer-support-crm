@@ -104,8 +104,7 @@ async function makeUser(
   return { id: user.id, token };
 }
 
-type InternalStatus =
-  'NEW' | 'OPEN' | 'PENDING_CUSTOMER' | 'PENDING_INTERNAL' | 'ESCALATED' | 'RESOLVED' | 'CLOSED';
+type InternalStatus = 'NEW' | 'WAITING_FOR_AGENT' | 'WAITING_FOR_CUSTOMER' | 'RESOLVED';
 
 async function makeTicket(
   overrides: { customerId?: string; status?: InternalStatus } = {},
@@ -115,7 +114,7 @@ async function makeTicket(
       subject: `${SUBJECT_PREFIX} ${randomUUID().slice(0, 6)}`,
       description: 'The refund never arrived.',
       customerId: overrides.customerId ?? customerId,
-      status: overrides.status ?? 'OPEN',
+      status: overrides.status ?? 'WAITING_FOR_AGENT',
       priority: 'MEDIUM',
     },
     select: { id: true },
@@ -345,43 +344,37 @@ test('AC2 — the assignee is a first name and nothing more', async () => {
 // AC3 — status translation
 // ---------------------------------------------------------------------------
 
-test('AC3 — every internal status maps to the customer-facing set', async () => {
+test('AC3 — every status is returned canonically to the customer', async () => {
   const expected: [InternalStatus, string][] = [
-    ['NEW', 'OPEN'],
-    ['OPEN', 'IN_PROGRESS'],
-    ['PENDING_INTERNAL', 'IN_PROGRESS'],
-    ['ESCALATED', 'IN_PROGRESS'],
-    ['PENDING_CUSTOMER', 'WAITING_ON_YOU'],
+    ['NEW', 'NEW'],
+    ['WAITING_FOR_AGENT', 'WAITING_FOR_AGENT'],
+    ['WAITING_FOR_CUSTOMER', 'WAITING_FOR_CUSTOMER'],
     ['RESOLVED', 'RESOLVED'],
-    ['CLOSED', 'CLOSED'],
   ];
 
   for (const [internal, portal] of expected) {
     const ticketId = await makeTicket({ status: internal });
 
-    const { body, raw } = await call<PortalTicketDetail>(`/portal/tickets/${ticketId}`, {
+    const { body } = await call<PortalTicketDetail>(`/portal/tickets/${ticketId}`, {
       token: portalToken,
     });
 
     assert.equal(body.data!.status, portal, `${internal} should read as ${portal}`);
-
-    // The internal name must not appear anywhere in the payload — AC2's
-    // "internal statuses" and AC3's mapping are the same requirement twice.
-    if (internal === 'PENDING_INTERNAL' || internal === 'ESCALATED') {
-      assert.ok(!raw.includes(internal), `${internal} leaked into the payload`);
-    }
   }
 });
 
-test('AC3 — filtering by a customer-facing status filters in the query', async () => {
-  await makeTicket({ status: 'PENDING_CUSTOMER' });
+test('AC3 — filtering by status filters in the query', async () => {
+  await makeTicket({ status: 'WAITING_FOR_CUSTOMER' });
 
-  const { body } = await call<PortalTicket[]>('/portal/tickets?status=WAITING_ON_YOU&pageSize=50', {
-    token: portalToken,
-  });
+  const { body } = await call<PortalTicket[]>(
+    '/portal/tickets?status=WAITING_FOR_CUSTOMER&pageSize=50',
+    {
+      token: portalToken,
+    },
+  );
 
   assert.ok(body.data!.length >= 1);
-  assert.ok(body.data!.every((ticket) => ticket.status === 'WAITING_ON_YOU'));
+  assert.ok(body.data!.every((ticket) => ticket.status === 'WAITING_FOR_CUSTOMER'));
 });
 
 // ---------------------------------------------------------------------------

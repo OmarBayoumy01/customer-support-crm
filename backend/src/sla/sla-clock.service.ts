@@ -17,10 +17,10 @@ export const SLA_BREACH_RULE = 'sla.target-passed';
 export const AT_RISK_FRACTION = 0.75;
 
 /** The status while a ticket is waiting on the customer — the only paused one. */
-const PAUSED_STATUS: TicketStatus = 'PENDING_CUSTOMER';
+const PAUSED_STATUS: TicketStatus = 'WAITING_FOR_CUSTOMER';
 
 /** A ticket in one of these has stopped counting for good. */
-const FINISHED_STATUSES: TicketStatus[] = ['RESOLVED', 'CLOSED'];
+const FINISHED_STATUSES: TicketStatus[] = ['RESOLVED'];
 
 /**
  * When a target is due.
@@ -107,7 +107,7 @@ export class SlaClockService {
   /**
    * AC3 — the resolution clock pauses while the ticket waits on the customer.
    *
-   * Only the resolution clock. A ticket in `PENDING_CUSTOMER` has by definition
+   * Only the resolution clock. A ticket in `WAITING_FOR_CUSTOMER` has by definition
    * already had an agent reply, so its response clock stopped for good when
    * that reply was sent.
    */
@@ -284,19 +284,21 @@ export class SlaClockService {
     });
 
     for (const ticket of responseOverdue) {
-      await this.prisma.ticket.update({
-        where: { id: ticket.id },
+      const updated = await this.prisma.ticket.updateMany({
+        where: { id: ticket.id, firstResponseBreached: false },
         data: { firstResponseBreached: true },
       });
 
-      await this.history.record({
-        ticketId: ticket.id,
-        actorUserId: null,
-        eventType: 'SLA_BREACHED',
-        field: 'firstResponseDueAt',
-        toValue: ticket.firstResponseDueAt?.toISOString() ?? undefined,
-        automationRule: SLA_BREACH_RULE,
-      });
+      if (updated.count > 0) {
+        await this.history.record({
+          ticketId: ticket.id,
+          actorUserId: null,
+          eventType: 'SLA_BREACHED',
+          field: 'firstResponseDueAt',
+          toValue: ticket.firstResponseDueAt?.toISOString() ?? undefined,
+          automationRule: SLA_BREACH_RULE,
+        });
+      }
     }
 
     const resolutionOverdue = await this.prisma.notDeleted.ticket.findMany({
@@ -310,19 +312,21 @@ export class SlaClockService {
     });
 
     for (const ticket of resolutionOverdue) {
-      await this.prisma.ticket.update({
-        where: { id: ticket.id },
+      const updated = await this.prisma.ticket.updateMany({
+        where: { id: ticket.id, resolutionBreached: false },
         data: { resolutionBreached: true },
       });
 
-      await this.history.record({
-        ticketId: ticket.id,
-        actorUserId: null,
-        eventType: 'SLA_BREACHED',
-        field: 'resolutionDueAt',
-        toValue: ticket.resolutionDueAt?.toISOString() ?? undefined,
-        automationRule: SLA_BREACH_RULE,
-      });
+      if (updated.count > 0) {
+        await this.history.record({
+          ticketId: ticket.id,
+          actorUserId: null,
+          eventType: 'SLA_BREACHED',
+          field: 'resolutionDueAt',
+          toValue: ticket.resolutionDueAt?.toISOString() ?? undefined,
+          automationRule: SLA_BREACH_RULE,
+        });
+      }
     }
 
     if (responseOverdue.length > 0 || resolutionOverdue.length > 0) {

@@ -132,27 +132,23 @@ export function eventFor(field: string, next: unknown): TicketEventType {
 /**
  * Which event a status change is — US-47, AC4.
  *
- * `CLOSED`, `ESCALATED` and `REOPENED` have been in `TicketEventType` since US-6
- * with nothing writing them, the same gap US-48 found with `UNASSIGNED`. A
- * timeline that records every one of these as "status changed" makes a manager
- * read the values to work out what happened, and P11's reports would have to
- * parse them.
+ * Two of the three special cases have gone with the statuses that caused them.
+ * `CLOSED` no longer exists, and `ESCALATED` is now recorded by the sweep as an
+ * event of its own against `escalatedAt` rather than as a status change. Both
+ * remain in `TicketEventType` because **history already contains them** and it
+ * is append-only.
  *
- * Resolution stays `STATUS_CHANGED` with `toValue: 'RESOLVED'`, which is what
- * US-50 flagged: the enum has no `RESOLVED` member, and adding one to the
- * database enum is a migration this story does not need.
+ * `REOPENED` is the one that still fires: a customer replying to a resolved
+ * request is not an ordinary status change, and a manager reading the timeline
+ * should not have to compare two status values to notice it happened.
+ *
+ * Resolution stays `STATUS_CHANGED` with `toValue: RESOLVED`, which is what
+ * US-47 decided — the `RESOLVED` event type it might have used does not exist
+ * and adding one would be a migration for nothing.
  */
 export function statusEventFor(from: TicketStatus, to: TicketStatus): TicketEventType {
-  if (to === 'OPEN' && (from === 'RESOLVED' || from === 'CLOSED')) {
+  if (to === 'WAITING_FOR_AGENT' && from === 'RESOLVED') {
     return 'REOPENED';
-  }
-
-  if (to === 'CLOSED') {
-    return 'CLOSED';
-  }
-
-  if (to === 'ESCALATED') {
-    return 'ESCALATED';
   }
 
   return 'STATUS_CHANGED';

@@ -235,10 +235,10 @@ export function DesignSystemPage(): React.JSX.Element {
             filters={[
               {
                 key: 'status',
-                label: t('ticket.status.open'),
+                label: t('ticket.status.waitingForAgent'),
                 options: [
-                  { value: 'OPEN', label: t('ticket.status.open') },
-                  { value: 'ESCALATED', label: t('ticket.status.escalated') },
+                  { value: 'WAITING_FOR_AGENT', label: t('ticket.status.waitingForAgent') },
+                  { value: 'WAITING_FOR_CUSTOMER', label: t('ticket.status.waitingForCustomer') },
                 ],
               },
               {

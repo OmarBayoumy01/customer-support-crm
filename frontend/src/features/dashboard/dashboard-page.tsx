@@ -164,7 +164,7 @@ export function DashboardPage(): React.JSX.Element {
         return figures === null ? (
           <span className="text-meta text-ink-faint">{t('ticket.queue.noSla')}</span>
         ) : (
-          <SlaMeter {...figures} met={ticket.status === 'RESOLVED' || ticket.status === 'CLOSED'} />
+          <SlaMeter {...figures} met={ticket.status === 'RESOLVED'} />
         );
       },
     },

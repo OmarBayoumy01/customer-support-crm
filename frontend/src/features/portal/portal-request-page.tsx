@@ -2,10 +2,9 @@ import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router';
 import { AlertCircle, ArrowLeft, Check, LifeBuoy, LoaderCircle, Send } from 'lucide-react';
-import type { PortalMessage, PortalTicketDetail, PortalTicketStatus } from '@crm/shared';
+import type { PortalMessage, PortalTicketDetail, TicketStatus } from '@crm/shared';
 
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -25,12 +24,12 @@ import { usePortalReply, usePortalRequest } from './use-portal';
  */
 const STEPS = ['received', 'in_progress', 'resolved'] as const;
 
-function stepIndexFor(status: PortalTicketStatus): number {
-  if (status === 'RESOLVED' || status === 'CLOSED') {
+function stepIndexFor(status: TicketStatus): number {
+  if (status === 'RESOLVED') {
     return 2;
   }
 
-  return status === 'OPEN' ? 0 : 1;
+  return status === 'NEW' ? 0 : 1;
 }
 
 /**
@@ -40,7 +39,7 @@ function stepIndexFor(status: PortalTicketStatus): number {
  * indicator that distinguishes done from pending by hue alone fails the
  * definition of done.
  */
-function Progress({ status }: { status: PortalTicketStatus }): React.JSX.Element {
+function Progress({ status }: { status: TicketStatus }): React.JSX.Element {
   const { t } = useTranslation();
   const reached = stepIndexFor(status);
 
@@ -199,7 +198,6 @@ export function PortalRequestPage(): React.JSX.Element {
   }, [draft, reply]);
 
   const detail = request.data;
-  const closed = detail?.status === 'CLOSED';
 
   return (
     <div className="bg-canvas min-h-screen">
@@ -263,69 +261,50 @@ export function PortalRequestPage(): React.JSX.Element {
               <Thread request={detail} />
             </section>
 
-            {closed ? (
-              <Card className="mt-6">
-                <CardContent className="p-5">
-                  <Badge variant="outline" className="mb-2 font-normal">
-                    {t('portal.requests.status.CLOSED')}
-                  </Badge>
-                  {/*
-                    No composer on a closed request: the server refuses the reply,
-                    and offering a box that will be refused is worse than saying
-                    why up front.
-                  */}
-                  <p className="text-body text-ink-muted">{t('portal.request.closedNotice')}</p>
-                  <Button asChild variant="outline" size="sm" className="mt-4">
-                    <Link to="/portal/new">{t('portal.home.newRequest')}</Link>
-                  </Button>
-                </CardContent>
-              </Card>
-            ) : (
-              <Card className="mt-6">
-                <CardContent className="p-5">
-                  {reply.isError ? (
-                    <div
-                      role="alert"
-                      className="border-sla-breach/30 bg-sla-breach-soft text-sla-breach mb-4 flex items-start gap-2 rounded-md border px-3 py-2.5"
-                    >
-                      <AlertCircle aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-                      <span className="text-body">{t('portal.request.replyFailed')}</span>
-                    </div>
-                  ) : null}
-
-                  <Label htmlFor="portal-reply" className="mb-1.5">
-                    {t('portal.request.replyLabel')}
-                  </Label>
-                  <Textarea
-                    id="portal-reply"
-                    rows={4}
-                    className="text-start"
-                    placeholder={t('portal.request.replyPlaceholder')}
-                    value={draft}
-                    onChange={(event) => {
-                      setDraft(event.target.value);
-                    }}
-                  />
-
-                  <div className="mt-3 flex justify-end">
-                    <Button
-                      type="button"
-                      disabled={reply.isPending || draft.trim() === ''}
-                      aria-busy={reply.isPending}
-                      className="gap-2"
-                      onClick={send}
-                    >
-                      {reply.isPending ? (
-                        <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />
-                      ) : (
-                        <Send aria-hidden="true" className="size-4" />
-                      )}
-                      {reply.isPending ? t('portal.request.sending') : t('portal.request.send')}
-                    </Button>
+            <Card className="mt-6">
+              <CardContent className="p-5">
+                {reply.isError ? (
+                  <div
+                    role="alert"
+                    className="border-sla-breach/30 bg-sla-breach-soft text-sla-breach mb-4 flex items-start gap-2 rounded-md border px-3 py-2.5"
+                  >
+                    <AlertCircle aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+                    <span className="text-body">{t('portal.request.replyFailed')}</span>
                   </div>
-                </CardContent>
-              </Card>
-            )}
+                ) : null}
+
+                <Label htmlFor="portal-reply" className="mb-1.5">
+                  {t('portal.request.replyLabel')}
+                </Label>
+                <Textarea
+                  id="portal-reply"
+                  rows={4}
+                  className="text-start"
+                  placeholder={t('portal.request.replyPlaceholder')}
+                  value={draft}
+                  onChange={(event) => {
+                    setDraft(event.target.value);
+                  }}
+                />
+
+                <div className="mt-3 flex justify-end">
+                  <Button
+                    type="button"
+                    disabled={reply.isPending || draft.trim() === ''}
+                    aria-busy={reply.isPending}
+                    className="gap-2"
+                    onClick={send}
+                  >
+                    {reply.isPending ? (
+                      <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />
+                    ) : (
+                      <Send aria-hidden="true" className="size-4" />
+                    )}
+                    {reply.isPending ? t('portal.request.sending') : t('portal.request.send')}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           </>
         )}
       </main>

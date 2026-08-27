@@ -56,7 +56,7 @@ let agentId: string;
 async function makeTicket(
   overrides: {
     hoursAgo?: number;
-    status?: 'NEW' | 'OPEN' | 'PENDING_CUSTOMER' | 'ESCALATED' | 'RESOLVED' | 'CLOSED';
+    status?: 'NEW' | 'WAITING_FOR_AGENT' | 'WAITING_FOR_CUSTOMER' | 'RESOLVED';
     assigneeId?: string | null;
     withDepartment?: boolean;
   } = {},
@@ -66,7 +66,7 @@ async function makeTicket(
       subject: `${SUBJECT_PREFIX} ${randomUUID().slice(0, 6)}`,
       customerId,
       priority: 'MEDIUM',
-      status: overrides.status ?? 'OPEN',
+      status: overrides.status ?? 'WAITING_FOR_AGENT',
       createdAt: new Date(Date.now() - (overrides.hoursAgo ?? 0) * HOUR),
       ...(overrides.withDepartment === false ? {} : { departmentId }),
       ...(overrides.assigneeId === undefined ? {} : { assigneeId: overrides.assigneeId }),
@@ -175,7 +175,7 @@ test('a ticket below the first rung fires nothing', async () => {
     select: { status: true, escalatedAt: true },
   });
 
-  assert.equal(ticket.status, 'OPEN');
+  assert.equal(ticket.status, 'WAITING_FOR_AGENT');
   assert.equal(ticket.escalatedAt, null);
 });
 
@@ -192,8 +192,7 @@ test('crossing 75% fires the first rung only, and does not change the status', a
     select: { status: true, escalatedAt: true },
   });
 
-  // Only the 100% rung carries `changeStatusToEscalated`.
-  assert.equal(ticket.status, 'OPEN');
+  assert.equal(ticket.status, 'WAITING_FOR_AGENT');
   assert.equal(ticket.escalatedAt, null);
 });
 
@@ -206,7 +205,7 @@ test('a ticket past 90% fires both warning rungs in one pass', async () => {
   assert.deepEqual(await rungsOf(id), ['0', '1']);
   assert.equal(
     (await prisma.ticket.findUniqueOrThrow({ where: { id }, select: { status: true } })).status,
-    'OPEN',
+    'WAITING_FOR_AGENT',
   );
 });
 
@@ -226,7 +225,7 @@ test('AC3 — a ticket past its target is escalated, to the department manager',
     select: { status: true, escalatedAt: true, escalatedToId: true },
   });
 
-  assert.equal(ticket.status, 'ESCALATED');
+  assert.equal(ticket.status, 'WAITING_FOR_AGENT');
   assert.ok(ticket.escalatedAt !== null);
   // The rung notifies DEPARTMENT_MANAGER, so that is who it is escalated to —
   // recorded as data even though nothing can be sent to them yet.
@@ -237,13 +236,13 @@ test('AC3 — a ticket past its target is escalated, to the department manager',
   assert.deepEqual(await rungsOf(id), ['0', '1', '2']);
 });
 
-test('AC3 and AC6 — the status change is recorded and attributed to the rule', async () => {
+test('AC3 and AC6 — the escalation is recorded and attributed to the rule', async () => {
   const id = await makeTicket({ hoursAgo: 30, assigneeId: agentId });
 
   await escalation.run();
 
   const entry = await prisma.ticketHistory.findFirstOrThrow({
-    where: { ticketId: id, field: 'status', toValue: 'ESCALATED' },
+    where: { ticketId: id, eventType: 'ESCALATED', field: 'escalatedAt' },
     select: { eventType: true, actorUserId: true, metadata: true },
   });
 
@@ -262,10 +261,9 @@ test('AC4 — an escalated ticket is in the state the queue’s escalated view s
 
   await escalation.run();
 
-  // "Tickets Requiring Attention" is US-58 and does not exist. This is the
-  // filter that surfaces the same tickets today.
+  // Escalated view selects tickets where escalatedAt is not null and not resolved.
   const found = await prisma.notDeleted.ticket.count({
-    where: { id, status: 'ESCALATED' },
+    where: { id, escalatedAt: { not: null }, status: { not: 'RESOLVED' } },
   });
 
   assert.equal(found, 1);
@@ -297,7 +295,7 @@ test('AC5 — running the pass again escalates nothing twice', async () => {
     select: { status: true, escalatedAt: true },
   });
 
-  assert.equal(after.status, 'ESCALATED');
+  assert.equal(after.status, 'WAITING_FOR_AGENT');
   assert.deepEqual(after.escalatedAt, first.escalatedAt);
 
   // Nothing fired on either repeat — for this ticket or any other already done.
@@ -308,8 +306,13 @@ test('AC5 — running the pass again escalates nothing twice', async () => {
   );
 });
 
-test('AC5 — a ticket already in ESCALATED is left alone', async () => {
-  const id = await makeTicket({ hoursAgo: 30, status: 'ESCALATED', assigneeId: agentId });
+test('AC5 — a ticket with escalatedAt already set is left alone', async () => {
+  const id = await makeTicket({ hoursAgo: 30, assigneeId: agentId });
+  const existingEscalatedAt = new Date(Date.now() - 5 * HOUR);
+  await prisma.ticket.update({
+    where: { id },
+    data: { escalatedAt: existingEscalatedAt },
+  });
 
   await escalation.run();
 
@@ -318,10 +321,8 @@ test('AC5 — a ticket already in ESCALATED is left alone', async () => {
     select: { status: true, escalatedAt: true },
   });
 
-  // The rungs are still recorded — they were genuinely crossed — but the status
-  // is not rewritten and no second escalation timestamp is stamped.
-  assert.equal(ticket.status, 'ESCALATED');
-  assert.equal(ticket.escalatedAt, null);
+  assert.equal(ticket.status, 'WAITING_FOR_AGENT');
+  assert.equal(ticket.escalatedAt?.getTime(), existingEscalatedAt.getTime());
 });
 
 // ---------------------------------------------------------------------------
@@ -357,6 +358,6 @@ test('a ticket with no department still escalates, with nobody to escalate to', 
 
   // A missing recipient is a reason to keep going, not to leave a late ticket
   // un-escalated.
-  assert.equal(ticket.status, 'ESCALATED');
+  assert.equal(ticket.status, 'WAITING_FOR_AGENT');
   assert.equal(ticket.escalatedToId, null);
 });

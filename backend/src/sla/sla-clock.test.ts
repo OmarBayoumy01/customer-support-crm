@@ -43,7 +43,7 @@ const HOUR = 60 * MINUTE;
 async function makeTicket(
   overrides: {
     priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
-    status?: 'NEW' | 'OPEN' | 'PENDING_CUSTOMER' | 'RESOLVED' | 'CLOSED';
+    status?: 'NEW' | 'WAITING_FOR_AGENT' | 'WAITING_FOR_CUSTOMER' | 'RESOLVED';
     hoursAgo?: number;
     customerId?: string;
   } = {},
@@ -53,7 +53,7 @@ async function makeTicket(
       subject: `Clock ${run} ${randomUUID().slice(0, 6)}`,
       customerId: overrides.customerId ?? customerId,
       priority: overrides.priority ?? 'MEDIUM',
-      status: overrides.status ?? 'OPEN',
+      status: overrides.status ?? 'WAITING_FOR_AGENT',
       createdAt: new Date(Date.now() - (overrides.hoursAgo ?? 0) * HOUR),
     },
     select: { id: true },
@@ -159,7 +159,7 @@ test('AC3 — the resolution clock pauses and resumes, and the deadline moves wi
     select: { resolutionDueAt: true },
   });
 
-  await clock.onStatusChange(id, 'OPEN', 'PENDING_CUSTOMER');
+  await clock.onStatusChange(id, 'WAITING_FOR_AGENT', 'WAITING_FOR_CUSTOMER');
 
   const paused = await prisma.ticket.findUniqueOrThrow({
     where: { id },
@@ -176,7 +176,7 @@ test('AC3 — the resolution clock pauses and resumes, and the deadline moves wi
     data: { slaPausedAt: new Date(Date.now() - 30 * MINUTE) },
   });
 
-  await clock.onStatusChange(id, 'PENDING_CUSTOMER', 'OPEN');
+  await clock.onStatusChange(id, 'WAITING_FOR_CUSTOMER', 'WAITING_FOR_AGENT');
 
   const resumed = await prisma.ticket.findUniqueOrThrow({
     where: { id },
@@ -197,14 +197,14 @@ test('AC3 — pausing an already-paused ticket does not restart the pause', asyn
   const id = await makeTicket();
 
   await clock.applyOnCreate(id);
-  await clock.onStatusChange(id, 'OPEN', 'PENDING_CUSTOMER');
+  await clock.onStatusChange(id, 'WAITING_FOR_AGENT', 'WAITING_FOR_CUSTOMER');
 
   const first = await prisma.ticket.findUniqueOrThrow({
     where: { id },
     select: { slaPausedAt: true },
   });
 
-  await clock.onStatusChange(id, 'PENDING_INTERNAL', 'PENDING_CUSTOMER');
+  await clock.onStatusChange(id, 'NEW', 'WAITING_FOR_CUSTOMER');
 
   const second = await prisma.ticket.findUniqueOrThrow({
     where: { id },

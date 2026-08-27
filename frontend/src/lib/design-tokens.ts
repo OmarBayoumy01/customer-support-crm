@@ -15,7 +15,6 @@
  */
 import {
   AlertTriangle,
-  ArrowUpCircle,
   CheckCircle2,
   Circle,
   CircleDot,
@@ -23,19 +22,15 @@ import {
   Flame,
   Minus,
   PauseCircle,
-  XCircle,
   type LucideIcon,
 } from 'lucide-react';
 
 /** Matches `TicketStatus` in the Prisma schema. */
 export const TICKET_STATUSES = [
   'NEW',
-  'OPEN',
-  'PENDING_CUSTOMER',
-  'PENDING_INTERNAL',
-  'ESCALATED',
+  'WAITING_FOR_AGENT',
+  'WAITING_FOR_CUSTOMER',
   'RESOLVED',
-  'CLOSED',
 ] as const;
 
 export type TicketStatus = (typeof TICKET_STATUSES)[number];
@@ -59,11 +54,10 @@ export interface Presentation {
 /**
  * Status is **not** on the urgency ramp.
  *
- * A ticket being "Pending customer" is not an emergency, and colouring it as
- * one is how a queue becomes unreadable. Status is rendered in the chrome
- * greys, with the icon carrying the distinction. Only `ESCALATED` borrows from
- * the ramp, because an escalation genuinely is the thing an agent should look
- * at next.
+ * A ticket being "Waiting for customer" is not an emergency, and colouring it
+ * as one is how a queue becomes unreadable. Status is rendered in the chrome
+ * greys, with the icon carrying the distinction. Escalation is now data (the
+ * `escalatedAt` column), not a status, so it no longer appears here.
  */
 export const STATUS_PRESENTATION: Record<TicketStatus, Presentation> = {
   NEW: {
@@ -71,35 +65,20 @@ export const STATUS_PRESENTATION: Record<TicketStatus, Presentation> = {
     icon: Circle,
     className: 'text-ink bg-secondary border-line',
   },
-  OPEN: {
-    labelKey: 'ticket.status.open',
+  WAITING_FOR_AGENT: {
+    labelKey: 'ticket.status.waitingForAgent',
     icon: CircleDot,
     className: 'text-ink bg-secondary border-line',
   },
-  PENDING_CUSTOMER: {
-    labelKey: 'ticket.status.pendingCustomer',
+  WAITING_FOR_CUSTOMER: {
+    labelKey: 'ticket.status.waitingForCustomer',
     icon: PauseCircle,
     className: 'text-ink-muted bg-secondary border-line',
-  },
-  PENDING_INTERNAL: {
-    labelKey: 'ticket.status.pendingInternal',
-    icon: Clock,
-    className: 'text-ink-muted bg-secondary border-line',
-  },
-  ESCALATED: {
-    labelKey: 'ticket.status.escalated',
-    icon: ArrowUpCircle,
-    className: 'text-sla-breach bg-sla-breach-soft border-sla-breach/25',
   },
   RESOLVED: {
     labelKey: 'ticket.status.resolved',
     icon: CheckCircle2,
     className: 'text-sla-ok bg-sla-ok-soft border-sla-ok/25',
-  },
-  CLOSED: {
-    labelKey: 'ticket.status.closed',
-    icon: XCircle,
-    className: 'text-ink-muted bg-transparent border-line',
   },
 };
 

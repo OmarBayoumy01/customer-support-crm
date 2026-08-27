@@ -60,11 +60,13 @@
   "ticket": {
     "status": {
       "new": "New",
+      "waitingForAgent": "Waiting for agent",
+      "waitingForCustomer": "Waiting for customer",
+      "resolved": "Resolved",
       "open": "Open",
       "pendingCustomer": "Pending customer",
       "pendingInternal": "Pending internal",
       "escalated": "Escalated",
-      "resolved": "Resolved",
       "closed": "Closed"
     },
     "priority": {
@@ -106,7 +108,7 @@
         "mine": "My tickets",
         "escalated": "Escalated",
         "breached": "Breached SLA",
-        "closed": "Closed"
+        "resolved": "Resolved"
       },
       "filter": {
         "status": "Status",
@@ -450,11 +452,10 @@
       "previous": "Previous",
       "next": "Next",
       "status": {
-        "OPEN": "Open",
-        "IN_PROGRESS": "In progress",
-        "WAITING_ON_YOU": "Waiting on you",
-        "RESOLVED": "Resolved",
-        "CLOSED": "Closed"
+        "NEW": "Received",
+        "WAITING_FOR_AGENT": "Waiting for support",
+        "WAITING_FOR_CUSTOMER": "Waiting for your reply",
+        "RESOLVED": "Resolved"
       }
     },
     "request": {

@@ -60,11 +60,13 @@
   "ticket": {
     "status": {
       "new": "جديدة",
+      "waitingForAgent": "بانتظار الموظف",
+      "waitingForCustomer": "بانتظار العميل",
+      "resolved": "تم حلها",
       "open": "مفتوحة",
       "pendingCustomer": "بانتظار العميل",
       "pendingInternal": "بانتظار الفريق",
       "escalated": "مُصعّدة",
-      "resolved": "تم حلها",
       "closed": "مغلقة"
     },
     "priority": {
@@ -106,7 +108,7 @@
         "mine": "تذاكري",
         "escalated": "مُصعّدة",
         "breached": "تجاوزت مدة الخدمة",
-        "closed": "مغلقة"
+        "resolved": "تم حلها"
       },
       "filter": {
         "status": "الحالة",
@@ -462,11 +464,10 @@
       "previous": "السابق",
       "next": "التالي",
       "status": {
-        "OPEN": "مفتوح",
-        "IN_PROGRESS": "قيد المعالجة",
-        "WAITING_ON_YOU": "بانتظار ردّك",
-        "RESOLVED": "تم حله",
-        "CLOSED": "مغلق"
+        "NEW": "تم الاستلام",
+        "WAITING_FOR_AGENT": "بانتظار الدعم",
+        "WAITING_FOR_CUSTOMER": "بانتظار ردّك",
+        "RESOLVED": "تم حله"
       }
     },
     "request": {

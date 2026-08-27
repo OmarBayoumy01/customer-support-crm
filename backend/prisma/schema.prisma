@@ -38,14 +38,20 @@ datasource db {
 // ============================================================================
 
 /// From the story's technical notes, in workflow order.
+/// Who is expected to act next, and nothing else.
+///
+/// Assignment is `assigneeId`, escalation is `escalatedAt`/`escalatedToId`, SLA
+/// standing is derived from the due dates, and internal work is a message with
+/// `isInternal`. A ticket can be assigned, escalated, breached and
+/// WAITING_FOR_CUSTOMER at once, and every one of those facts stays readable.
+///
+/// The retired values (OPEN, PENDING_CUSTOMER, PENDING_INTERNAL, ESCALATED,
+/// CLOSED) survive only as text in TicketHistory, which is append-only.
 enum TicketStatus {
   NEW
-  OPEN
-  PENDING_CUSTOMER
-  PENDING_INTERNAL
-  ESCALATED
+  WAITING_FOR_AGENT
+  WAITING_FOR_CUSTOMER
   RESOLVED
-  CLOSED
 }
 
 enum TicketPriority {
@@ -576,7 +582,15 @@ model Ticket {
   slaPausedMs Int @default(0)
 
   resolvedAt DateTime?
-  closedAt   DateTime?
+
+  /// When a ticket reached the retired CLOSED status.
+  ///
+  /// Nothing writes it any more: RESOLVED is the only terminal status, and
+  /// whether a customer confirms a resolution is a separate action that does not
+  /// exist yet. Kept because the rows that carry it are the only record of which
+  /// tickets were closed rather than merely resolved, and because it is the
+  /// field that action will use when it arrives.
+  closedAt DateTime?
 
   escalatedAt   DateTime?
   escalatedToId String?

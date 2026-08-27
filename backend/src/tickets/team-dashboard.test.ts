@@ -141,11 +141,12 @@ async function makeUser(
 async function makeTicket(options: {
   departmentId?: string;
   assigneeId?: string | null;
-  status?: 'NEW' | 'OPEN' | 'PENDING_CUSTOMER' | 'ESCALATED' | 'RESOLVED' | 'CLOSED';
+  status?: 'NEW' | 'WAITING_FOR_AGENT' | 'WAITING_FOR_CUSTOMER' | 'RESOLVED';
   hoursAgo?: number;
   withSla?: boolean;
   respondedHoursAfter?: number;
   resolvedHoursAfter?: number;
+  escalatedAt?: Date | null;
 }): Promise<string> {
   const createdAt = new Date(Date.now() - (options.hoursAgo ?? 1) * HOUR);
 
@@ -155,7 +156,7 @@ async function makeTicket(options: {
       customerId,
       departmentId: options.departmentId ?? departmentId,
       priority: 'MEDIUM',
-      status: options.status ?? 'OPEN',
+      status: options.status ?? 'WAITING_FOR_AGENT',
       createdAt,
       updatedAt: createdAt,
       ...(options.assigneeId == null ? {} : { assigneeId: options.assigneeId }),
@@ -165,6 +166,7 @@ async function makeTicket(options: {
       ...(options.resolvedHoursAfter === undefined
         ? {}
         : { resolvedAt: new Date(createdAt.getTime() + options.resolvedHoursAfter * HOUR) }),
+      ...(options.escalatedAt ? { escalatedAt: options.escalatedAt } : {}),
     },
     select: { id: true },
   });
@@ -263,7 +265,7 @@ test('another department’s tickets are excluded from every figure', async () =
   const before = (await overview(managerToken)).body.data!;
 
   await makeTicket({ departmentId: otherDepartmentId, assigneeId: agentId });
-  await makeTicket({ departmentId: otherDepartmentId, status: 'ESCALATED', hoursAgo: 40 });
+  await makeTicket({ departmentId: otherDepartmentId, escalatedAt: new Date(), hoursAgo: 40 });
 
   const after = (await overview(managerToken)).body.data!;
 
@@ -315,11 +317,11 @@ test('AC1 — open and unassigned match the scoped rows', async () => {
   const body = (await overview(managerToken)).body.data!;
 
   const openRows = await prisma.notDeleted.ticket.count({
-    where: { departmentId, status: { notIn: ['RESOLVED', 'CLOSED'] } },
+    where: { departmentId, status: { not: 'RESOLVED' } },
   });
 
   const unassignedRows = await prisma.notDeleted.ticket.count({
-    where: { departmentId, assigneeId: null, status: { notIn: ['RESOLVED', 'CLOSED'] } },
+    where: { departmentId, assigneeId: null, status: { not: 'RESOLVED' } },
   });
 
   assert.equal(body.open, openRows);
@@ -405,7 +407,7 @@ test('AC1 — customer satisfaction is absent from the payload, not zero', async
 // ---------------------------------------------------------------------------
 
 test('AC2 — the five distributions are present and scoped', async () => {
-  await makeTicket({ status: 'ESCALATED', assigneeId: agentId, hoursAgo: 30 });
+  await makeTicket({ escalatedAt: new Date(), assigneeId: agentId, hoursAgo: 30 });
 
   const body = (await overview(managerToken)).body.data!;
 
@@ -441,7 +443,11 @@ test('AC2 — an agent slice carries the agent’s name, not just an id', async 
 
 test('AC3 — attention returns breached and escalated tickets and not healthy ones', async () => {
   const breachedId = await makeTicket({ hoursAgo: 30, assigneeId: agentId });
-  const escalatedId = await makeTicket({ hoursAgo: 2, status: 'ESCALATED', assigneeId: agentId });
+  const escalatedId = await makeTicket({
+    hoursAgo: 2,
+    escalatedAt: new Date(),
+    assigneeId: agentId,
+  });
   const healthyId = await makeTicket({ hoursAgo: 1, assigneeId: agentId });
 
   const { status, body } = await get<Ticket[]>(

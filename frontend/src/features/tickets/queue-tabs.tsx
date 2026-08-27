@@ -12,7 +12,7 @@ const VIEW_ICON: Record<TicketView, typeof Inbox> = {
   mine: UserRound,
   escalated: ArrowUpCircle,
   breached: AlertTriangle,
-  closed: CheckCircle2,
+  resolved: CheckCircle2,
 };
 
 export interface QueueTabsProps {

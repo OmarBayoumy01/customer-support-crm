@@ -46,7 +46,7 @@ function detail(overrides: Partial<TicketDetail> = {}): TicketDetail {
     number: 1041,
     subject: 'Refund approved but never arrived',
     description: 'Your team approved a refund on the 3rd and nothing has arrived.',
-    status: 'ESCALATED',
+    status: 'WAITING_FOR_AGENT',
     priority: 'URGENT',
     channel: 'EMAIL',
     customer: {
@@ -206,7 +206,7 @@ describe('AC1 — header', () => {
     expect(screen.getByText('#1041')).toBeInTheDocument();
 
     // AC6 — each of these is on the page, not behind a dialog.
-    expect(screen.getByText('Escalated')).toBeInTheDocument();
+    expect(screen.getByText('Waiting for agent')).toBeInTheDocument();
     expect(screen.getByText('Urgent')).toBeInTheDocument();
     // The assignee also appears on their own messages, so the assertion is that
     // the header names them, not that the name appears exactly once.

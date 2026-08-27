@@ -77,8 +77,8 @@ const OVERVIEW: TeamOverview = {
   averageResolutionSeconds: 23_400,
   byStatus: [
     { key: 'NEW', label: 'NEW', count: 9 },
-    { key: 'OPEN', label: 'OPEN', count: 12 },
-    { key: 'ESCALATED', label: 'ESCALATED', count: 3 },
+    { key: 'WAITING_FOR_AGENT', label: 'WAITING_FOR_AGENT', count: 12 },
+    { key: 'WAITING_FOR_CUSTOMER', label: 'WAITING_FOR_CUSTOMER', count: 3 },
   ],
   byPriority: [
     { key: 'URGENT', label: 'URGENT', count: 4 },
@@ -117,7 +117,7 @@ function ticketFixture(overrides: Record<string, unknown>): Ticket {
     id: BREACHED_ID,
     number: 1042,
     subject: 'Refund has not arrived',
-    status: 'OPEN',
+    status: 'WAITING_FOR_AGENT',
     priority: 'HIGH',
     channel: 'EMAIL',
     customer: {
@@ -398,9 +398,9 @@ describe('AC2 — the distributions', () => {
     }
 
     // Statuses and priorities read in the platform's own words, not the enum.
-    expect(within(charts).getByText('Escalated')).toBeInTheDocument();
+    expect(within(charts).getByText('Waiting for customer')).toBeInTheDocument();
     expect(within(charts).getByText('Urgent')).toBeInTheDocument();
-    expect(within(charts).queryByText('ESCALATED')).not.toBeInTheDocument();
+    expect(within(charts).queryByText('WAITING_FOR_CUSTOMER')).not.toBeInTheDocument();
 
     // A department has a name, and the ticket nobody has filed says so.
     expect(within(charts).getByText('Billing')).toBeInTheDocument();

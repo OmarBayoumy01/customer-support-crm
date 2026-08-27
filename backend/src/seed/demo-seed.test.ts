@@ -124,15 +124,7 @@ test('AC1 — every status and every priority is represented', async () => {
   const statuses = new Set(rows.map((row) => row.status));
   const priorities = new Set(rows.map((row) => row.priority));
 
-  for (const status of [
-    'NEW',
-    'OPEN',
-    'PENDING_CUSTOMER',
-    'PENDING_INTERNAL',
-    'ESCALATED',
-    'RESOLVED',
-    'CLOSED',
-  ] as const) {
+  for (const status of ['NEW', 'WAITING_FOR_AGENT', 'WAITING_FOR_CUSTOMER', 'RESOLVED'] as const) {
     assert.ok(statuses.has(status), `no ticket has status ${status}`);
   }
 

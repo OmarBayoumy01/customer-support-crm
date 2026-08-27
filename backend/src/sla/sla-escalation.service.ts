@@ -1,5 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { canTransition } from '@crm/shared';
 
 import { PrismaService } from '../prisma/index.js';
 import { TicketHistoryService } from '../tickets/ticket-history.service.js';
@@ -24,7 +23,7 @@ export const SLA_ESCALATION_RULE = 'sla.escalation-threshold';
 export const ESCALATION_STEP_FIELD = 'escalationStep';
 
 /** A ticket in one of these is finished; its clocks have stopped. */
-const FINISHED_STATUSES: TicketStatus[] = ['RESOLVED', 'CLOSED'];
+const FINISHED_STATUSES: TicketStatus[] = ['RESOLVED'];
 
 /** How many tickets one pass will look at. The sweep uses the same bound. */
 const SWEEP_LIMIT = 500;
@@ -221,23 +220,29 @@ export class SlaEscalationService {
     const recipientId = await this.recipientFor(ticket, rung);
 
     if (rung.changeStatusToEscalated) {
-      // AC5 again, from the other direction: a ticket already escalated is not
-      // escalated a second time even if its history were somehow missing.
-      const alreadyEscalated = ticket.status === 'ESCALATED' || ticket.escalatedAt !== null;
-
       /**
-       * The state machine is the same one a person is held to — US-47's map.
+       * **Escalation is data, not a status.**
        *
-       * An automation that can make a move an agent cannot is a second, quieter
-       * state machine. A ticket that cannot legally reach `ESCALATED` is skipped
-       * and logged rather than forced.
+       * This used to write `status: 'ESCALATED'`, which meant an escalated ticket
+       * could no longer say whose turn it was — and meant the sweep sometimes
+       * found a ticket it could not legally move there, logged a warning, and
+       * left it un-escalated. The two columns it also wrote, `escalatedAt` and
+       * `escalatedToId`, were always the durable record; now they are the only
+       * one, and the lifecycle status stays where the workflow put it.
+       *
+       * So a ticket can be escalated **and** `WAITING_FOR_CUSTOMER` at the same
+       * time, which is a real situation the old model could not express.
+       *
+       * Idempotency rests on `escalatedAt` alone. It was already half the old
+       * condition, and it is the half that does not depend on a status.
        */
-      if (!alreadyEscalated && canTransition(ticket.status, 'ESCALATED')) {
+      if (ticket.escalatedAt === null) {
+        const escalatedAt = new Date();
+
         await this.prisma.ticket.update({
           where: { id: ticket.id },
           data: {
-            status: 'ESCALATED',
-            escalatedAt: new Date(),
+            escalatedAt,
             // Data, not a notification: who the ticket was escalated *to*, which
             // is what the manager dashboard and US-62 will both read.
             ...(recipientId === null ? {} : { escalatedToId: recipientId }),
@@ -248,16 +253,13 @@ export class SlaEscalationService {
           ticketId: ticket.id,
           actorUserId: null,
           eventType: 'ESCALATED',
-          field: 'status',
-          fromValue: ticket.status,
-          toValue: 'ESCALATED',
+          // `field` is no longer `status`: the status does not change, which was
+          // the whole point. The entry records the escalation itself.
+          field: 'escalatedAt',
+          fromValue: undefined,
+          toValue: escalatedAt.toISOString(),
           automationRule: SLA_ESCALATION_RULE,
         });
-      } else if (!alreadyEscalated) {
-        this.logger.warn(
-          `Ticket ${ticket.id} is past its target but cannot move from ${ticket.status} ` +
-            'to ESCALATED; leaving the status alone',
-        );
       }
     }
 

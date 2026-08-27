@@ -1,9 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import {
-  PORTAL_STATUS,
   URGENCY_PRIORITY,
-  internalStatusesFor,
-  toPortalStatus,
   type PortalMessage,
   type PortalTicket,
   type PortalTicketDetail,
@@ -19,7 +16,7 @@ import { ApiException } from '../common/index.js';
 import { PrismaService } from '../prisma/index.js';
 import { CategoriesService } from '../categories/index.js';
 import { TicketsService } from '../tickets/index.js';
-import type { Prisma, TicketStatus } from '../generated/prisma/client.js';
+import type { Prisma } from '../generated/prisma/client.js';
 
 /**
  * Everything the portal may read about a ticket — US-82, AC2.
@@ -78,15 +75,44 @@ const RECENT_MESSAGE_COUNT = 30;
  * `null`, and carries no actor, no field name, no from/to values and no
  * internal status string.
  *
- * A `STATUS_CHANGED` entry is mapped **through `PORTAL_STATUS`** and emitted only
- * when the customer-facing status actually moved. So `OPEN -> PENDING_INTERNAL`
- * produces nothing — both read as "In Progress" — and an escalation produces
- * nothing at all, which is what keeps AC6 from undoing US-82 AC2.
+ * A `STATUS_CHANGED` entry is mapped to its portal event kind and emitted only
+ * when the customer-facing status actually moved. So a transition that does not
+ * change the customer-facing kind produces nothing, which is what keeps AC6
+ * from undoing US-82 AC2.
  *
  * Everything not named here is dropped: priority changes, category changes,
  * department moves, escalations, SLA breaches and unassignments are the
  * support desk talking to itself.
  */
+function statusToPortalKind(status: string | null): PortalEventKind | null {
+  switch (status) {
+    // Current statuses
+    case 'WAITING_FOR_AGENT':
+      return 'in_progress';
+    case 'WAITING_FOR_CUSTOMER':
+      return 'waiting_on_you';
+    case 'RESOLVED':
+      return 'resolved';
+    case 'NEW':
+      return null; // covered by CREATED
+
+    // Retired statuses — historical timeline entries
+    case 'OPEN':
+      return 'in_progress';
+    case 'PENDING_CUSTOMER':
+      return 'waiting_on_you';
+    case 'PENDING_INTERNAL':
+      return null; // internal-only, never shown to customer
+    case 'CLOSED':
+      return 'closed';
+    case 'ESCALATED':
+      return null; // escalation is an internal event
+
+    default:
+      return null;
+  }
+}
+
 export function portalEventKindFor(entry: {
   eventType: string;
   fromValue: string | null;
@@ -95,36 +121,21 @@ export function portalEventKindFor(entry: {
   switch (entry.eventType) {
     case 'CREATED':
       return 'received';
-
     case 'ASSIGNED':
       return 'assigned';
-
     case 'REOPENED':
       return 'reopened';
-
     case 'CLOSED':
       return 'closed';
-
     case 'STATUS_CHANGED': {
-      const to = PORTAL_STATUS[entry.toValue as TicketStatus] ?? null;
-      const from =
-        entry.fromValue === null ? null : (PORTAL_STATUS[entry.fromValue as TicketStatus] ?? null);
-
-      // A move the customer cannot see is not an event they should be told
-      // about — and an unrecognised status is dropped rather than guessed at.
-      if (to === null || to === from) {
+      const kind = statusToPortalKind(entry.toValue);
+      const fromKind = entry.fromValue === null ? null : statusToPortalKind(entry.fromValue);
+      // A move the customer cannot see is not an event they should be told about.
+      if (kind === null || kind === fromKind) {
         return null;
       }
-
-      if (to === 'IN_PROGRESS') return 'in_progress';
-      if (to === 'WAITING_ON_YOU') return 'waiting_on_you';
-      if (to === 'RESOLVED') return 'resolved';
-      if (to === 'CLOSED') return 'closed';
-
-      // `OPEN` is only ever the starting state, which `CREATED` already covers.
-      return null;
+      return kind;
     }
-
     default:
       return null;
   }
@@ -199,8 +210,7 @@ export class PortalService {
       id: row.id,
       number: row.number,
       subject: row.subject,
-      // AC3 — the internal status never reaches the payload.
-      status: toPortalStatus(row.status),
+      status: row.status,
       categoryName:
         row.category === null ? null : locale === 'AR' ? row.category.nameAr : row.category.nameEn,
       createdAt: row.createdAt.toISOString(),
@@ -237,9 +247,7 @@ export class PortalService {
   /**
    * The customer's own requests — AC1.
    *
-   * The status filter is translated to the internal statuses it covers and
-   * applied **in the query**, so filtering by "In Progress" is an `IN` clause
-   * rather than a pass over fetched rows.
+   * The status filter is applied **in the query**, rather than a pass over fetched rows.
    */
   async tickets(
     customerId: string,
@@ -248,7 +256,7 @@ export class PortalService {
   ): Promise<{ tickets: PortalTicket[]; total: number }> {
     const where: Prisma.TicketWhereInput = {
       customerId,
-      ...(query.status === undefined ? {} : { status: { in: internalStatusesFor(query.status) } }),
+      ...(query.status === undefined ? {} : { status: query.status }),
     };
 
     /**
@@ -544,23 +552,6 @@ export class PortalService {
       throw ApiException.notFound('That request');
     }
 
-    /**
-     * A closed request does not take replies — US-85, and an interpretation
-     * worth stating.
-     *
-     * **This is not a new lifecycle rule:** nothing transitions and nothing is
-     * added to the state machine. US-47 decided that a customer reply reopens a
-     * `RESOLVED` request and deliberately not a `CLOSED` one, so a reply here
-     * would sit in a ticket that is in no open queue — a message nobody is
-     * coming for, acknowledged with a success message. Refusing says so instead.
-     * US-90 is the story that gives a customer a way back into a closed request.
-     */
-    if (ticket.status === 'CLOSED') {
-      throw ApiException.unprocessable(
-        'This request is closed. Please raise a new one and we will pick it up.',
-      );
-    }
-
     const message = await this.prisma.message.create({
       data: {
         ticketId,
@@ -586,7 +577,7 @@ export class PortalService {
     /**
      * US-47's reopen rule, called for the first time.
      *
-     * `onCustomerReply` reopens a `RESOLVED` request to `OPEN`, clears
+     * `onCustomerReply` reopens a `RESOLVED` request to `WAITING_FOR_AGENT`, clears
      * `resolvedAt`, increments `reopenCount`, writes a `REOPENED` entry with no
      * actor and restarts the clock. Anything else it leaves alone. **That
      * transition is used exactly as US-47 defined it** — this story adds no state

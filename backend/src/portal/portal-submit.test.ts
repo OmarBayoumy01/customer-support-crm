@@ -182,7 +182,7 @@ test('an authenticated customer creates a request, and it belongs to them', asyn
   // The serialised response: the portal shape, with a number the customer can
   // quote.
   assert.ok(detail.number > 0);
-  assert.equal(detail.status, 'OPEN');
+  assert.equal(detail.status, 'NEW');
   assert.equal(detail.categoryName, 'Billing');
 
   // And the row behind it.
@@ -397,7 +397,7 @@ test('the initial state is NEW, unassigned, numbered, and on the clock', async (
   // number in the database, not a display value invented on the way out.
   assert.equal(detail.number, row.number);
   assert.equal(detail.subject, row.subject);
-  assert.equal(detail.status, 'OPEN');
+  assert.equal(detail.status, 'NEW');
   assert.equal(detail.assigneeFirstName, null);
 });
 
