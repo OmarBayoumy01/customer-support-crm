@@ -165,6 +165,25 @@ describe('AC2 — navigation gating', () => {
     }
   });
 
+  test('a destination whose story has not shipped says so, rather than locked', () => {
+    // An administrator holds every permission, so "SLA policies" showing as
+    // locked to them would be a lie about the reason — the route simply does
+    // not exist yet. Two different problems deserve two different sentences.
+    renderSidebar(ADMIN);
+
+    const sla = screen
+      .getAllByText('SLA policies')
+      .map((node) => node.closest('[aria-disabled="true"]'))
+      .find((node) => node !== null);
+
+    expect(sla).not.toBeNull();
+    expect(sla?.textContent).toContain('not built yet');
+    expect(sla?.textContent).not.toContain('You do not have permission');
+
+    // And it is not a link, so nobody lands on the 404.
+    expect(screen.queryByRole('link', { name: 'SLA policies' })).not.toBeInTheDocument();
+  });
+
   test('an item everyone may reach is never locked', () => {
     renderSidebar(sessionWith({}));
 

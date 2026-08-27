@@ -1,4 +1,4 @@
-import { Lock } from 'lucide-react';
+import { Hammer, Lock } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router';
 import { useTranslation } from 'react-i18next';
 
@@ -69,6 +69,38 @@ function SidebarLink({ item }: { item: NavItem }): React.JSX.Element {
   const label = t(item.labelKey);
   const Icon = item.icon;
   const isActive = pathname === item.to || pathname.startsWith(`${item.to}/`);
+
+  /**
+   * A destination whose story has not shipped.
+   *
+   * Checked **before** the permission, because "you do not have access" is the
+   * wrong sentence about a screen that does not exist: it sends somebody to ask
+   * their administrator for a permission that would change nothing. Not a link
+   * either — the route resolves to the 404, and offering that as a menu item
+   * reads as a broken product rather than an unfinished one.
+   */
+  if (item.available === false) {
+    return (
+      <SidebarMenuItem>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <SidebarMenuButton
+              aria-disabled="true"
+              className="text-ink-faint cursor-not-allowed hover:bg-transparent"
+            >
+              <Icon aria-hidden="true" />
+              <span>{label}</span>
+              {!collapsed && <Hammer aria-hidden="true" className="ms-auto size-3.5 opacity-70" />}
+              <span className="sr-only"> — {t('nav.unbuiltHint')}</span>
+            </SidebarMenuButton>
+          </TooltipTrigger>
+          <TooltipContent side={tooltipSide}>
+            {label} — {t('nav.unbuiltHint')}
+          </TooltipContent>
+        </Tooltip>
+      </SidebarMenuItem>
+    );
+  }
 
   /**
    * Locked rather than hidden — AC2.

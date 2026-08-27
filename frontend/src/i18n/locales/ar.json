@@ -54,7 +54,8 @@
     "settings": "الإعدادات",
     "designSystem": "نظام التصميم",
     "administration": "الإدارة",
-    "team": "نظرة الفريق"
+    "team": "نظرة الفريق",
+    "unbuiltHint": "لم يُبنَ بعد"
   },
   "ticket": {
     "status": {

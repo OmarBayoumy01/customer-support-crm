@@ -21,6 +21,16 @@ export interface NavItem {
   permission?: PermissionKey;
   /** Which live count, if any, this item shows. */
   badge?: 'assignedTickets';
+  /**
+   * `false` where the destination has no route yet.
+   *
+   * The item still renders, because US-28's AC1 is about the grouping and a
+   * sidebar with four links in it does not show one. But it renders as **not
+   * built yet** rather than as a link into the 404 or — worse — as *locked*,
+   * which tells somebody they lack a permission for a screen that does not
+   * exist. Delete the flag in the story that adds the route.
+   */
+  available?: boolean;
 }
 
 export interface NavSection {
@@ -63,13 +73,25 @@ export const NAV_SECTIONS: NavSection[] = [
         permission: 'ticket:view',
         badge: 'assignedTickets',
       },
-      { to: '/customers', labelKey: 'nav.customers', icon: Users, permission: 'customer:view' },
+      {
+        to: '/customers',
+        labelKey: 'nav.customers',
+        icon: Users,
+        permission: 'customer:view',
+        available: false,
+      },
     ],
   },
   {
     labelKey: 'nav.section.knowledge',
     items: [
-      { to: '/articles', labelKey: 'nav.articles', icon: BookOpen, permission: 'article:view' },
+      {
+        to: '/articles',
+        labelKey: 'nav.articles',
+        icon: BookOpen,
+        permission: 'article:view',
+        available: false,
+      },
     ],
   },
   {
@@ -88,14 +110,21 @@ export const NAV_SECTIONS: NavSection[] = [
         labelKey: 'nav.departments',
         icon: Building2,
         permission: 'department:manage',
+        available: false,
       },
-      { to: '/admin/sla', labelKey: 'nav.slaPolicies', icon: LifeBuoy, permission: 'sla:manage' },
+      {
+        to: '/admin/sla',
+        labelKey: 'nav.slaPolicies',
+        icon: LifeBuoy,
+        permission: 'sla:manage',
+        available: false,
+      },
     ],
   },
   {
     labelKey: 'nav.section.account',
     items: [
-      { to: '/settings', labelKey: 'nav.settings', icon: Settings },
+      { to: '/settings', labelKey: 'nav.settings', icon: Settings, available: false },
       // Not a real product destination — the living reference for this design
       // system, kept in the app so it cannot rot the way a static styleguide
       // does. Under Account because it belongs to nobody's daily work.

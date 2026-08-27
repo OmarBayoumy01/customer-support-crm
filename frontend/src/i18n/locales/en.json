@@ -54,7 +54,8 @@
     "settings": "Settings",
     "designSystem": "Design system",
     "administration": "Administration",
-    "team": "Team overview"
+    "team": "Team overview",
+    "unbuiltHint": "not built yet"
   },
   "ticket": {
     "status": {
