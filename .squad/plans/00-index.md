@@ -29,6 +29,12 @@ One row per feature folder under `.squad/plans/`. `NN` continues as a global exe
 | `sla`                 | [00-overview.md](./sla/00-overview.md)                   | 27, 29   |
 | `administration`      | [00-overview.md](./administration/00-overview.md)        | 28       |
 
+## Where the workflow stands
+
+**[00-workflow-status.md](./00-workflow-status.md)** — read this first when picking the project
+up: the end-to-end journey step by step, what is left, in what order, the locked decisions,
+and the acceptance criteria deliberately left unmet.
+
 ## A note on 13–20
 
 **These eight were written after their code shipped, on 2026-08-26.** Stories US-15, US-16,
