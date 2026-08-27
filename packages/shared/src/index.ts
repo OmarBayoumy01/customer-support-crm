@@ -178,8 +178,14 @@ export {
   type AssignedTicketCount,
   DashboardMetricSchema,
   AssignedSummarySchema,
+  DistributionSliceSchema,
+  TeamOverviewSchema,
+  TeamOverviewQuerySchema,
   type DashboardMetric,
   type AssignedSummary,
+  type DistributionSlice,
+  type TeamOverview,
+  type TeamOverviewQuery,
 } from './dto/ticket-counts.js';
 
 export { CategorySchema, type Category } from './dto/category.js';

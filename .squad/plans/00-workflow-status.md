@@ -38,9 +38,9 @@ The target flow, with the story that owns each step and its real state:
 | Customer sees the result | US-84 | ✅ in review |
 | Customer replies again | US-85 | ✅ in review |
 | Agent sees their workload | US-55 | ✅ in review |
-| Manager reports on it | **US-58** | ❌ not started |
+| Manager reports on it | US-58 | ✅ in review |
 
-**25 of 28 stories are done** (waves 0 and 1, eight of ten in wave 2, and all of waves 3 and 4). **The customer journey now runs end to end.** Every finished story is
+**26 of 28 stories are done** (waves 0 and 1, eight of ten in wave 2, and all of waves 3 and 4). **The core workflow now runs end to end, customer → report.** Every finished story is
 `In review` in Notion — never `Done`, which is the human's call.
 
 **What is demonstrable today:** sign in as a seeded agent → browse and filter the queue → open
@@ -71,22 +71,21 @@ report. Escalation happens but cannot notify anybody — see the flags.
 | **Ticket history** | Every mutation recorded, actor or automation attributed, names stored beside ids, append-only enforced by a trigger | — | US-50 ✅ | US-40 |
 | **Portal** | **Complete for the MVP**: the boundary (own module, own `crm-portal` strategy, allowlist DTOs, rate limit, rule #1 in the query with its regression test), sign-in, submit, the request list, and the thread with a customer reply that reopens a resolved request through US-47's rule | Rating (US-88), customer reopen of a closed request (US-90), attachments (US-51) — all deferred | US-82, 21, 86, 84, 85 ✅ | — |
 | **Dashboard** | The agent dashboard: four KPIs from the caller's own scoped rows through the existing SLA rule, their tickets urgency-first, and row actions reusing US-47 and US-48's controls | Snooze (no owner), and a real week-ago comparison for three of four KPIs (needs a snapshot) | US-55 ✅ | — |
-| **Reports** | Nothing | **The manager dashboard** — this *is* the "Report" step | **US-58** ❌ | US-40 |
+| **Reports** | **The manager dashboard** — six KPIs, five distributions and the attention table, every figure inside the caller's own scope in the query, all from `slaFor` and the queue's own list | Customer satisfaction (no rating exists — US-88), and charts are labelled bar rows rather than a charts library, per the scope document | US-58 ✅ | US-40 |
 
 ---
 
 ## What is left, in the order to do it
 
-Three stories. The order below is the critical path, not the story numbers.
+Two stories, and **neither is on the critical path** — the workflow closes without them.
 
 | # | Story | Why here | Size |
 | - | ----- | -------- | ---- |
-| 1 | **US-58** Manager dashboard | **This is the "Report" step.** P11 Reports is entirely V2 | medium |
-| 2 | US-41 Create a ticket as an agent | Second entry point. **The loop closes without it** | medium |
-| 3 | US-35 View a customer profile | The customer as a thing you can open. **The loop closes without it** | medium |
+| 1 | US-41 Create a ticket as an agent | Second entry point. **The loop closes without it** | medium |
+| 2 | US-35 View a customer profile | The customer as a thing you can open. **The loop closes without it** | medium |
 
-**If credits are the binding constraint, stop after 1.** Items 2 and 3 are the two remaining
-wave-2 stories and both are genuine capabilities, but neither is on the critical path: tickets
+**If credits are the binding constraint, stop now.** Both are genuine capabilities and both are
+the last of wave 2, but neither is on the critical path: tickets
 enter through the portal, and the customer is already visible from the ticket's context panel.
 That is a scope decision for the human, flagged rather than taken.
 
@@ -137,7 +136,6 @@ That is a scope decision for the human, flagged rather than taken.
 | US-48 | AC1 agent is notified | No notification channel exists | US-62 |
 | US-48 | AC5 out of office | **Not modelled in the schema at all** | a story that owns agent availability |
 | US-71 | AC1, AC2 notifications | Each rung records history and logs its recipient; no channel exists | US-62 |
-| US-71 | AC4 Tickets Requiring Attention | Escalated tickets surface in the queue's `escalated` view | US-58 |
 | US-55 | AC1 comparison on three of four KPIs | The status, breach flags and warning window a week ago are not recoverable from ticket rows; it needs a daily snapshot, which is P11 analytics | P11 |
 | US-55 | AC4 snooze | No column, no endpoint, and no story owns it | a story that owns snooze |
 | US-85 | AC5 attachment button | Object storage is US-51, deferred | US-51 |
@@ -147,7 +145,10 @@ That is a scope decision for the human, flagged rather than taken.
 | US-86 | AC3 article deflection | The knowledge base is all of P09, cut; US-76 is the story's own dependency | P09 |
 | US-86 | AC4 "view it" link | Still absent from the confirmation, though the screen now exists — the list is one tap away and the confirmation links there | a cheap follow-up |
 | US-21 | AC3 guest browsing | The knowledge base is all of P09 (cut) and "register" is US-20 (deferred); there is no submit control to gate either | P09 and US-20 |
-| US-69 | AC6 "and dashboards" | The agent dashboard now uses the same `SlaMeter` as the queue, so this holds on three surfaces; the manager dashboard is the last one | US-58 |
+| US-58 | AC1 customer satisfaction | No rating column, no endpoint that could set one, and US-88 deferred. Omitted from the payload rather than sent as a null somebody would render as "0%" | US-88 |
+| US-58 | AC2 "charts" | Rendered as accessible labelled bar rows. Recharts is in the stack list but **not installed**, and the scope document rules a charts library out for this story. A deviation in medium, not in content | a story that adds charting |
+| US-58 | AC3 "requiring attention" excludes *at risk* | The at-risk fraction cannot be a SQL comparison, so including it would mean filtering fetched rows and reporting a `total` that disagreed with them. At-risk is the KPI beside the table | a schema change that stores the fraction |
+| US-58 | AC5 branch filter | The API takes `branchId` and honours it; the page exposes only the department control, because no seeded branch data exists to pick from | a story that owns branches |
 | US-69 | AC4 paused *periods* | The schema banks a total plus the current pause, not a list of intervals | a schema change nobody needs yet |
 
 ---

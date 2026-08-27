@@ -75,7 +75,8 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     labelKey: 'nav.section.analytics',
     items: [
-      { to: '/reports', labelKey: 'nav.reports', icon: BarChart3, permission: 'report:view' },
+      // US-58. The MVP's reporting surface, since all of P11 is V2.
+      { to: '/team', labelKey: 'nav.team', icon: BarChart3, permission: 'report:view' },
     ],
   },
   {

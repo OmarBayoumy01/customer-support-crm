@@ -7,6 +7,7 @@ import { RouteFallback } from '@/components/states/route-fallback';
 import { useAuth } from '@/features/auth/auth-context';
 import { RequireAuth } from '@/features/auth/require-auth';
 import { RequirePermission } from '@/features/auth/require-permission';
+import { TeamDashboardPage } from '@/features/dashboard/team-dashboard-page';
 import { PortalHomePage } from '@/features/portal/portal-home-page';
 import { PortalRequestPage } from '@/features/portal/portal-request-page';
 import { PortalSubmitPage } from '@/features/portal/portal-submit-page';
@@ -99,6 +100,17 @@ export function AppRoutes(): React.JSX.Element {
             <Route element={<RequirePermission permission="ticket:view" />}>
               <Route path="/tickets" element={<TicketsQueuePage />} />
               <Route path="/tickets/:id" element={<TicketDetailPage />} />
+            </Route>
+
+            {/*
+              US-58 — the manager dashboard, and the MVP's "Report" step.
+
+              Nested inside RequirePermission so an agent without report:view
+              sees the permission-denied screen rather than an empty page that
+              would 403 every request it made — AC6.
+            */}
+            <Route element={<RequirePermission permission="report:view" />}>
+              <Route path="/team" element={<TeamDashboardPage />} />
             </Route>
 
             <Route path="/design-system" element={<DesignSystemPage />} />

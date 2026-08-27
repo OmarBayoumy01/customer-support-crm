@@ -4,6 +4,7 @@ import {
   CreateTicketMessageSchema,
   CreateTicketSchema,
   PaginationQuerySchema,
+  TeamOverviewQuerySchema,
   TicketListQuerySchema,
   UpdateTicketSchema,
 } from '@crm/shared';
@@ -26,3 +27,6 @@ export class AssignTicketDto extends createZodDto(AssignTicketSchema) {}
 
 /** Moving a ticket through its lifecycle — US-47. */
 export class ChangeTicketStatusDto extends createZodDto(ChangeTicketStatusSchema) {}
+
+/** AC5's department and branch filters — US-58. Filters, never scope selectors. */
+export class TeamOverviewQueryDto extends createZodDto(TeamOverviewQuerySchema) {}

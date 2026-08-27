@@ -200,6 +200,20 @@ export const TicketListQuerySchema = PaginationQuerySchema.extend({
   assigneeId: z.string().uuid().optional(),
   /** `unassigned` is a real filter, and the one an agent picking up work uses. */
   unassigned: z.enum(['true']).optional(),
+  /**
+   * Tickets a manager must act on now — US-58, AC3.
+   *
+   * Open and **already past a target, or escalated**. Entirely one SQL group,
+   * which is why it is a filter here rather than a bespoke endpoint: the scope,
+   * the sort, the paging and the total are all the queue's, already tested.
+   *
+   * Deliberately not the at-risk fraction. That is a proportion of each ticket's
+   * own target and cannot be a single SQL comparison, so including it would mean
+   * filtering fetched rows and reporting a total that disagreed with them. "At
+   * risk" is the KPI beside the table instead, where it can be computed
+   * honestly.
+   */
+  attention: z.enum(['true']).optional(),
   departmentId: z.string().uuid().optional(),
   branchId: z.string().uuid().optional(),
   channel: ChannelSchema.optional(),

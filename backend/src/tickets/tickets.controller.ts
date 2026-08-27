@@ -4,6 +4,7 @@ import {
   ApiErrorSchema,
   AssignableAgentSchema,
   AssignedSummarySchema,
+  TeamOverviewSchema,
   AssignedTicketCountSchema,
   buildPaginationMeta,
   TicketCountsSchema,
@@ -15,6 +16,7 @@ import {
   type ApiPaginated,
   type AssignableAgent,
   type AssignedSummary,
+  type TeamOverview,
   type AssignedTicketCount,
   type Ticket,
   type TicketCounts,
@@ -38,6 +40,7 @@ import {
   CreateTicketDto,
   CreateTicketMessageDto,
   PaginationQueryDto,
+  TeamOverviewQueryDto,
   TicketListQueryDto,
   UpdateTicketDto,
 } from './dto/ticket.dto.js';
@@ -158,6 +161,40 @@ export class TicketsController {
     @CurrentUser() user: CurrentUserPayload | undefined,
   ): Promise<AssignedSummary> {
     return this.tickets.assignedSummary(await this.actorFrom(user));
+  }
+
+  /**
+   * The manager dashboard — US-58, AC1, AC2, AC5 and AC6.
+   *
+   * `report:view` is AC6: the catalogue grants it to a manager at `TEAM` and an
+   * administrator at `ALL`, and **not to an agent**.
+   *
+   * `departmentId` and `branchId` are **filters**, not scope selectors. They are
+   * `AND`ed with the caller’s own `ticket:view` scope, so they can only narrow
+   * it: a manager asking for another department gets zero rather than that
+   * department. Nothing in the request builds the scope clause.
+   */
+  @Get('team/overview')
+  @RequirePermission('report:view')
+  @ApiOperation({
+    summary: 'Team workload and SLA health',
+    description:
+      'Every figure is computed inside the caller’s own ticket scope, in the query. The SLA ' +
+      'figures use the same `slaFor` the queue and the agent dashboard use — there is no ' +
+      'dashboard definition of at-risk or breached. The two averages read a 30-day window ' +
+      'and are null when there is nothing to average. **Customer satisfaction is absent**: ' +
+      'no rating exists in the domain, and US-88 owns it.',
+  })
+  @ApiZodQuery(TeamOverviewQueryDto)
+  @ApiZodResponse(200, TeamOverviewSchema, 'The overview')
+  async teamOverview(
+    @Query() query: TeamOverviewQueryDto,
+    @CurrentUser() user: CurrentUserPayload | undefined,
+  ): Promise<TeamOverview> {
+    return this.tickets.teamOverview(await this.actorFrom(user), {
+      departmentId: query.departmentId,
+      branchId: query.branchId,
+    });
   }
 
   /**

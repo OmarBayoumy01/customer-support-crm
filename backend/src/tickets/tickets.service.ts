@@ -8,6 +8,8 @@ import {
   STATUS_PERMISSION,
   type AssignableAgent,
   type AssignedSummary,
+  type DistributionSlice,
+  type TeamOverview,
   type AssignedTicketCount,
   type TicketCounts,
   type TicketView,
@@ -169,6 +171,72 @@ function statusTimestamps(from: TicketStatus, to: TicketStatus): Prisma.TicketUp
   return {};
 }
 
+/**
+ * How far back US-58's averages and daily buckets look.
+ *
+ * A window rather than all history, because "average response time" over two
+ * years is a number that cannot move and therefore tells a manager nothing about
+ * this month. Thirty days is what a monthly review looks at.
+ */
+const OVERVIEW_WINDOW_DAYS = 30;
+
+/** The bound on any row-level fetch behind a dashboard figure. */
+const OVERVIEW_ROW_CAP = 2_000;
+
+/**
+ * The mean gap between two timestamps, in whole seconds — US-58, AC1.
+ *
+ * Pairs whose second value is null are **skipped, not counted as zero**: a ticket
+ * nobody has replied to yet is missing from the average rather than dragging it
+ * to nothing. Returns null when there is nothing to average, because "no data"
+ * and "instant" are different answers.
+ */
+function meanSecondsBetween(pairs: [Date, Date | null][]): number | null {
+  let total = 0;
+  let counted = 0;
+
+  for (const [from, to] of pairs) {
+    if (to === null) {
+      continue;
+    }
+
+    total += Math.max(0, to.getTime() - from.getTime());
+    counted += 1;
+  }
+
+  return counted === 0 ? null : Math.round(total / counted / 1000);
+}
+
+/**
+ * Tickets per day across the window — AC2's "tickets over time".
+ *
+ * Every day in the window appears, including the empty ones: a line that skips
+ * quiet days reads as though the quiet days were busy.
+ */
+function dailyBuckets(dates: Date[], from: Date, to: Date): DistributionSlice[] {
+  const counts = new Map<string, number>();
+
+  const dayKey = (date: Date): string => date.toISOString().slice(0, 10);
+
+  for (
+    const cursor = new Date(dayKey(from));
+    cursor.getTime() <= to.getTime();
+    cursor.setUTCDate(cursor.getUTCDate() + 1)
+  ) {
+    counts.set(dayKey(cursor), 0);
+  }
+
+  for (const date of dates) {
+    const key = dayKey(date);
+
+    if (counts.has(key)) {
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+  }
+
+  return [...counts.entries()].map(([key, count]) => ({ key, label: key, count }));
+}
+
 @Injectable()
 export class TicketsService {
   private readonly logger = new Logger(TicketsService.name);
@@ -327,6 +395,38 @@ export class TicketsService {
       where.assigneeId = null;
     } else if (query.assigneeId !== undefined) {
       where.assigneeId = query.assigneeId;
+    }
+
+    /**
+     * AC3's "tickets requiring attention" — US-58.
+     *
+     * Open and **already past a target, or escalated**: the tickets a manager has
+     * to act on now. One SQL group, so the scope, the sort, the paging and the
+     * total are the queue's own and already correct.
+     *
+     * `resolutionDueAt < now` covers the minute between a deadline passing and
+     * the sweep flagging it — without it the table would miss exactly the ticket
+     * that just went late.
+     *
+     * The at-risk *fraction* is not here: it is a proportion of each ticket's own
+     * target, so it cannot be a SQL comparison, and filtering fetched rows would
+     * report a total that disagreed with the rows returned. That figure is the
+     * dashboard's "SLA at risk" KPI instead.
+     */
+    if (query.attention === 'true') {
+      groups.push({
+        AND: [
+          { status: { notIn: ['RESOLVED', 'CLOSED'] } },
+          {
+            OR: [
+              { firstResponseBreached: true },
+              { resolutionBreached: true },
+              { status: 'ESCALATED' },
+              { resolutionDueAt: { lt: now } },
+            ],
+          },
+        ],
+      });
     }
 
     if (query.createdFrom !== undefined || query.createdTo !== undefined) {
@@ -532,6 +632,186 @@ export class TicketsService {
       dueSoon: { value: dueSoon, previous: null },
       breached: { value: breached, previous: null },
     };
+  }
+
+  /**
+   * The team, as a manager sees it — US-58, AC1 and AC2.
+   *
+   * **Scope comes from the caller's token and nothing else.** `scopeFor` reads
+   * their `ticket:view` grants and returns the `where` fragment; every query
+   * below carries it.
+   *
+   * **`departmentId` and `branchId` are filters, not scope selectors.** They are
+   * `AND`ed with the scope clause and can therefore only narrow it: an
+   * administrator filtering by a department sees that department, and a manager
+   * filtering by somebody else’s sees zero — scope ∩ filter, which is the
+   * correct answer rather than an error. Nothing the request sends can widen
+   * what the token allows, because the scope clause is not built from it.
+   *
+   * **No dashboard definitions.** "Open" is the same `notIn` the queue uses and
+   * the SLA figures come from `slaFor`, exactly as in US-55.
+   */
+  async teamOverview(
+    actor: TicketActor,
+    filters: { departmentId?: string | undefined; branchId?: string | undefined } = {},
+    now = new Date(),
+  ): Promise<TeamOverview> {
+    const scope = await this.scopeFor(actor);
+
+    const inScope: Prisma.TicketWhereInput = {
+      AND: [
+        scope,
+        ...(filters.departmentId === undefined ? [] : [{ departmentId: filters.departmentId }]),
+        ...(filters.branchId === undefined ? [] : [{ branchId: filters.branchId }]),
+      ],
+    };
+
+    const openWhere: Prisma.TicketWhereInput = {
+      AND: [inScope, { status: { notIn: ['RESOLVED', 'CLOSED'] } }],
+    };
+
+    /** The averages and the daily buckets read one bounded window. */
+    const windowStart = new Date(now.getTime() - OVERVIEW_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+
+    const [
+      open,
+      unassigned,
+      openRows,
+      statusGroups,
+      priorityGroups,
+      departmentGroups,
+      agentGroups,
+      windowRows,
+    ] = await Promise.all([
+      this.prisma.notDeleted.ticket.count({ where: openWhere }),
+      this.prisma.notDeleted.ticket.count({
+        where: { AND: [openWhere, { assigneeId: null }] },
+      }),
+      // The SLA figures need `slaFor`, which is per-row arithmetic against
+      // each ticket’s own target. Bounded, like `assignedCount` and US-55.
+      this.prisma.notDeleted.ticket.findMany({
+        where: openWhere,
+        select: TICKET_SELECT,
+        take: OVERVIEW_ROW_CAP,
+      }),
+      this.prisma.notDeleted.ticket.groupBy({
+        by: ['status'],
+        where: inScope,
+        _count: { _all: true },
+      }),
+      this.prisma.notDeleted.ticket.groupBy({
+        by: ['priority'],
+        where: inScope,
+        _count: { _all: true },
+      }),
+      this.prisma.notDeleted.ticket.groupBy({
+        by: ['departmentId'],
+        where: inScope,
+        _count: { _all: true },
+      }),
+      this.prisma.notDeleted.ticket.groupBy({
+        by: ['assigneeId'],
+        where: openWhere,
+        _count: { _all: true },
+      }),
+      // Two purposes, one fetch: the averages and AC2’s daily buckets.
+      this.prisma.notDeleted.ticket.findMany({
+        where: { AND: [inScope, { createdAt: { gte: windowStart } }] },
+        select: { createdAt: true, firstRespondedAt: true, resolvedAt: true },
+        take: OVERVIEW_ROW_CAP,
+      }),
+    ]);
+
+    let atRisk = 0;
+    let breached = 0;
+
+    for (const row of openRows) {
+      const { state } = this.slaFor(row);
+
+      if (state === 'warn') {
+        atRisk += 1;
+      }
+
+      if (state === 'breach' || row.firstResponseBreached || row.resolutionBreached) {
+        breached += 1;
+      }
+    }
+
+    return {
+      open,
+      unassigned,
+      atRisk,
+      breached,
+      averageResponseSeconds: meanSecondsBetween(
+        windowRows.map((row) => [row.createdAt, row.firstRespondedAt]),
+      ),
+      averageResolutionSeconds: meanSecondsBetween(
+        windowRows.map((row) => [row.createdAt, row.resolvedAt]),
+      ),
+      byStatus: statusGroups.map((group) => ({
+        key: group.status,
+        label: group.status,
+        count: group._count._all,
+      })),
+      byPriority: priorityGroups.map((group) => ({
+        key: group.priority,
+        label: group.priority,
+        count: group._count._all,
+      })),
+      byDepartment: await this.labelledSlices(
+        departmentGroups.map((group) => ({ id: group.departmentId, count: group._count._all })),
+        'department',
+      ),
+      byAgent: await this.labelledSlices(
+        agentGroups.map((group) => ({ id: group.assigneeId, count: group._count._all })),
+        'user',
+      ),
+      overTime: dailyBuckets(
+        windowRows.map((row) => row.createdAt),
+        windowStart,
+        now,
+      ),
+    };
+  }
+
+  /**
+   * Turns grouped ids into named slices — AC2.
+   *
+   * One indexed read per kind rather than a join on the group-by, and a null id
+   * becomes an explicit "unassigned" / "no department" slice rather than being
+   * dropped: a manager needs to see that ten tickets belong to nobody.
+   */
+  private async labelledSlices(
+    groups: { id: string | null; count: number }[],
+    kind: 'department' | 'user',
+  ): Promise<DistributionSlice[]> {
+    const ids = groups.map((group) => group.id).filter((id): id is string => id !== null);
+
+    const names = new Map<string, string>();
+
+    if (ids.length > 0) {
+      if (kind === 'department') {
+        const rows = await this.prisma.notDeleted.department.findMany({
+          where: { id: { in: ids } },
+          select: { id: true, nameEn: true },
+        });
+
+        for (const row of rows) names.set(row.id, row.nameEn);
+      } else {
+        const rows = await this.prisma.notDeleted.user.findMany({
+          where: { id: { in: ids } },
+          select: { id: true, firstName: true, lastName: true },
+        });
+
+        for (const row of rows) names.set(row.id, `${row.firstName} ${row.lastName}`);
+      }
+    }
+
+    return groups.map((group) => ({
+      key: group.id ?? 'none',
+      label: group.id === null ? 'none' : (names.get(group.id) ?? 'none'),
+      count: group.count,
+    }));
   }
 
   async list(query: TicketListQuery, actor: TicketActor): Promise<ApiPaginated<Ticket>> {

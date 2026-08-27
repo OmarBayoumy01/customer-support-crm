@@ -53,7 +53,8 @@
     "slaPolicies": "SLA policies",
     "settings": "Settings",
     "designSystem": "Design system",
-    "administration": "Administration"
+    "administration": "Administration",
+    "team": "Team overview"
   },
   "ticket": {
     "status": {
@@ -497,6 +498,49 @@
         "closed": "Your request was closed",
         "reopened": "Your request was reopened"
       }
+    }
+  },
+  "team": {
+    "title": "Team overview",
+    "subtitle": "Where the team stands, and what needs stepping in on.",
+    "department": "Department",
+    "allDepartments": "All I can see",
+    "noDepartment": "No department",
+    "noData": "No data",
+    "escalated": "Request #{{number}} escalated.",
+    "kpi": {
+      "label": "Team numbers",
+      "open": "Open tickets",
+      "unassigned": "Unassigned",
+      "atRisk": "SLA at risk",
+      "breached": "SLA breached",
+      "avgResponse": "Average first response",
+      "avgResolution": "Average resolution",
+      "failed": "We could not load the team numbers just now.",
+      "satisfactionPending": "Customer satisfaction needs ratings, which are not collected yet."
+    },
+    "charts": {
+      "label": "Distributions",
+      "overTime": "Tickets over time (last 14 days)",
+      "byStatus": "By status",
+      "byPriority": "By priority",
+      "byDepartment": "By department",
+      "byAgent": "Agent workload (open)"
+    },
+    "table": {
+      "label": "Tickets requiring attention",
+      "ticket": "Ticket",
+      "customer": "Customer",
+      "agent": "Agent",
+      "priority": "Priority",
+      "sla": "SLA",
+      "updated": "Last update",
+      "actions": "Actions",
+      "breached": "SLA breached",
+      "escalate": "Escalate",
+      "view": "Open ticket",
+      "emptyTitle": "Nothing needs stepping in on",
+      "emptyBody": "No ticket in view has passed a target or been escalated."
     }
   }
 }
