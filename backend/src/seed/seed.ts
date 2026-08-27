@@ -104,6 +104,38 @@ async function seedDevelopmentUsers(prisma: PrismaClient): Promise<void> {
       update: {},
     });
 
+    /**
+     * The portal account needs a `Customer` row, or it cannot sign in at all.
+     *
+     * US-21 decided that what makes an account a portal account is a linked
+     * customer and **not** a role name — roles are configuration, and which
+     * door an account may use should not be something an administrator can
+     * change by reassigning one. Which means the seeded `customer` role on its
+     * own gets refused at `/auth/portal/login`, and the documented development
+     * account for the customer role would be the one account nobody can use.
+     *
+     * Deliberately carries no tickets: it is the account to try submitting a
+     * request from, and its empty state is worth seeing.
+     */
+    if (definition.role === 'customer') {
+      const linked = await prisma.customer.findFirst({
+        where: { userId: user.id },
+        select: { id: true },
+      });
+
+      if (linked === null) {
+        await prisma.customer.create({
+          data: {
+            userId: user.id,
+            email: definition.email,
+            firstName: definition.firstName,
+            lastName: definition.lastName,
+            type: 'INDIVIDUAL',
+          },
+        });
+      }
+    }
+
     console.log(`Seeded user ${definition.email.padEnd(21)} ${definition.role}`);
   }
 

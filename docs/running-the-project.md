@@ -89,12 +89,19 @@ Idempotent — safe to run again, and it runs on every `prisma migrate reset`. I
 Password is whatever `SEED_PASSWORD` is set to — `DevPassw0rd!` in
 `backend/.env.example`.
 
-| Email                | Role          |
-| -------------------- | ------------- |
-| `admin@crm.local`    | administrator |
-| `manager@crm.local`  | manager       |
-| `agent@crm.local`    | agent         |
-| `customer@crm.local` | customer      |
+| Email                | Role          | Signs in at     |
+| -------------------- | ------------- | --------------- |
+| `admin@crm.local`    | administrator | `/login`        |
+| `manager@crm.local`  | manager       | `/login`        |
+| `agent@crm.local`    | agent         | `/login`        |
+| `customer@crm.local` | customer      | `/portal/login` |
+
+**The customer account signs in at the portal, not the staff login**, and the staff login
+refuses it. What makes an account a portal account is a linked `Customer` row rather than a
+role name — US-21's decision — so the seed creates one for it. It deliberately owns no
+tickets: it is the account to try submitting a request from, and its empty state is worth
+seeing. For a customer who already has a conversation, use the portal account under **Demo
+staff** below.
 
 These exist only because a helpdesk with no accounts cannot be signed into. The seed
 **refuses to create them when `NODE_ENV=production`**, and it never overwrites a password
@@ -112,6 +119,16 @@ of these to see a queue that actually belongs to somebody:
 | `huda.mansour@crm.local`  | agent   | Billing          |
 | `priya.raman@crm.local`   | agent   | Technical        |
 | `khalid.otaibi@crm.local` | manager | Technical        |
+
+And one portal account, for the half of the product a customer sees:
+
+| Email                                     | Role     | Signs in at     |
+| ----------------------------------------- | -------- | --------------- |
+| `j.whitfield@northgate-logistics.example` | customer | `/portal/login` |
+
+James Whitfield is Northgate Logistics — four requests across three statuses, with agent
+replies and internal notes on them. Sign in as him to see that a request reads correctly
+from the customer's side, and that **no internal note appears there**.
 
 Everything in the demo set is invented — names, companies, order numbers, amounts. Nothing
 is taken from a real customer.

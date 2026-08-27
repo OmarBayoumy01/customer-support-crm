@@ -244,6 +244,55 @@ export async function seedDemoData(prisma: PrismaClient): Promise<void> {
     customerIdByKey.set(customer.key, row.id);
   }
 
+  /**
+   * A portal sign-in for a customer who already has a conversation.
+   *
+   * `customer@crm.local` is deliberately empty, which leaves nowhere to see the
+   * thing the portal exists for: an existing request, with an agent's replies on
+   * it and the internal notes filtered out. Northgate has four tickets across
+   * three statuses, so it is the one worth being able to sign in as.
+   *
+   * The email is the customer's own rather than a second alias, so the account
+   * and the identity it reads are the same thing.
+   */
+  const portalCustomerKey = 'northgate';
+  const portalCustomerId = customerIdByKey.get(portalCustomerKey);
+  const customerRoleId = roleIdByKey.get('customer');
+
+  if (portalCustomerId !== undefined && customerRoleId !== undefined) {
+    const portalCustomer = await prisma.customer.findUniqueOrThrow({
+      where: { id: portalCustomerId },
+      select: { email: true, firstName: true, lastName: true, userId: true, preferredLocale: true },
+    });
+
+    if (portalCustomer.userId === null && portalCustomer.email !== null) {
+      const portalUser = await prisma.user.upsert({
+        where: { email: portalCustomer.email },
+        create: {
+          email: portalCustomer.email,
+          passwordHash,
+          firstName: portalCustomer.firstName,
+          lastName: portalCustomer.lastName,
+          locale: portalCustomer.preferredLocale,
+        },
+        // Never touches `passwordHash`, for the reason the staff loop gives.
+        update: {},
+        select: { id: true },
+      });
+
+      await prisma.userRole.upsert({
+        where: { userId_roleId: { userId: portalUser.id, roleId: customerRoleId } },
+        create: { userId: portalUser.id, roleId: customerRoleId },
+        update: {},
+      });
+
+      await prisma.customer.update({
+        where: { id: portalCustomerId },
+        data: { userId: portalUser.id },
+      });
+    }
+  }
+
   // --- Tickets -------------------------------------------------------------
   let ticketsCreated = 0;
 
