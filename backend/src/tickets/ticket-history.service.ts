@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 
 import { PrismaService } from '../prisma/index.js';
 import type { TicketHistoryEntry } from '@crm/shared';
-import type { Prisma, TicketEventType } from '../generated/prisma/client.js';
+import type { Prisma, TicketEventType, TicketStatus } from '../generated/prisma/client.js';
 
 /** One recorded change. */
 export interface HistoryEntry {
@@ -127,6 +127,35 @@ export function eventFor(field: string, next: unknown): TicketEventType {
   }
 
   return EVENT_FOR_FIELD[field] ?? 'STATUS_CHANGED';
+}
+
+/**
+ * Which event a status change is — US-47, AC4.
+ *
+ * `CLOSED`, `ESCALATED` and `REOPENED` have been in `TicketEventType` since US-6
+ * with nothing writing them, the same gap US-48 found with `UNASSIGNED`. A
+ * timeline that records every one of these as "status changed" makes a manager
+ * read the values to work out what happened, and P11's reports would have to
+ * parse them.
+ *
+ * Resolution stays `STATUS_CHANGED` with `toValue: 'RESOLVED'`, which is what
+ * US-50 flagged: the enum has no `RESOLVED` member, and adding one to the
+ * database enum is a migration this story does not need.
+ */
+export function statusEventFor(from: TicketStatus, to: TicketStatus): TicketEventType {
+  if (to === 'OPEN' && (from === 'RESOLVED' || from === 'CLOSED')) {
+    return 'REOPENED';
+  }
+
+  if (to === 'CLOSED') {
+    return 'CLOSED';
+  }
+
+  if (to === 'ESCALATED') {
+    return 'ESCALATED';
+  }
+
+  return 'STATUS_CHANGED';
 }
 
 /**

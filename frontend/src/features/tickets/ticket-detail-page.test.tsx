@@ -66,6 +66,7 @@ function detail(overrides: Partial<TicketDetail> = {}): TicketDetail {
     slaPolicyName: 'VIP',
     sla: {
       state: 'breach',
+      firstRespondedAt: null,
       firstResponseDueAt: new Date(Date.now() - 3 * HOUR).toISOString(),
       resolutionDueAt: new Date(Date.now() - HOUR).toISOString(),
       firstResponseBreached: true,

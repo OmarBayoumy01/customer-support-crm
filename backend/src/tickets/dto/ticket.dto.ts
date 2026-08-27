@@ -1,5 +1,6 @@
 import {
   AssignTicketSchema,
+  ChangeTicketStatusSchema,
   CreateTicketMessageSchema,
   CreateTicketSchema,
   PaginationQuerySchema,
@@ -22,3 +23,6 @@ export class CreateTicketMessageDto extends createZodDto(CreateTicketMessageSche
 
 /** Who owns the ticket — US-48. Separate from `UpdateTicketDto`, see the schema. */
 export class AssignTicketDto extends createZodDto(AssignTicketSchema) {}
+
+/** Moving a ticket through its lifecycle — US-47. */
+export class ChangeTicketStatusDto extends createZodDto(ChangeTicketStatusSchema) {}

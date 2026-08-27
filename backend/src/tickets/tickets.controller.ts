@@ -32,6 +32,7 @@ import {
 } from '../openapi/index.js';
 import {
   AssignTicketDto,
+  ChangeTicketStatusDto,
   CreateTicketDto,
   CreateTicketMessageDto,
   PaginationQueryDto,
@@ -348,5 +349,41 @@ export class TicketsController {
     @CurrentUser() user: CurrentUserPayload | undefined,
   ): Promise<Ticket> {
     return this.tickets.assign(id, body.assigneeId, await this.actorFrom(user));
+  }
+
+  /**
+   * Move a ticket through its lifecycle — US-47.
+   *
+   * The transition endpoint `PATCH /tickets/:id` has been refusing `status` in
+   * favour of since US-40. Legality is decided by `TICKET_TRANSITIONS` in
+   * `@crm/shared`, which the control also reads — so what the screen offers and
+   * what the server accepts come from one definition rather than two that drift.
+   *
+   * `ticket:update` is the floor. Resolving or closing additionally needs
+   * `ticket:close` and escalating needs `ticket:escalate`; both are checked in
+   * the service, because they are properties of the destination rather than of
+   * the action, and they belong with the rest of the transition rules.
+   */
+  @Patch(':id/status')
+  @RequirePermission('ticket:update')
+  @ApiOperation({
+    summary: 'Move a ticket to another status',
+    description:
+      'Only transitions valid from the current status are accepted; anything else is 422. ' +
+      'Resolving and closing require `ticket:close`, escalating requires `ticket:escalate`. ' +
+      'The SLA clock pauses on Pending Customer and stops on Resolved, and the change is ' +
+      'written to the ticket’s history.',
+  })
+  @ApiZodBody(ChangeTicketStatusDto)
+  @ApiZodResponse(200, TicketSchema, 'Updated')
+  @ApiResponse({ status: 403, schema: zodToOpenApi(ApiErrorSchema) })
+  @ApiResponse({ status: 404, schema: zodToOpenApi(ApiErrorSchema) })
+  @ApiResponse({ status: 422, schema: zodToOpenApi(ApiErrorSchema) })
+  async changeStatus(
+    @Param('id') id: string,
+    @Body() body: ChangeTicketStatusDto,
+    @CurrentUser() user: CurrentUserPayload | undefined,
+  ): Promise<Ticket> {
+    return this.tickets.changeStatus(id, body.status, await this.actorFrom(user));
   }
 }

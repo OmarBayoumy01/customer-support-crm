@@ -229,6 +229,17 @@
       "openCount_other": "{{count}} تذكرة مفتوحة",
       "unavailable": "غير متاح",
       "unknown": "المسؤول السابق"
+    },
+    "statusControl": {
+      "saved": "تم تغيير الحالة إلى {{status}}.",
+      "current": "الحالة الحالية",
+      "notAllowed": "غير متاح من هنا",
+      "noPermission": "يتطلب صلاحية",
+      "confirmResolve": {
+        "title": "حل التذكرة دون رد؟",
+        "description": "لم يردّ أحد على العميل في هذه التذكرة. حلّها الآن يغلقها دون أن يسمع منا شيئًا.",
+        "confirm": "حلّها على أي حال"
+      }
     }
   },
   "states": {

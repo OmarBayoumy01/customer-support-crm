@@ -21,6 +21,67 @@ export const TicketStatusSchema = z.enum([
 ]);
 export type TicketStatus = z.infer<typeof TicketStatusSchema>;
 
+/**
+ * Which statuses a ticket may move to from each status — US-47, AC2.
+ *
+ * **One map, shared.** AC2 asks for two things that must not disagree: the
+ * control offers only valid moves, and the server rejects invalid ones. Two
+ * lists would drift, and the failure is the worst kind — the screen invites a
+ * move and the server answers with an error for doing what was offered.
+ *
+ * Three decisions worth stating:
+ *
+ * - **`NEW` is never a target.** It means "nobody has looked at this yet", which
+ *   stops being true the moment somebody does. A ticket cannot become
+ *   un-triaged.
+ * - **`NEW` may go straight to `CLOSED`.** Spam and duplicates are closed, not
+ *   resolved; routing them through `RESOLVED` would count them as work done.
+ * - **`CLOSED` may reopen to `OPEN`.** A ticket closed by mistake has to be
+ *   undoable, or an agent raises a duplicate to correct the record. This is
+ *   staff only — what a *customer* may do to a closed ticket is US-90.
+ */
+export const TICKET_TRANSITIONS: Record<TicketStatus, readonly TicketStatus[]> = {
+  NEW: ['OPEN', 'PENDING_CUSTOMER', 'PENDING_INTERNAL', 'ESCALATED', 'RESOLVED', 'CLOSED'],
+  OPEN: ['PENDING_CUSTOMER', 'PENDING_INTERNAL', 'ESCALATED', 'RESOLVED', 'CLOSED'],
+  PENDING_CUSTOMER: ['OPEN', 'PENDING_INTERNAL', 'ESCALATED', 'RESOLVED', 'CLOSED'],
+  PENDING_INTERNAL: ['OPEN', 'PENDING_CUSTOMER', 'ESCALATED', 'RESOLVED', 'CLOSED'],
+  ESCALATED: ['OPEN', 'PENDING_CUSTOMER', 'PENDING_INTERNAL', 'RESOLVED', 'CLOSED'],
+  RESOLVED: ['OPEN', 'CLOSED'],
+  CLOSED: ['OPEN'],
+};
+
+/** Whether one status may become another. */
+export function canTransition(from: TicketStatus, to: TicketStatus): boolean {
+  return TICKET_TRANSITIONS[from].includes(to);
+}
+
+/**
+ * The permission a destination needs **on top of** `ticket:update` — US-47.
+ *
+ * Every status change requires `ticket:update`, which is a floor the route's
+ * guard states declaratively. Two destinations require more than that, and the
+ * catalogue already names them. Because it is a property of the *destination*
+ * rather than of the action, it is checked with the rest of the transition rules
+ * rather than by a second guard — splitting `/resolve` and `/escalate` into
+ * endpoints of their own would scatter one state machine across three doors.
+ *
+ * Typed as a plain record of strings rather than importing `PermissionKey`, to
+ * keep the ticket contract from depending on the authorisation one. The backend
+ * narrows it where it reads it.
+ */
+export const STATUS_PERMISSION: Partial<Record<TicketStatus, string>> = {
+  RESOLVED: 'ticket:close',
+  CLOSED: 'ticket:close',
+  ESCALATED: 'ticket:escalate',
+};
+
+/** Moving a ticket through its lifecycle — US-47. */
+export const ChangeTicketStatusSchema = z.object({
+  status: TicketStatusSchema,
+});
+
+export type ChangeTicketStatus = z.infer<typeof ChangeTicketStatusSchema>;
+
 /** Matches `TicketPriority` in the Prisma schema. */
 export const TicketPrioritySchema = z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']);
 export type TicketPriority = z.infer<typeof TicketPrioritySchema>;
@@ -162,6 +223,16 @@ export const TicketCustomerSchema = z.object({
 
 export const TicketSlaSchema = z.object({
   state: SlaStateSchema,
+  /**
+   * When the first customer-facing agent reply went out — US-47, AC3.
+   *
+   * Null means nothing has been said to the customer yet, which is exactly the
+   * fact the resolve confirmation needs: "no agent reply exists on the ticket".
+   * US-68 already maintains this column and deliberately excludes internal
+   * notes, so the screen does not have to count messages or reason about which
+   * ones are customer-facing.
+   */
+  firstRespondedAt: z.string().datetime().nullable(),
   firstResponseDueAt: z.string().datetime().nullable(),
   resolutionDueAt: z.string().datetime().nullable(),
   firstResponseBreached: z.boolean(),

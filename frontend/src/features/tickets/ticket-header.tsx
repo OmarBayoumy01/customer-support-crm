@@ -3,12 +3,13 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TicketDetail } from '@crm/shared';
 
-import { StatusBadge, formatRemaining } from '@/components/domain/indicators';
+import { formatRemaining } from '@/components/domain/indicators';
 import { Card, CardContent } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { TicketAssignee } from './ticket-assignee';
+import { TicketStatusControl } from './ticket-status';
 import { TicketClassification } from './ticket-classification';
 
 /**
@@ -111,11 +112,9 @@ export interface TicketHeaderProps {
  * workspace that hides the assignee behind two clicks is a workspace where
  * tickets sit unassigned.
  *
- * **Status is still read-only.** Moving a ticket through its lifecycle is
- * US-47's, which validates that the move is legal, and rendering a control that
- * silently does nothing would be worse than rendering the value. Priority and
- * category became real controls with US-49, and the assignee with US-48 — which
- * renders this same badge for anybody without `ticket:assign`.
+ * **Every pill in the header is now a control.** Priority and category became
+ * real with US-49, the assignee with US-48, and status with US-47 — which lists
+ * all seven and disables the moves the state machine does not allow from here.
  */
 export function TicketHeader({ ticket, className }: TicketHeaderProps): React.JSX.Element {
   const { t, i18n } = useTranslation();
@@ -146,10 +145,10 @@ export function TicketHeader({ ticket, className }: TicketHeaderProps): React.JS
           {/*
             AC1's inline controls, and AC6's "never behind a dialog".
             Priority and category became real controls with US-49, the assignee
-            with US-48. Status is still US-47's.
+            with US-48, status with US-47.
           */}
           <div className="flex flex-wrap items-center gap-2">
-            <StatusBadge status={ticket.status} />
+            <TicketStatusControl ticket={ticket} />
             <TicketClassification ticket={ticket} />
             <TicketAssignee ticket={ticket} />
           </div>

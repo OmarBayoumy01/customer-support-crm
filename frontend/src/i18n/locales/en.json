@@ -217,6 +217,17 @@
       "openCount_other": "{{count}} open",
       "unavailable": "Unavailable",
       "unknown": "Former assignee"
+    },
+    "statusControl": {
+      "saved": "Status changed to {{status}}.",
+      "current": "Current",
+      "notAllowed": "Not available from here",
+      "noPermission": "Needs permission",
+      "confirmResolve": {
+        "title": "Resolve without replying?",
+        "description": "Nobody has replied to the customer on this ticket. Resolving now closes it without them hearing anything back.",
+        "confirm": "Resolve anyway"
+      }
     }
   },
   "states": {

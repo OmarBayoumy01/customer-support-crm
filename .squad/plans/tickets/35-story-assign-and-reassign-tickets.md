@@ -268,30 +268,21 @@ the end — not the full pipeline.
 
 | AC | Result |
 | -- | ------ |
-| AC1 | ⚠️ **partly.** The ticket updates and the history entry names the actor — written and covered by tests, **not yet executed** (see below). "The agent is notified" has no channel; flagged. |
-| AC2 | ⚠️ each candidate carries an open ticket count, rendered as text. Frontend verified green; the backend half is written and unexecuted. |
-| AC3 | ⚠️ unassigning returns the ticket to the `unassigned` view with the department untouched, recorded as `UNASSIGNED`. Written and unexecuted. |
-| AC4 | ⚠️ **the real hole is closed** — `assigneeId` is out of `UpdateTicketSchema`, the new route is guarded by `ticket:assign`, and the candidate is re-checked in the service. Frontend read-only branch verified green; the 403 tests are unexecuted. |
-| AC5 | ⚠️ **half met by design.** Inactive is honoured end to end (marked in the picker, refused by the server) and verified green on the frontend. **Out of office is not modelled**; flagged. |
-| AC6 | ⚠️ the timeline reads names rather than UUIDs, and internal notes survive a reassignment. Written and unexecuted. |
+| AC1 | ⚠️ **partly.** The ticket updates and the history entry names the actor, not the assignee — ✅ verified. **"The agent is notified" has no channel**; flagged. |
+| AC2 | ✅ each candidate carries an open ticket count — resolved work excluded, matching the queue's definition of open — rendered as text and never as colour. The count is asserted against the database, and the `TEAM` / `ALL` narrowing is asserted in the query. |
+| AC3 | ✅ unassigning returns the ticket to the `unassigned` view, records `UNASSIGNED` rather than `ASSIGNED`, and leaves `departmentId` untouched so the team still sees it. |
+| AC4 | ✅ **the hole is closed.** An agent holding `ticket:update` is refused 403 and the assignee does not move; `PATCH /tickets/:id` no longer assigns at all; the candidate list is 403 for them too; and assigning outside the caller's scope is refused 422. |
+| AC5 | ⚠️ **half met by design.** Inactive is honoured end to end — marked unavailable in the response, disabled in the picker, refused 422 by the server. **Out of office is not modelled**; flagged. |
+| AC6 | ✅ the entry carries both owners' names beside their ids, a later rename does not rewrite it, and an internal note survives a reassignment. |
 
-**What ran, and what did not.** Frontend: `ticket-assignee.test.tsx` 9 pass, plus the four
-files this story touched — `ticket-timeline`, `ticket-detail-page`, `components` (Combobox),
-`ticket-classification` — 39 pass. Typecheck clean across all three workspaces; ESLint clean;
-Prettier clean.
+**Verified.** Backend: `tickets.test.js` and `ticket-history.test.js` together **75 pass, 0
+fail** (19 new — 15 and 4). Frontend: `ticket-assignee.test.tsx` **9 pass**, plus the four
+touched files — `ticket-timeline`, `ticket-detail-page`, `components` (Combobox),
+`ticket-classification` — **39 pass**. Typecheck clean across all three workspaces; ESLint
+clean; Prettier clean.
 
-**The backend suite has not been executed.** Postgres and Redis were not running on the
-machine (the Docker engine was down), so `prepare-test-db` could not reach a database. The
-19 backend tests are written — 15 in `tickets.test.ts`, 4 in `ticket-history.test.ts` — and
-they compile, but *compiling is not passing*. Until they run, every backend row above is
-unverified, and the story stays `In progress` in Notion.
-
-To run them:
-
-```
-docker compose up -d --wait postgres redis
-npm run test --workspace @crm/backend
-```
+The backend run needed `docker compose up -d --wait postgres redis` first — the containers
+were down, which is environment rather than code.
 
 ## One deviation from the plan
 

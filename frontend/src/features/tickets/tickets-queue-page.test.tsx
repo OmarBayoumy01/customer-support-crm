@@ -54,6 +54,7 @@ function ticket(overrides: Partial<Ticket> = {}): Ticket {
     tags: [],
     sla: {
       state: 'ok',
+      firstRespondedAt: null,
       firstResponseDueAt: new Date(Date.now() + HOUR).toISOString(),
       resolutionDueAt: new Date(Date.now() + 6 * HOUR).toISOString(),
       firstResponseBreached: false,
@@ -201,6 +202,7 @@ describe('AC2 — scannability', () => {
       ticket({
         sla: {
           state: 'none',
+          firstRespondedAt: null,
           firstResponseDueAt: null,
           resolutionDueAt: null,
           firstResponseBreached: false,

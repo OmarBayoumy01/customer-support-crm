@@ -4,6 +4,8 @@ import {
   toSkipTake,
   TICKET_VIEWS,
   type ApiPaginated,
+  canTransition,
+  STATUS_PERMISSION,
   type AssignableAgent,
   type AssignedTicketCount,
   type TicketCounts,
@@ -16,6 +18,8 @@ import {
   type TicketListQuery,
   type TicketMessage,
   type UpdateTicket,
+  type PermissionKey,
+  type TicketStatus,
 } from '@crm/shared';
 
 import { ApiException } from '../common/index.js';
@@ -26,6 +30,7 @@ import { SlaClockService } from '../sla/sla-clock.service.js';
 import {
   automationRuleOf,
   eventFor,
+  statusEventFor,
   labelOf,
   FROM_LABEL_METADATA_KEY,
   TO_LABEL_METADATA_KEY,
@@ -59,6 +64,7 @@ const TICKET_SELECT = {
   departmentId: true,
   branchId: true,
   tags: true,
+  firstRespondedAt: true,
   firstResponseDueAt: true,
   firstResponseBreached: true,
   resolutionDueAt: true,
@@ -126,6 +132,35 @@ function toMessage(row: MessageRow): TicketMessage {
   };
 }
 
+/**
+ * The lifecycle timestamps a status change owes — US-47, AC4.
+ *
+ * `resolvedAt`, `closedAt` and `reopenCount` have been read by the detail
+ * payload since US-40 and written by nothing. P11’s reports are why they
+ * exist, so they are maintained here rather than left for a reporting story to
+ * backfill out of history.
+ *
+ * A free function so the reopen path and the ordinary path cannot disagree
+ * about what reopening means.
+ */
+function statusTimestamps(from: TicketStatus, to: TicketStatus): Prisma.TicketUpdateInput {
+  if (to === 'RESOLVED') {
+    return { resolvedAt: new Date() };
+  }
+
+  if (to === 'CLOSED') {
+    return { closedAt: new Date() };
+  }
+
+  // Coming back from a finished state is a reopen, and the timestamps of the
+  // ending that has just been undone must not survive it.
+  if (to === 'OPEN' && (from === 'RESOLVED' || from === 'CLOSED')) {
+    return { resolvedAt: null, closedAt: null, reopenCount: { increment: 1 } };
+  }
+
+  return {};
+}
+
 @Injectable()
 export class TicketsService {
   private readonly logger = new Logger(TicketsService.name);
@@ -167,6 +202,7 @@ export class TicketsService {
     if (due === null) {
       return {
         state: 'none',
+        firstRespondedAt: row.firstRespondedAt?.toISOString() ?? null,
         firstResponseDueAt: row.firstResponseDueAt?.toISOString() ?? null,
         resolutionDueAt: null,
         firstResponseBreached: row.firstResponseBreached,
@@ -188,6 +224,7 @@ export class TicketsService {
 
     return {
       state,
+      firstRespondedAt: row.firstRespondedAt?.toISOString() ?? null,
       firstResponseDueAt: row.firstResponseDueAt?.toISOString() ?? null,
       resolutionDueAt: due.toISOString(),
       firstResponseBreached: row.firstResponseBreached,
@@ -1005,5 +1042,140 @@ export class TicketsService {
     );
 
     return this.toTicket(row);
+  }
+  /**
+   * Move a ticket through its lifecycle — US-47.
+   *
+   * The endpoint US-40 promised when it refused `status` on the general PATCH:
+   * "a second, unguarded door onto the same state machine". This is the guarded
+   * one, and it does four things in order — check the move is legal, check the
+   * caller may make *this* move, write the status with its timestamps, then tell
+   * the clock and the timeline.
+   *
+   * **The extra permission is checked here rather than by a guard.** Every status
+   * change needs `ticket:update`, which the route states declaratively; resolving
+   * and closing additionally need `ticket:close`, and escalating needs
+   * `ticket:escalate`. That is a property of the *destination*, so it belongs
+   * with the rest of the transition rules — splitting `/resolve` and `/escalate`
+   * into routes of their own would scatter one state machine across three doors.
+   */
+  async changeStatus(id: string, to: TicketStatus, actor: TicketActor): Promise<Ticket> {
+    const scope = await this.scopeFor(actor);
+
+    const before = await this.prisma.notDeleted.ticket.findFirst({
+      where: { AND: [{ id }, scope] },
+      select: { status: true },
+    });
+
+    if (before === null) {
+      throw ApiException.notFound('That ticket');
+    }
+
+    const from = before.status;
+
+    // Nothing moved. Same rule the rest of the service follows: a request that
+    // re-sends the current value leaves no trace.
+    if (from === to) {
+      return this.toTicket(
+        await this.prisma.ticket.findUniqueOrThrow({ where: { id }, select: TICKET_SELECT }),
+      );
+    }
+
+    if (!canTransition(from, to)) {
+      throw ApiException.unprocessable(`A ticket cannot move from ${from} to ${to}.`);
+    }
+
+    const required = STATUS_PERMISSION[to];
+
+    if (required !== undefined) {
+      const scopes = await this.permissions.scopesFor(actor.userId, required as PermissionKey);
+
+      if (scopes.length === 0) {
+        throw ApiException.forbidden(`You do not have permission to set a ticket to ${to}.`);
+      }
+    }
+
+    const row = await this.prisma.ticket.update({
+      where: { id },
+      data: { status: to, ...statusTimestamps(from, to) },
+      select: TICKET_SELECT,
+    });
+
+    /**
+     * AC4 — the clock reacts.
+     *
+     * `SlaClockService.onStatusChange` was written by US-68 and has had no
+     * caller until now: it pauses the resolution clock on `PENDING_CUSTOMER`,
+     * stops it on `RESOLVED` / `CLOSED`, and adds the banked pause back to the
+     * deadline on the way out. Nothing about that arithmetic is repeated here.
+     */
+    await this.clock.onStatusChange(id, from, to);
+
+    await this.history.record({
+      ticketId: id,
+      actorUserId: actor.userId,
+      eventType: statusEventFor(from, to),
+      field: 'status',
+      fromValue: from,
+      toValue: to,
+    });
+
+    return this.toTicket(row);
+  }
+
+  /**
+   * A customer replied to a resolved ticket, so it is open again — US-47, AC5.
+   *
+   * **Nothing calls this yet.** No code path writes a customer message: the staff
+   * composer hardcodes `senderType: 'AGENT'`, and the portal reply endpoint is
+   * US-85 in wave 4. The rule is built and tested here because it is a lifecycle
+   * rule, and the portal story is the wrong owner for one — the same split US-1
+   * used for the internal-note filter it could not yet demonstrate.
+   *
+   * Attributed to **no actor**: no member of staff reopened it. The customer is
+   * not a `User` in the sense `actorUserId` means, and naming whoever last
+   * touched the ticket would be the lie US-50's AC3 exists to prevent.
+   *
+   * A `CLOSED` ticket deliberately does not reopen this way. A closed
+   * conversation is finished, and what a customer may do to one is US-90's
+   * decision, not this method's.
+   */
+  async onCustomerReply(ticketId: string): Promise<void> {
+    const ticket = await this.prisma.notDeleted.ticket.findFirst({
+      where: { id: ticketId },
+      select: { id: true, status: true, assigneeId: true },
+    });
+
+    if (ticket === null || ticket.status !== 'RESOLVED') {
+      return;
+    }
+
+    await this.prisma.ticket.update({
+      where: { id: ticketId },
+      data: { status: 'OPEN', ...statusTimestamps('RESOLVED', 'OPEN') },
+    });
+
+    // Restarts the resolution clock the same way an agent's move would.
+    await this.clock.onStatusChange(ticketId, 'RESOLVED', 'OPEN');
+
+    await this.history.record({
+      ticketId,
+      actorUserId: null,
+      eventType: 'REOPENED',
+      field: 'status',
+      fromValue: 'RESOLVED',
+      toValue: 'OPEN',
+    });
+
+    /**
+     * AC5's "the assigned agent is notified" — as far as it goes today.
+     *
+     * P07 is deferred, so there is no channel. The reopen shows up in the
+     * agent's queue and sidebar badge, and this line is the traceable record
+     * until US-62 has something to send.
+     */
+    this.logger.log(
+      `Ticket ${ticketId} reopened by a customer reply (assignee ${ticket.assigneeId ?? 'none'})`,
+    );
   }
 }
