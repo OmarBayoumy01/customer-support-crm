@@ -118,6 +118,23 @@ export {
   type TicketAttachment,
   type TicketHistoryEntry,
 } from './dto/ticket.js';
+export {
+  PortalTicketStatusSchema,
+  PortalAttachmentSchema,
+  PortalMessageSchema,
+  PortalTicketSchema,
+  PortalTicketDetailSchema,
+  PortalTicketListQuerySchema,
+  PORTAL_STATUS,
+  toPortalStatus,
+  internalStatusesFor,
+  type PortalTicketStatus,
+  type PortalAttachment,
+  type PortalMessage,
+  type PortalTicket,
+  type PortalTicketDetail,
+  type PortalTicketListQuery,
+} from './dto/portal.js';
 
 export {
   SlaClockSchema,

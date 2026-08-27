@@ -151,6 +151,24 @@ export const EnvSchema = z.object({
   LOGIN_THROTTLE_WINDOW_SECONDS: z.coerce.number().int().positive().default(900),
 
   /**
+   * Portal rate limits — US-82, AC5.
+   *
+   * Requests, not failures: a customer doing nothing wrong is still capable of
+   * doing too much of it. Two independent counters for the same reason the
+   * login throttle has two — per account stops one signed-in customer, per IP
+   * stops a spray across many accounts from one place.
+   *
+   * Generous by default. The portal is the surface a real customer uses while
+   * a page loads several requests at once, and a limit that trips during
+   * ordinary use is a limit that gets raised until it means nothing.
+   */
+  PORTAL_RATE_LIMIT_PER_ACCOUNT: z.coerce.number().int().positive().default(120),
+  PORTAL_RATE_LIMIT_PER_IP: z.coerce.number().int().positive().default(240),
+
+  /** The counting window for both portal limits, in seconds. */
+  PORTAL_RATE_LIMIT_WINDOW_SECONDS: z.coerce.number().int().positive().default(60),
+
+  /**
    * `Secure` on the refresh cookie. Off by default only because a developer on
    * plain `http://localhost` would otherwise never receive the cookie at all
    * and login would appear to work while silently issuing no session.

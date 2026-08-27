@@ -1,0 +1,62 @@
+# portal — plan overview
+
+Entry point for the **customer portal**. Five of the twenty-eight stories in
+[`../00-mvp-scope.md`](../00-mvp-scope.md) live here — US-21, US-82, US-86, US-84, US-85 —
+and together they close the loop: a customer raises a request and sees the answer.
+
+## Stories
+
+| NN  | File | Title | Tracker id | Depends on |
+| --- | ---- | ----- | ---------- | ---------- |
+| 39  | `39-story-customer-scoped-portal-api.md` | Build the customer-scoped portal API | US-82 | US-40 |
+
+## Why this feature exists as its own module
+
+**The portal is a separate API surface, not a flag on the staff one.** A shared controller
+deciding what to serialise from a boolean is one `if` away from serving an internal note to
+a customer, and that is the failure the project's first non-negotiable rule exists to
+prevent.
+
+So `backend/src/portal/` has its own controller, its own passport strategy pinned to the
+`crm-portal` audience, its own allowlist DTOs in `packages/shared/src/dto/portal.ts`, and
+its own rate limit. Nothing in it is a variation on a staff endpoint.
+
+## The rule, and the five places it is enforced
+
+Non-negotiable rule #1 — *an internal note must never reach a customer* — is enforced in the
+query and in the contract, never in the client:
+
+1. **Messages** — `isInternal: false` in the `where`.
+2. **Counts** — the same `where`, so a total cannot disclose what the list omitted.
+3. **Attachments** — selected through the message, because `Attachment` has no `isInternal`
+   of its own and the staff detail selects them off the ticket.
+4. **History** — absent from the contract entirely; there is nothing to filter.
+5. **The contract** — hand-written allowlists, never `omit`s of the staff DTO. An omit list
+   is a denylist that does not know about the next field somebody adds.
+
+`backend/src/portal/portal.test.ts` opens with the regression test the rule demands, asserted
+against the serialised JSON.
+
+## Locked decisions
+
+- **Ownership is not the `OWN` permission scope.** US-13's scope produces the right clause,
+  but a permission scope is *configuration* — an administrator who granted a customer-facing
+  role `ticket:view` at `ALL` would silently widen the portal to every ticket in the
+  platform. The portal resolves `Customer.userId → customerId` from the authenticated token
+  and filters on it unconditionally. No linked customer means 403, never "no filter".
+- **`@Public()` and `@UseGuards(PortalAuthGuard)` are a pair.** The global `JwtAuthGuard` is
+  pinned to `crm-staff`, so a portal route needs `@Public()` to reach its own guard — and
+  `@Public()` alone would leave it open to the internet. The 401 test is what stands between
+  a refactor and an open endpoint.
+- **Somebody else's request answers 404**, not 403. A 403 confirms it exists.
+- **One Redis, no throttling library.** The counter must be shared across replicas to mean
+  anything, and it fails open like the login throttle — a portal returning 429 to everyone
+  through a Redis outage is the worse failure.
+
+## What the next stories inherit
+
+- **US-86** adds `POST /portal/tickets` to this controller and inherits the guard, the
+  throttle and the scope.
+- **US-84** and **US-85** are the screens over this API. If they need a field, it is added to
+  the allowlist deliberately — which is the point of the allowlist.
+- **US-21** is the sign-in screen. The audience it will use is already enforced here.

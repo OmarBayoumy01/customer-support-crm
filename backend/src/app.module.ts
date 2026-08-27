@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 
 import { AuditModule } from './audit/index.js';
 import { AuthModule, TokenRevocationModule } from './auth/index.js';
+import { PortalModule } from './portal/index.js';
 import { CategoriesModule } from './categories/index.js';
 import { CommonModule } from './common/index.js';
 import { CustomersModule } from './customers/index.js';
@@ -50,6 +51,7 @@ import { RedisModule } from './redis/index.js';
     CustomersModule,
     CategoriesModule,
     TicketsModule,
+    PortalModule,
     HealthModule,
   ],
 })

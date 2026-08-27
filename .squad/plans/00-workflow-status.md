@@ -33,11 +33,12 @@ The target flow, with the story that owns each step and its real state:
 | Agent *sees* the clock on a ticket | US-69 | ✅ in review |
 | Escalate on breach | US-71 | ✅ in review |
 | Resolve | US-47 | ✅ in review |
+| Customer-scoped portal API | US-82 | ✅ in review |
 | Customer sees the result | **US-84** | ❌ not started |
 | Customer replies again | **US-85** | ❌ not started |
 | Manager reports on it | **US-55, US-58** | ❌ not started |
 
-**19 of 28 stories are done** (waves 0 and 1, eight of ten in wave 2, and wave 3). Every finished story is
+**20 of 28 stories are done** (waves 0 and 1, eight of ten in wave 2, wave 3, and the portal API). Every finished story is
 `In review` in Notion — never `Done`, which is the human's call.
 
 **What is demonstrable today:** sign in as a seeded agent → browse and filter the queue → open
@@ -66,7 +67,7 @@ report. Escalation happens but cannot notify anybody — see the flags.
 | **Escalation** | The seeded 75/90/100% ladder is read every minute inside the existing sweep; the breach rung moves the ticket to `ESCALATED`, stamps `escalatedAt`/`escalatedToId`, and records history attributed to the rule. Idempotent per rung | Notifications — **US-62**, deferred | US-71 ✅ | — |
 | **Resolution** | Validated transitions, `resolvedAt`/`closedAt`/`reopenCount`, reopen rule built | Reopen *trigger* — needs US-85 | US-47 ✅ | US-45 |
 | **Ticket history** | Every mutation recorded, actor or automation attributed, names stored beside ids, append-only enforced by a trigger | — | US-50 ✅ | US-40 |
-| **Portal** | `crm-portal` audience exists | **The entire portal** | **US-21, 82, 86, 84, 85** ❌ | US-40, US-120 |
+| **Portal** | **The customer-scoped API and its boundary**: own module, own passport strategy pinned to `crm-portal`, allowlist DTOs, per-account and per-IP rate limit, and rule #1 enforced in the query with its regression test | Sign-in screen, submit, and the two screens | US-82 ✅ · **US-21, 86, 84, 85** ❌ | US-40, US-120 |
 | **Dashboard** | Placeholder page, sidebar badge already live | **All metrics** | **US-55** ❌ | US-40 |
 | **Reports** | Nothing | **The manager dashboard** — this *is* the "Report" step | **US-58** ❌ | US-40 |
 
@@ -74,21 +75,20 @@ report. Escalation happens but cannot notify anybody — see the flags.
 
 ## What is left, in the order to do it
 
-Nine stories. The order below is the critical path, not the story numbers.
+Eight stories. The order below is the critical path, not the story numbers.
 
 | # | Story | Why here | Size |
 | - | ----- | -------- | ---- |
 | 1 | **US-21** Sign in to the customer portal | Opens the customer half. Portal accounts come from the seed | small |
-| 2 | **US-82** Customer-scoped portal API | **Carries non-negotiable rule #1** — internal notes filtered in the query, with the regression test | medium |
-| 3 | **US-86** Submit a support request | "Customer submits" — the real entry point | medium |
-| 4 | **US-84** Track my requests | "The customer sees the result" | small |
-| 5 | **US-85** Read and reply to my request | Closes the loop, and supplies US-47's reopen trigger | medium |
-| 6 | **US-55** Agent dashboard | First screen after sign-in; currently a placeholder | medium |
-| 7 | **US-58** Manager dashboard | **This is the "Report" step.** P11 Reports is entirely V2 | medium |
-| 8 | US-41 Create a ticket as an agent | Second entry point. **The loop closes without it** | medium |
-| 9 | US-35 View a customer profile | The customer as a thing you can open. **The loop closes without it** | medium |
+| 2 | **US-86** Submit a support request | "Customer submits" — the real entry point | medium |
+| 3 | **US-84** Track my requests | "The customer sees the result" | small |
+| 4 | **US-85** Read and reply to my request | Closes the loop, and supplies US-47's reopen trigger | medium |
+| 5 | **US-55** Agent dashboard | First screen after sign-in; currently a placeholder | medium |
+| 6 | **US-58** Manager dashboard | **This is the "Report" step.** P11 Reports is entirely V2 | medium |
+| 7 | US-41 Create a ticket as an agent | Second entry point. **The loop closes without it** | medium |
+| 8 | US-35 View a customer profile | The customer as a thing you can open. **The loop closes without it** | medium |
 
-**If credits are the binding constraint, stop after 7.** Items 8 and 9 are the two remaining
+**If credits are the binding constraint, stop after 6.** Items 7 and 8 are the two remaining
 wave-2 stories and both are genuine capabilities, but neither is on the critical path: tickets
 enter through the portal, and the customer is already visible from the ticket's context panel.
 That is a scope decision for the human, flagged rather than taken.
@@ -102,13 +102,23 @@ That is a scope decision for the human, flagged rather than taken.
   `TICKET_TRANSITIONS` in `packages/shared/src/dto/ticket.ts` and are enforced on both sides.
 - **The server is the security boundary.** Every permission is re-checked in a guard, and
   scoped permissions are applied *in the query* — never by filtering a fetched list.
-- **An internal note must never reach a customer.** `Message.isInternal` is written by US-1;
-  **the filter and its regression test belong to US-82** and must not be assumed done.
+- **An internal note must never reach a customer.** `Message.isInternal` is written by US-1,
+  and **US-82 closed all five leak vectors** — messages, counts, attachments (selected
+  through the message, since `Attachment` has no flag of its own), history (absent from the
+  contract), and the contract itself (hand-written allowlists, never an `omit` of the staff
+  DTO). The regression test is `backend/src/portal/portal.test.ts`, asserted against the
+  serialised JSON. **Any new customer-facing surface must close the same five.**
 - **A guarded operation gets its own route.** `PATCH /tickets/:id` deliberately refuses
   `status` and `assigneeId`; those are `/status` and `/assignee` behind their own permissions.
   Anything with its own rules follows that pattern.
 - **Shared contracts over duplication.** DTOs, enums and Zod schemas live in
   `packages/shared` and are imported by both sides.
+- **The portal never uses the `OWN` permission scope for ownership.** A permission scope is
+  configuration; the portal resolves `Customer.userId → customerId` from the token and
+  filters on it unconditionally. No linked customer means 403, never "no filter".
+- **Portal routes carry `@Public()` *and* `@UseGuards(PortalAuthGuard)`.** The first is
+  needed to bypass the staff-pinned global guard; the first *without* the second is an open
+  endpoint. The 401 test is what catches that.
 - **One queue.** BullMQ on the existing Redis. `SlaSweepWorker` is the pattern to follow.
 - **History is append-only**, enforced by a database trigger, and labels are captured at write
   time so a later rename cannot rewrite the past.
@@ -123,7 +133,6 @@ That is a scope decision for the human, flagged rather than taken.
 | ----- | -- | --- | -------------- |
 | US-68 | AC2 business hours | Needs US-75's calendar | US-75 |
 | US-46 / US-1 | attachment download | Needs S3 | US-51 |
-| US-1 | AC5 portal excludes notes | Rule built and tested; the portal is not | US-82 |
 | US-49 | AC3 manage categories | `GET /categories` built; the screen is not | US-113 |
 | US-48 | AC1 agent is notified | No notification channel exists | US-62 |
 | US-48 | AC5 out of office | **Not modelled in the schema at all** | a story that owns agent availability |
