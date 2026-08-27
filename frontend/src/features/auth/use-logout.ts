@@ -1,4 +1,4 @@
-import { useMutation, type UseMutationResult } from '@tanstack/react-query';
+import { useMutation, useQueryClient, type UseMutationResult } from '@tanstack/react-query';
 import { useNavigate } from 'react-router';
 
 import { http } from '../../lib/api-client';
@@ -19,6 +19,7 @@ import { useAuth } from './auth-context';
  */
 export function useLogout(): UseMutationResult<void, Error, { everywhere?: boolean } | void> {
   const { signOut } = useAuth();
+  const queryClient = useQueryClient();
   const navigate = useNavigate();
 
   return useMutation<void, Error, { everywhere?: boolean } | void>({
@@ -31,6 +32,22 @@ export function useLogout(): UseMutationResult<void, Error, { everywhere?: boole
     retry: false,
     onSettled: () => {
       signOut();
+
+      /**
+       * Everything the last session fetched, thrown away.
+       *
+       * The cache is a module-level store that outlives a sign-out, so
+       * without this the next person to sign in on this tab is shown the
+       * previous one's tickets, numbers and names until each query happens to
+       * refetch. On a shared machine that is a data leak, and it is the thing
+       * that reads as "the app remembered the old user".
+       *
+       * `clear` rather than `invalidateQueries`: invalidating keeps the data
+       * and marks it stale, which still renders it once while the refetch is
+       * in flight.
+       */
+      queryClient.clear();
+
       void navigate('/login', { replace: true });
     },
   });

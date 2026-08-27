@@ -9,6 +9,7 @@ import { AuthController } from './auth.controller.js';
 import { AuthService } from './auth.service.js';
 import { JwtAuthGuard } from './jwt-auth.guard.js';
 import { JwtStrategy } from './jwt.strategy.js';
+import { SessionJwtStrategy } from './session-jwt.strategy.js';
 import { LoginThrottleService } from './login-throttle.service.js';
 import { PermissionsGuard } from '../permissions/index.js';
 import { PasswordService } from './password.service.js';
@@ -50,6 +51,8 @@ import { TokenService } from './token.service.js';
     SessionService,
     LoginThrottleService,
     JwtStrategy,
+    // Either audience, and only the sign-out routes use it.
+    SessionJwtStrategy,
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     // Second, and the order matters: PermissionsGuard reads the user that
     // JwtAuthGuard put on the request. Registered here rather than in

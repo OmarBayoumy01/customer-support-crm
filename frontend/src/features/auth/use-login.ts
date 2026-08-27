@@ -1,4 +1,4 @@
-import { useMutation, type UseMutationResult } from '@tanstack/react-query';
+import { useMutation, useQueryClient, type UseMutationResult } from '@tanstack/react-query';
 import { useLocation, useNavigate } from 'react-router';
 import { LoginResponseSchema, type LoginRequest, type LoginResponse } from '@crm/shared';
 
@@ -34,6 +34,7 @@ async function postLogin(credentials: LoginRequest): Promise<LoginResponse> {
 
 export function useLogin(): UseMutationResult<LoginResponse, ApiRequestError, LoginRequest> {
   const { signIn } = useAuth();
+  const queryClient = useQueryClient();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -49,6 +50,15 @@ export function useLogin(): UseMutationResult<LoginResponse, ApiRequestError, Lo
   return useMutation<LoginResponse, ApiRequestError, LoginRequest>({
     mutationFn: postLogin,
     onSuccess: (response) => {
+      /**
+       * Anything the previous session left behind, before this one renders.
+       *
+       * `useLogout` clears the cache too, and this is the other half: a
+       * session can also end without anybody clicking Sign out — an expired
+       * refresh, a revoked token, a second person using the same tab.
+       */
+      queryClient.clear();
+
       signIn(response);
 
       const landing =
@@ -60,13 +70,19 @@ export function useLogin(): UseMutationResult<LoginResponse, ApiRequestError, Lo
        *
        * A customer who followed a staff link, was bounced to the form, and
        * signed in must not be sent on to a staff route that will refuse them:
-       * the server would answer 401 and the screen would read as broken. Staff
-       * are not restricted the other way, because every staff account may open
-       * the portal's own pages — it has none they can reach.
+       * the server would answer 401 and the screen would read as broken.
+       *
+       * **And the same in reverse.** A staff member who was bounced off a
+       * portal page must not be carried back to it — the portal API refuses a
+       * staff token just as firmly. So the destination is honoured only when
+       * it belongs to the application that actually signed in, which is also
+       * why signing in as staff after a customer used the tab does not land
+       * on the portal.
        */
-      const honourIntended =
-        intended !== undefined &&
-        (response.audience !== 'crm-portal' || intended.startsWith('/portal'));
+      const isPortalPath = intended?.startsWith('/portal') === true;
+      const wantsPortal = response.audience === 'crm-portal';
+
+      const honourIntended = intended !== undefined && isPortalPath === wantsPortal;
 
       // `replace`, so the back button does not return to a login form the user
       // has already used.

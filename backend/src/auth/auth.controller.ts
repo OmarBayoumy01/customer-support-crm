@@ -1,4 +1,4 @@
-import { Body, Controller, HttpCode, Post, Req, Res } from '@nestjs/common';
+import { Body, Controller, HttpCode, Post, Req, Res, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { ApiErrorSchema, LoginResponseSchema, type LoginResponse } from '@crm/shared';
@@ -12,6 +12,7 @@ import { SessionService } from './session.service.js';
 import { TokenRevocationService } from './token-revocation.service.js';
 import { Public } from './decorators/public.decorator.js';
 import { RefreshService } from './refresh.service.js';
+import { SessionAuthGuard } from './session-jwt.strategy.js';
 import { LoginRequestDto } from './dto/login.dto.js';
 import { TokenService } from './token.service.js';
 
@@ -139,6 +140,21 @@ export class AuthController {
    * Not `@Public()`: signing out is something an authenticated caller does, and
    * the token being presented is the one being revoked.
    */
+  /**
+   * Signing out belongs to neither application.
+   *
+   * `@Public()` takes the route off the global staff guard and
+   * `SessionAuthGuard` puts it back on one that accepts **either** audience.
+   * The pairing is deliberate and the two must travel together — see the note
+   * on the guard.
+   *
+   * Before this, a customer’s `crm-portal` token was refused here with a 401.
+   * The client clears its own state either way, so the sign-out looked like it
+   * had worked while the session and the refresh cookie both survived — and the
+   * next page load traded that cookie for a new token and signed them back in.
+   */
+  @Public()
+  @UseGuards(SessionAuthGuard)
   @Post('logout')
   @HttpCode(204)
   @ApiBearerAuth(BEARER_AUTH_NAME)
@@ -173,6 +189,9 @@ export class AuthController {
    * The one to reach for after losing a laptop, which is exactly when a
    * per-device list is no use to anybody.
    */
+  /** Either audience, for the reason `logout` gives. */
+  @Public()
+  @UseGuards(SessionAuthGuard)
   @Post('logout-all')
   @HttpCode(204)
   @ApiBearerAuth(BEARER_AUTH_NAME)

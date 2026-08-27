@@ -247,6 +247,142 @@ test('AC4 — after a forced logout the user can simply sign in again', async ()
   assert.equal(await callProtected(fresh.accessToken), 200);
 });
 
+// ---------------------------------------------------------------------------
+// A customer can sign out — the bug that read as a stale cache
+// ---------------------------------------------------------------------------
+
+/**
+ * A portal account: a user with a linked `Customer` row, which is what decides
+ * the audience of the token the one login endpoint issues.
+ */
+async function signInAsCustomer(): Promise<Session> {
+  const address = `logout-customer-${run}-${String(++created)}@example.com`;
+
+  const user = await prisma.user.create({
+    data: {
+      email: address,
+      passwordHash: await passwords.hash(PASSWORD),
+      firstName: 'Logout',
+      lastName: 'Customer',
+      roles: { create: { roleId } },
+    },
+    select: { id: true },
+  });
+
+  await prisma.customer.create({
+    data: {
+      firstName: 'Logout',
+      lastName: 'Customer',
+      email: address,
+      userId: user.id,
+    },
+  });
+
+  const response = await fetch(`${baseUrl}/auth/login`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ email: address, password: PASSWORD }),
+  });
+
+  const body = (await response.json()) as { data: { accessToken: string; audience: string } };
+
+  // The premise of the tests below: this really is a portal token.
+  assert.equal(body.data.audience, 'crm-portal');
+
+  return {
+    userId: user.id,
+    accessToken: body.data.accessToken,
+    refreshToken:
+      /crm_refresh_token=([^;]+)/.exec(response.headers.get('set-cookie') ?? '')?.[1] ?? '',
+  };
+}
+
+test('a customer can sign out, and the session and cookie really end', async () => {
+  /**
+   * The bug this pins down.
+   *
+   * `/auth/logout` sat behind the staff-audience strategy, so a portal token
+   * was refused with a 401. The client clears its own state regardless, so the
+   * sign-out **looked** like it worked — while the session stayed alive and the
+   * refresh cookie stayed on the browser. The next page load exchanged that
+   * cookie for a fresh token and signed the customer straight back in, which
+   * reads exactly like the application having cached the old user.
+   */
+  const session = await signInAsCustomer();
+
+  const response = await fetch(`${baseUrl}/auth/logout`, {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${session.accessToken}`,
+      cookie: `${REFRESH_COOKIE}=${session.refreshToken}`,
+    },
+  });
+
+  assert.equal(response.status, 204);
+  assert.match(response.headers.get('set-cookie') ?? '', /crm_refresh_token=;/);
+
+  assert.equal(
+    await prisma.session.count({ where: { userId: session.userId, revokedAt: null } }),
+    0,
+  );
+});
+
+test('and the cookie cannot then be traded for a new session', async () => {
+  const session = await signInAsCustomer();
+
+  await fetch(`${baseUrl}/auth/logout`, {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${session.accessToken}`,
+      cookie: `${REFRESH_COOKIE}=${session.refreshToken}`,
+    },
+  });
+
+  // The half that produced the symptom: a surviving cookie plus the
+  // boot-time restore is what signed the customer back in.
+  const refreshed = await fetch(`${baseUrl}/auth/refresh`, {
+    method: 'POST',
+    headers: { cookie: `${REFRESH_COOKIE}=${session.refreshToken}` },
+  });
+
+  assert.equal(refreshed.status, 401);
+});
+
+test('signing out everywhere works for a customer too', async () => {
+  const session = await signInAsCustomer();
+
+  const response = await fetch(`${baseUrl}/auth/logout-all`, {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${session.accessToken}`,
+      cookie: `${REFRESH_COOKIE}=${session.refreshToken}`,
+    },
+  });
+
+  assert.equal(response.status, 204);
+  assert.equal(
+    await prisma.session.count({ where: { userId: session.userId, revokedAt: null } }),
+    0,
+  );
+});
+
+test('signing out is still authenticated — an anonymous attempt is 401', async () => {
+  // The guard on these routes is applied with `@Public()`, which takes them off
+  // the global one. This is the test standing between that pairing and an open
+  // endpoint that would let anyone end anybody’s session.
+  for (const path of ['/auth/logout', '/auth/logout-all']) {
+    const response = await fetch(`${baseUrl}${path}`, { method: 'POST' });
+
+    assert.equal(response.status, 401, path);
+  }
+});
+
+test('a staff token still signs out, unchanged', async () => {
+  const session = await signIn();
+
+  assert.equal(await logout(session), 204);
+});
+
 test('a token with no jti is refused, since nothing could ever revoke it', async () => {
   const { JwtService } = await import('@nestjs/jwt');
   const jwt = app.get(JwtService);

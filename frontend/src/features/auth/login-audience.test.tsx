@@ -30,7 +30,9 @@ import i18n from '@/i18n';
 import { AppProviders } from '@/app/providers';
 import { http } from '@/lib/api-client';
 import { publishSession, resetSessionStore } from '@/lib/session-store';
+import { createQueryClient } from '@/app/providers';
 import { LoginPage } from '@/features/auth/login-page';
+import { useLogout } from '@/features/auth/use-logout';
 import { RequireAuth } from '@/features/auth/require-auth';
 import { PortalHomePage } from '@/features/portal/portal-home-page';
 
@@ -296,6 +298,111 @@ describe('the destination somebody was heading for', () => {
     await waitFor(() => {
       expect(screen.getByTestId('path')).toHaveTextContent('/tickets/abc');
     });
+  });
+
+  test('a staff member is NOT carried back to a portal page', async () => {
+    // The mirror of the case above, and the reason it matters: the portal API
+    // refuses a staff token exactly as firmly as the staff API refuses a portal
+    // one. Carrying them there would show a page whose every request 401s.
+    respondWith({ session: STAFF });
+
+    renderAt('/login', { from: '/portal/requests/abc' });
+
+    await signIn();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('path')).toHaveTextContent('/dashboard');
+    });
+
+    expect(screen.queryByText('one request')).not.toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// What the last session leaves behind
+// ---------------------------------------------------------------------------
+
+describe('the cache between two sessions', () => {
+  /** A button that signs out, so the hook can be exercised through the UI. */
+  function SignOutButton(): React.JSX.Element {
+    const logout = useLogout();
+
+    return (
+      <button
+        type="button"
+        onClick={() => {
+          logout.mutate();
+        }}
+      >
+        sign out
+      </button>
+    );
+  }
+
+  test('signing out throws away everything the previous session fetched', async () => {
+    const user = userEvent.setup();
+    const client = createQueryClient();
+
+    publishSession(CUSTOMER);
+
+    // Something the last session had loaded — a list of their requests.
+    client.setQueryData(['tickets', 'list', 'portal'], { data: [{ id: 'x' }] });
+
+    render(
+      <MemoryRouter initialEntries={['/somewhere']}>
+        <AppProviders queryClient={client}>
+          <Where />
+          <Routes>
+            <Route path="/login" element={<div>login screen</div>} />
+            <Route path="/somewhere" element={<SignOutButton />} />
+          </Routes>
+        </AppProviders>
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'sign out' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('path')).toHaveTextContent('/login');
+    });
+
+    /**
+     * The cache outlives a sign-out, so without clearing it the next person to
+     * use this tab is shown the previous one's data until each query happens to
+     * refetch. On a shared machine that is a leak, and it is what reads as "the
+     * app remembered the old user".
+     */
+    await waitFor(() => {
+      expect(client.getQueryCache().getAll()).toHaveLength(0);
+    });
+  });
+
+  test('signing in throws it away too, for the sessions nobody signed out of', async () => {
+    const client = createQueryClient();
+
+    client.setQueryData(['tickets', 'list', 'staff'], { data: [{ id: 'y' }] });
+
+    render(
+      <MemoryRouter initialEntries={['/login']}>
+        <AppProviders queryClient={client}>
+          <Where />
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/portal" element={<div>portal home</div>} />
+          </Routes>
+        </AppProviders>
+      </MemoryRouter>,
+    );
+
+    await signIn();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('path')).toHaveTextContent('/portal');
+    });
+
+    // An expired refresh or a revoked token ends a session without anybody
+    // clicking Sign out, so the sign-in side has to clear it as well.
+    expect(client.getQueryData(['tickets', 'list', 'staff'])).toBeUndefined();
   });
 });
 
