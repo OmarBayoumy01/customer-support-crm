@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { canTransition, STATUS_PERMISSION, type Ticket, type TicketDetail } from '@crm/shared';
+import { canTransition, STATUS_PERMISSION, type Ticket } from '@crm/shared';
 import type { PermissionKey } from '@crm/shared';
 
 import { ConfirmDialog } from '@/components/common/confirm-dialog';
@@ -20,8 +20,15 @@ import { cn } from '@/lib/utils';
 import { ASSIGNED_TICKET_COUNT_KEY } from './use-assigned-ticket-count';
 import { ticketDetailKey } from './use-ticket-detail';
 
+/**
+ * What this control actually reads — US-55.
+ *
+ * Widened from `TicketDetail` so the dashboard can hand it a queue row. It only
+ * ever needed the id, the status and whether a reply has gone out, and saying so
+ * is more honest than requiring the whole detail payload.
+ */
 export interface TicketStatusControlProps {
-  ticket: TicketDetail;
+  ticket: Pick<Ticket, 'id' | 'status'> & { sla: Pick<Ticket['sla'], 'firstRespondedAt'> };
   className?: string | undefined;
 }
 

@@ -176,6 +176,10 @@ export {
   type TicketView,
   type TicketCounts,
   type AssignedTicketCount,
+  DashboardMetricSchema,
+  AssignedSummarySchema,
+  type DashboardMetric,
+  type AssignedSummary,
 } from './dto/ticket-counts.js';
 
 export { CategorySchema, type Category } from './dto/category.js';

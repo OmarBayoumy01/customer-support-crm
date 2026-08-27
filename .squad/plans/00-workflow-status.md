@@ -37,9 +37,10 @@ The target flow, with the story that owns each step and its real state:
 | Customer-scoped portal API | US-82 | ✅ in review |
 | Customer sees the result | US-84 | ✅ in review |
 | Customer replies again | US-85 | ✅ in review |
-| Manager reports on it | **US-55, US-58** | ❌ not started |
+| Agent sees their workload | US-55 | ✅ in review |
+| Manager reports on it | **US-58** | ❌ not started |
 
-**24 of 28 stories are done** (waves 0 and 1, eight of ten in wave 2, and all of waves 3 and 4). **The customer journey now runs end to end.** Every finished story is
+**25 of 28 stories are done** (waves 0 and 1, eight of ten in wave 2, and all of waves 3 and 4). **The customer journey now runs end to end.** Every finished story is
 `In review` in Notion — never `Done`, which is the human's call.
 
 **What is demonstrable today:** sign in as a seeded agent → browse and filter the queue → open
@@ -69,23 +70,22 @@ report. Escalation happens but cannot notify anybody — see the flags.
 | **Resolution** | Validated transitions, `resolvedAt`/`closedAt`/`reopenCount`, and the reopen rule now **called** — a customer reply to a resolved request reopens it | — | US-47 ✅ · trigger from US-85 ✅ | — |
 | **Ticket history** | Every mutation recorded, actor or automation attributed, names stored beside ids, append-only enforced by a trigger | — | US-50 ✅ | US-40 |
 | **Portal** | **Complete for the MVP**: the boundary (own module, own `crm-portal` strategy, allowlist DTOs, rate limit, rule #1 in the query with its regression test), sign-in, submit, the request list, and the thread with a customer reply that reopens a resolved request through US-47's rule | Rating (US-88), customer reopen of a closed request (US-90), attachments (US-51) — all deferred | US-82, 21, 86, 84, 85 ✅ | — |
-| **Dashboard** | Placeholder page, sidebar badge already live | **All metrics** | **US-55** ❌ | US-40 |
+| **Dashboard** | The agent dashboard: four KPIs from the caller's own scoped rows through the existing SLA rule, their tickets urgency-first, and row actions reusing US-47 and US-48's controls | Snooze (no owner), and a real week-ago comparison for three of four KPIs (needs a snapshot) | US-55 ✅ | — |
 | **Reports** | Nothing | **The manager dashboard** — this *is* the "Report" step | **US-58** ❌ | US-40 |
 
 ---
 
 ## What is left, in the order to do it
 
-Four stories. The order below is the critical path, not the story numbers.
+Three stories. The order below is the critical path, not the story numbers.
 
 | # | Story | Why here | Size |
 | - | ----- | -------- | ---- |
-| 1 | **US-55** Agent dashboard | First screen after sign-in; currently a placeholder | medium |
-| 2 | **US-58** Manager dashboard | **This is the "Report" step.** P11 Reports is entirely V2 | medium |
-| 3 | US-41 Create a ticket as an agent | Second entry point. **The loop closes without it** | medium |
-| 4 | US-35 View a customer profile | The customer as a thing you can open. **The loop closes without it** | medium |
+| 1 | **US-58** Manager dashboard | **This is the "Report" step.** P11 Reports is entirely V2 | medium |
+| 2 | US-41 Create a ticket as an agent | Second entry point. **The loop closes without it** | medium |
+| 3 | US-35 View a customer profile | The customer as a thing you can open. **The loop closes without it** | medium |
 
-**If credits are the binding constraint, stop after 2.** Items 3 and 4 are the two remaining
+**If credits are the binding constraint, stop after 1.** Items 2 and 3 are the two remaining
 wave-2 stories and both are genuine capabilities, but neither is on the critical path: tickets
 enter through the portal, and the customer is already visible from the ticket's context panel.
 That is a scope decision for the human, flagged rather than taken.
@@ -138,6 +138,8 @@ That is a scope decision for the human, flagged rather than taken.
 | US-48 | AC5 out of office | **Not modelled in the schema at all** | a story that owns agent availability |
 | US-71 | AC1, AC2 notifications | Each rung records history and logs its recipient; no channel exists | US-62 |
 | US-71 | AC4 Tickets Requiring Attention | Escalated tickets surface in the queue's `escalated` view | US-58 |
+| US-55 | AC1 comparison on three of four KPIs | The status, breach flags and warning window a week ago are not recoverable from ticket rows; it needs a daily snapshot, which is P11 analytics | P11 |
+| US-55 | AC4 snooze | No column, no endpoint, and no story owns it | a story that owns snooze |
 | US-85 | AC5 attachment button | Object storage is US-51, deferred | US-51 |
 | US-85 | a reply does not clear `WAITING_ON_YOU` | `onCustomerReply` handles `RESOLVED` only; fixing it means adding a lifecycle rule, so it is reported rather than invented | whoever owns that rule |
 | US-84 | AC4 star rating | Rating is US-88, deferred — no column, no endpoint, nowhere to put a star | US-88 |
@@ -145,7 +147,7 @@ That is a scope decision for the human, flagged rather than taken.
 | US-86 | AC3 article deflection | The knowledge base is all of P09, cut; US-76 is the story's own dependency | P09 |
 | US-86 | AC4 "view it" link | Still absent from the confirmation, though the screen now exists — the list is one tap away and the confirmation links there | a cheap follow-up |
 | US-21 | AC3 guest browsing | The knowledge base is all of P09 (cut) and "register" is US-20 (deferred); there is no submit control to gate either | P09 and US-20 |
-| US-69 | AC6 "and dashboards" | Verified on the ticket and the queue; there are no dashboards yet | US-55, US-58 |
+| US-69 | AC6 "and dashboards" | The agent dashboard now uses the same `SlaMeter` as the queue, so this holds on three surfaces; the manager dashboard is the last one | US-58 |
 | US-69 | AC4 paused *periods* | The schema banks a total plus the current pause, not a list of intervals | a schema change nobody needs yet |
 
 ---

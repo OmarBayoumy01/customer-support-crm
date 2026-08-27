@@ -3,6 +3,7 @@ import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagg
 import {
   ApiErrorSchema,
   AssignableAgentSchema,
+  AssignedSummarySchema,
   AssignedTicketCountSchema,
   buildPaginationMeta,
   TicketCountsSchema,
@@ -13,6 +14,7 @@ import {
   toSkipTake,
   type ApiPaginated,
   type AssignableAgent,
+  type AssignedSummary,
   type AssignedTicketCount,
   type Ticket,
   type TicketCounts,
@@ -128,6 +130,34 @@ export class TicketsController {
     @CurrentUser() user: CurrentUserPayload | undefined,
   ): Promise<AssignedTicketCount> {
     return this.tickets.assignedCount(await this.actorFrom(user));
+  }
+
+  /**
+   * The agent dashboard's KPI row — US-55, AC1.
+   *
+   * Declared before `:id`, like the other literal paths on this controller.
+   *
+   * Every figure is the caller’s own assigned work: `assigneeId` and the
+   * caller’s scope are both in the query, so there is no shape of request that
+   * reports somebody else’s workload.
+   */
+  @Get('assigned/summary')
+  @RequirePermission('ticket:view')
+  @ApiOperation({
+    summary: 'What is on the signed-in agent’s plate',
+    description:
+      'Open, pending, due soon and breached, derived from the caller’s own open tickets ' +
+      'through the same SLA function the queue uses. `previous` is a week-ago comparison ' +
+      'and is **null wherever one cannot honestly be computed**: the status then is not ' +
+      'stored, the breach flags are current-only, and "due soon" is relative to now. Only ' +
+      '`open` has a past value, and it takes assignment as current because `assigneeId` is ' +
+      'a column rather than a history.',
+  })
+  @ApiZodResponse(200, AssignedSummarySchema, 'The summary')
+  async assignedSummary(
+    @CurrentUser() user: CurrentUserPayload | undefined,
+  ): Promise<AssignedSummary> {
+    return this.tickets.assignedSummary(await this.actorFrom(user));
   }
 
   /**

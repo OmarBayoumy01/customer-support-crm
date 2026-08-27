@@ -319,11 +319,38 @@
     "portalLink": "Use the portal sign-in"
   },
   "dashboard": {
-    "title": "Dashboard",
+    "title": "My workload",
     "greeting": "Signed in as {{name}}",
     "rolesLabel": "Roles",
     "noRoles": "No roles assigned",
-    "placeholder": "This is a placeholder. The real dashboard arrives with its own story."
+    "subtitle": "Here is what is on your plate, {{name}}.",
+    "subtitleAnonymous": "Here is what is on your plate.",
+    "kpi": {
+      "label": "My numbers",
+      "open": "Open tickets",
+      "pending": "Pending",
+      "dueSoon": "Due soon",
+      "breached": "SLA breaches",
+      "sinceLastWeek": "{{delta}} vs last week",
+      "noComparison": "No comparison available",
+      "failed": "We could not load your numbers just now."
+    },
+    "table": {
+      "label": "My tickets",
+      "id": "ID",
+      "subject": "Subject",
+      "customer": "Customer",
+      "priority": "Priority",
+      "status": "Status",
+      "sla": "SLA",
+      "updated": "Updated",
+      "actions": "Actions",
+      "reply": "Reply",
+      "open": "Open ticket",
+      "seeAll": "See all in the queue",
+      "emptyTitle": "Nothing assigned to you",
+      "emptyBody": "When a ticket is assigned to you it will appear here, most urgent first."
+    }
   },
   "signIn": {
     "headline": "The queue is waiting.",

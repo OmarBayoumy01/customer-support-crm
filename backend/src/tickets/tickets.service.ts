@@ -7,6 +7,7 @@ import {
   canTransition,
   STATUS_PERMISSION,
   type AssignableAgent,
+  type AssignedSummary,
   type AssignedTicketCount,
   type TicketCounts,
   type TicketView,
@@ -450,6 +451,87 @@ export class TicketsService {
       .filter((state) => state === 'warn' || state === 'breach').length;
 
     return { total: rows.length, atRisk };
+  }
+
+  /**
+   * What an agent holds, for the dashboard's KPI row — US-55, AC1.
+   *
+   * **One query, four numbers.** The open assigned tickets are fetched once and
+   * every figure is derived from them through `slaFor` — the same function the
+   * queue and the ticket header use. The warning window is a fraction of each
+   * ticket’s *own* target, so it cannot be one SQL comparison; `assignedCount`
+   * made the same call over the same bounded set, for the same reason.
+   *
+   * **`assigneeId` and the caller’s scope are both in the `where`.** A ticket
+   * assigned to me is inside any scope I could hold, so the scope clause can
+   * never widen this — but rule #2 says scoped permissions are applied in the
+   * query, and a redundant clause that cannot widen is cheaper than an argument
+   * about whether it was needed.
+   */
+  async assignedSummary(actor: TicketActor, now = new Date()): Promise<AssignedSummary> {
+    const scope = await this.scopeFor(actor);
+    const mine: Prisma.TicketWhereInput = { AND: [{ assigneeId: actor.userId }, scope] };
+
+    const rows = await this.prisma.notDeleted.ticket.findMany({
+      where: { AND: [mine, { status: { notIn: ['RESOLVED', 'CLOSED'] } }] },
+      select: TICKET_SELECT,
+      take: 500,
+    });
+
+    let pending = 0;
+    let dueSoon = 0;
+    let breached = 0;
+
+    for (const row of rows) {
+      if (row.status === 'PENDING_CUSTOMER' || row.status === 'PENDING_INTERNAL') {
+        pending += 1;
+      }
+
+      const { state } = this.slaFor(row);
+
+      if (state === 'warn') {
+        dueSoon += 1;
+      }
+
+      // The sweep’s flags as well as the arithmetic: a response target missed is
+      // a broken promise even when the resolution clock is still comfortable.
+      if (state === 'breach' || row.firstResponseBreached || row.resolutionBreached) {
+        breached += 1;
+      }
+    }
+
+    /**
+     * The one figure with an honest past value — US-55, AC1.
+     *
+     * A ticket was open a week ago if it existed then and had not been finished
+     * then, which `createdAt`, `resolvedAt` and `closedAt` can answer. The other
+     * three cannot: the status then is not stored, the breach flags are
+     * current-only, and "due soon" is a window relative to now. Those return
+     * `null` rather than a number nobody can defend.
+     *
+     * **Assignment is taken as current**, because `assigneeId` is a column and
+     * not a history. A ticket reassigned to me yesterday counts in both figures;
+     * the alternative is scanning `TicketHistory` per ticket on a dashboard load.
+     */
+    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+    const openThen = await this.prisma.notDeleted.ticket.count({
+      where: {
+        AND: [
+          mine,
+          { createdAt: { lte: weekAgo } },
+          { OR: [{ resolvedAt: null }, { resolvedAt: { gt: weekAgo } }] },
+          { OR: [{ closedAt: null }, { closedAt: { gt: weekAgo } }] },
+        ],
+      },
+    });
+
+    return {
+      open: { value: rows.length, previous: openThen },
+      pending: { value: pending, previous: null },
+      dueSoon: { value: dueSoon, previous: null },
+      breached: { value: breached, previous: null },
+    };
   }
 
   async list(query: TicketListQuery, actor: TicketActor): Promise<ApiPaginated<Ticket>> {

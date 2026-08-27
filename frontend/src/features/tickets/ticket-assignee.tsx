@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import type { AssignableAgent, Ticket, TicketDetail } from '@crm/shared';
+import type { AssignableAgent, Ticket } from '@crm/shared';
 
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -23,8 +23,14 @@ function initialsOf(name: string): string {
     .join('');
 }
 
+/**
+ * What this control actually reads — US-55.
+ *
+ * Widened from `TicketDetail` so the dashboard can hand it a queue row: the id
+ * and who holds it is all it ever used.
+ */
 export interface TicketAssigneeProps {
-  ticket: TicketDetail;
+  ticket: Pick<Ticket, 'id' | 'assigneeId' | 'assigneeName'>;
   className?: string | undefined;
 }
 
