@@ -55,6 +55,12 @@ export type CreateTicket = z.infer<typeof CreateTicketSchema>;
  * `status` is deliberately **absent**: moving a ticket through its lifecycle is
  * US-47's transition endpoint, which validates that the move is legal. Allowing
  * it here would be a second, unguarded door onto the same state machine.
+ *
+ * `assigneeId` left for the same reason in US-48, and it was not theoretical:
+ * this schema meant `PATCH /tickets/:id` reassigned a ticket under
+ * `ticket:update`, which every agent holds and which is **not** `ticket:assign`.
+ * Assignment is `PATCH /tickets/:id/assignee`, guarded by the permission that
+ * names it.
  */
 export const UpdateTicketSchema = z.object({
   subject: z.string().trim().min(3).max(200).optional(),
@@ -63,11 +69,57 @@ export const UpdateTicketSchema = z.object({
   priority: TicketPrioritySchema.optional(),
   departmentId: z.string().uuid().nullable().optional(),
   branchId: z.string().uuid().nullable().optional(),
-  assigneeId: z.string().uuid().nullable().optional(),
   tags: z.array(z.string().trim().min(1).max(40)).max(20).optional(),
 });
 
 export type UpdateTicket = z.infer<typeof UpdateTicketSchema>;
+
+/**
+ * Who owns the ticket — US-48.
+ *
+ * `assigneeId` is **required and nullable** rather than optional. Null is a
+ * deliberate unassignment (AC3), and an omitted field would be indistinguishable
+ * from it — which is how a client that forgets to send the value quietly empties
+ * a queue.
+ */
+export const AssignTicketSchema = z.object({
+  assigneeId: z.string().uuid().nullable(),
+});
+
+export type AssignTicket = z.infer<typeof AssignTicketSchema>;
+
+/**
+ * Somebody a ticket can be given to — US-48, AC2 and AC5.
+ *
+ * Candidacy is derived from permissions, not from a role name: whoever holds
+ * `ticket:update` can work a ticket, so whoever holds it can be handed one. A
+ * hardcoded list of role keys would be a second definition to keep in step with
+ * the catalogue.
+ */
+export const AssignableAgentSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+  email: z.string().email(),
+  departmentName: z.string().nullable(),
+  /**
+   * AC2 — "so I can avoid overloading one person".
+   *
+   * Open means not resolved and not closed, the same definition the queue's
+   * `open` view uses. Rendered as a number and never as a colour: the point is
+   * the comparison between two agents, which a hue cannot carry.
+   */
+  openTicketCount: z.number().int().nonnegative(),
+  /**
+   * AC5 — false when the user is inactive.
+   *
+   * Only inactive. "Out of office" has no representation in the domain schema,
+   * so the half of AC5 that depends on it is flagged unmet rather than faked
+   * from something adjacent.
+   */
+  isAvailable: z.boolean(),
+});
+
+export type AssignableAgent = z.infer<typeof AssignableAgentSchema>;
 
 /** AC2 — every one of these reaches the database. */
 export const TicketListQuerySchema = PaginationQuerySchema.extend({
@@ -222,6 +274,21 @@ export const TicketHistoryEntrySchema = z.object({
   field: z.string().nullable(),
   fromValue: z.string().nullable(),
   toValue: z.string().nullable(),
+  /**
+   * The same two values as a person reads them — US-48, AC6.
+   *
+   * `fromValue` and `toValue` hold ids for the fields that reference something
+   * (assignee, category, department), which is what a report wants and what a
+   * timeline must never show: *"Assignee moved from 0192c… to 0192d…"* does not
+   * tell the new owner who had it before.
+   *
+   * Captured when the entry is written, not joined when it is read. History is
+   * append-only and describes what was true at the time — a join would rename a
+   * historical entry when somebody's name changed, and would render blank once
+   * their row was deleted. Null for the fields whose value is already legible.
+   */
+  fromLabel: z.string().nullable(),
+  toLabel: z.string().nullable(),
   actorName: z.string().nullable(),
   /**
    * The automation that caused this, when nothing human did — US-50, AC3.

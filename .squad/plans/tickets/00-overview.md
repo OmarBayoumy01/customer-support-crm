@@ -14,6 +14,7 @@ in [`../00-mvp-scope.md`](../00-mvp-scope.md) touch it.
 | 32  | `32-story-read-the-ticket-conversation-timeline.md` | Read the ticket conversation timeline | US-46 | US-45 |
 | 33  | `33-story-reply-or-add-an-internal-note.md` | Reply to a customer or add an internal note | US-1 | US-46 |
 | 34  | `34-story-set-ticket-category-and-priority.md` | Set ticket category and priority | US-49 | US-45 |
+| 35  | `35-story-assign-and-reassign-tickets.md` | Assign and reassign tickets | US-48 | US-45 |
 
 ## No schema change
 

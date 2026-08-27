@@ -4,6 +4,7 @@ import {
   toSkipTake,
   TICKET_VIEWS,
   type ApiPaginated,
+  type AssignableAgent,
   type AssignedTicketCount,
   type TicketCounts,
   type TicketView,
@@ -22,7 +23,14 @@ import { PermissionsService, ticketScopeWhere } from '../permissions/index.js';
 import { PrismaService } from '../prisma/index.js';
 import type { Prisma } from '../generated/prisma/client.js';
 import { SlaClockService } from '../sla/sla-clock.service.js';
-import { automationRuleOf, TicketHistoryService } from './ticket-history.service.js';
+import {
+  automationRuleOf,
+  eventFor,
+  labelOf,
+  FROM_LABEL_METADATA_KEY,
+  TO_LABEL_METADATA_KEY,
+  TicketHistoryService,
+} from './ticket-history.service.js';
 
 /** Who is asking, and what they may see. */
 export interface TicketActor {
@@ -533,6 +541,8 @@ export class TicketsService {
         field: entry.field,
         fromValue: entry.fromValue,
         toValue: entry.toValue,
+        fromLabel: labelOf(entry.metadata, FROM_LABEL_METADATA_KEY),
+        toLabel: labelOf(entry.metadata, TO_LABEL_METADATA_KEY),
         actorName: entry.actor === null ? null : `${entry.actor.firstName} ${entry.actor.lastName}`,
         automationRule: automationRuleOf(entry.metadata),
         createdAt: entry.createdAt.toISOString(),
@@ -785,6 +795,214 @@ export class TicketsService {
 
       return this.toTicket(recomputed);
     }
+
+    return this.toTicket(row);
+  }
+
+  /**
+   * Who this caller may hand a ticket to — US-48, AC2 and AC5.
+   *
+   * **Candidacy is derived from permissions, not from role names.** A candidate
+   * is somebody who holds `ticket:update` through one of their roles, because
+   * that is precisely the permission needed to work the ticket once they have
+   * it. Matching on `role.key IN ('agent', 'manager')` would be a second
+   * definition of "an agent" to keep in step with the catalogue, and it would
+   * silently exclude every custom role an administrator ever creates.
+   *
+   * `customerProfile` must be absent as well. The `customer` role deliberately
+   * holds `ticket:view` and `ticket:create` and **not** `ticket:update`, so the
+   * permission clause already excludes portal users — this second clause is what
+   * keeps that true if somebody ever grants a customer role more than they meant
+   * to.
+   *
+   * Scope is applied here, in the query. `ALL` sees every candidate, `TEAM` sees
+   * their own department. Anything else sees only themselves: no seeded role
+   * grants `ticket:assign` at `OWN` or `ASSIGNED`, but a guard that lets someone
+   * through still has to answer with something defensible rather than everybody.
+   */
+  private async assignableWhere(actor: TicketActor): Promise<Prisma.UserWhereInput> {
+    const scopes = await this.permissions.scopesFor(actor.userId, 'ticket:assign');
+
+    const candidate: Prisma.UserWhereInput = {
+      customerProfile: { is: null },
+      roles: {
+        some: { role: { permissions: { some: { permission: { key: 'ticket:update' } } } } },
+      },
+    };
+
+    if (scopes.includes('ALL')) {
+      return candidate;
+    }
+
+    if (scopes.includes('TEAM')) {
+      // A manager with no department of their own would otherwise match every
+      // user whose department is also null. Fail closed: themselves.
+      return actor.departmentId === null
+        ? { ...candidate, id: actor.userId }
+        : { ...candidate, departmentId: actor.departmentId };
+    }
+
+    return { ...candidate, id: actor.userId };
+  }
+
+  /**
+   * The assignee picker's options — US-48, AC2 and AC5.
+   *
+   * Inactive candidates are **returned, marked unavailable**, rather than
+   * filtered out. AC5 asks for two things at once, and dropping them satisfies
+   * neither: a ticket whose assignee has since been deactivated still has to
+   * render that person's name, or the control claims "Unassigned" for a ticket
+   * that is assigned. The picker disables the row, so they are visible and not
+   * offered.
+   *
+   * The open counts are **one** query. A count per candidate is how a picker
+   * becomes the slowest thing on the screen, and it is four rows today and four
+   * hundred in any real deployment.
+   */
+  async assignees(actor: TicketActor): Promise<AssignableAgent[]> {
+    const rows = await this.prisma.notDeleted.user.findMany({
+      where: await this.assignableWhere(actor),
+      orderBy: [{ isActive: 'desc' }, { firstName: 'asc' }, { lastName: 'asc' }],
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        isActive: true,
+        department: { select: { nameEn: true } },
+      },
+    });
+
+    if (rows.length === 0) {
+      return [];
+    }
+
+    const workload = await this.prisma.notDeleted.ticket.groupBy({
+      by: ['assigneeId'],
+      where: {
+        assigneeId: { in: rows.map((row) => row.id) },
+        // The same definition of "open" the queue's views use.
+        status: { notIn: ['RESOLVED', 'CLOSED'] },
+      },
+      _count: { _all: true },
+    });
+
+    const openFor = new Map(
+      workload.map((group) => [group.assigneeId, group._count._all] as const),
+    );
+
+    return rows.map((row) => ({
+      id: row.id,
+      name: `${row.firstName} ${row.lastName}`,
+      email: row.email,
+      departmentName: row.department?.nameEn ?? null,
+      openTicketCount: openFor.get(row.id) ?? 0,
+      isAvailable: row.isActive,
+    }));
+  }
+
+  /**
+   * Assign, reassign, or unassign — US-48, AC1 and AC3.
+   *
+   * Its own operation rather than a field on `update`, and the reason is not
+   * tidiness: `assigneeId` used to be in `UpdateTicketSchema`, which meant
+   * `PATCH /tickets/:id` reassigned tickets under `ticket:update` — a permission
+   * every agent holds, and not the one that names this action. The controller's
+   * guard is now the boundary, and this method is the second half of it.
+   *
+   * **The candidate is validated, not trusted.** Holding `ticket:assign` says
+   * nothing about *whom* you may assign to, so the target has to come back from
+   * the same `assignableWhere` that builds the picker. One query defines the set;
+   * a separate rule here would be a second definition that has to agree.
+   */
+  async assign(id: string, assigneeId: string | null, actor: TicketActor): Promise<Ticket> {
+    const scope = await this.scopeFor(actor);
+
+    const before = await this.prisma.notDeleted.ticket.findFirst({
+      where: { AND: [{ id }, scope] },
+      select: {
+        assigneeId: true,
+        assignee: { select: { firstName: true, lastName: true } },
+      },
+    });
+
+    if (before === null) {
+      throw ApiException.notFound('That ticket');
+    }
+
+    let assigneeName: string | null = null;
+
+    if (assigneeId !== null) {
+      const candidate = await this.prisma.notDeleted.user.findFirst({
+        where: { AND: [{ id: assigneeId }, await this.assignableWhere(actor)] },
+        select: { firstName: true, lastName: true, isActive: true },
+      });
+
+      if (candidate === null) {
+        throw ApiException.unprocessable('That person cannot be assigned this ticket.');
+      }
+
+      // AC5, enforced on the server as well as rendered in the picker. The
+      // frontend disables the row; this is what makes it true for every caller.
+      if (!candidate.isActive) {
+        throw ApiException.unprocessable('That person is not available.');
+      }
+
+      assigneeName = `${candidate.firstName} ${candidate.lastName}`;
+    }
+
+    // Nothing to record when nothing moved. A PATCH that re-sends the current
+    // assignee should leave no trace, the same way `recordChanges` treats an
+    // unchanged field.
+    if (before.assigneeId === assigneeId) {
+      const unchanged = await this.prisma.ticket.findUniqueOrThrow({
+        where: { id },
+        select: TICKET_SELECT,
+      });
+
+      return this.toTicket(unchanged);
+    }
+
+    const row = await this.prisma.ticket.update({
+      where: { id },
+      data: { assigneeId },
+      select: TICKET_SELECT,
+    });
+
+    /**
+     * AC6 — the names, so the timeline can say who had it before.
+     *
+     * `fromValue` and `toValue` keep the ids; the labels are what the workspace
+     * renders. Both are captured now rather than joined on read, because history
+     * describes what was true when it happened.
+     */
+    await this.history.record({
+      ticketId: id,
+      actorUserId: actor.userId,
+      eventType: eventFor('assigneeId', assigneeId),
+      field: 'assigneeId',
+      fromValue: before.assigneeId ?? undefined,
+      toValue: assigneeId ?? undefined,
+      fromLabel:
+        before.assignee === null
+          ? null
+          : `${before.assignee.firstName} ${before.assignee.lastName}`,
+      toLabel: assigneeName,
+    });
+
+    /**
+     * AC1's "the agent is notified" — as far as it can go today.
+     *
+     * P07 is deferred by the MVP scope, so there is no notification channel to
+     * send to. What the new assignee actually gets is the ticket appearing in
+     * their queue and in their sidebar badge; this line is the traceable record
+     * in the meantime, and the event US-62 consumes when it arrives.
+     */
+    this.logger.log(
+      assigneeId === null
+        ? `Ticket ${id} unassigned by ${actor.userId}`
+        : `Ticket ${id} assigned to ${assigneeId} by ${actor.userId}`,
+    );
 
     return this.toTicket(row);
   }

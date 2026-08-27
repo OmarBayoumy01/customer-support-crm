@@ -19,6 +19,23 @@ export interface ComboboxOption {
   label: string;
   /** Rendered beside the label — an avatar, a status dot, a count. */
   adornment?: ReactNode;
+  /**
+   * Rendered at the far end of the row — US-48, AC2.
+   *
+   * For the fact that qualifies the choice rather than identifying it: an
+   * agent's open ticket count, or why they cannot be picked. Kept apart from
+   * `adornment` so it can be aligned to the trailing edge, which mirrors
+   * correctly in Arabic.
+   */
+  meta?: ReactNode;
+  /**
+   * Visible but not selectable — US-48, AC5.
+   *
+   * "Marked unavailable and not offered by default" is two things, and removing
+   * the row satisfies neither: a ticket already assigned to somebody since
+   * deactivated still has to show their name. Pair this with `meta` saying why.
+   */
+  disabled?: boolean;
 }
 
 export interface ComboboxProps {
@@ -98,7 +115,15 @@ export function Combobox({
                 <CommandItem
                   key={option.value}
                   value={option.label}
+                  disabled={option.disabled ?? false}
                   onSelect={() => {
+                    // `disabled` stops the pointer, but a keyboard Enter can
+                    // still reach here in some Command versions. Refusing in
+                    // both places is cheaper than depending on which.
+                    if (option.disabled === true) {
+                      return;
+                    }
+
                     // Selecting what is already selected clears it. A required
                     // field enforces itself; this one should not trap you.
                     onChange(option.value === value ? null : option.value);
@@ -114,6 +139,13 @@ export function Combobox({
                   />
                   {option.adornment}
                   <span className="truncate">{option.label}</span>
+                  {option.meta === undefined ? null : (
+                    // `ms-auto` rather than a margin on one side: the trailing
+                    // edge is the right in English and the left in Arabic.
+                    <span className="text-meta text-ink-muted ms-auto ps-2 shrink-0">
+                      {option.meta}
+                    </span>
+                  )}
                 </CommandItem>
               ))}
             </CommandGroup>

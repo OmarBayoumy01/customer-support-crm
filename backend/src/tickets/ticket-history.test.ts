@@ -172,6 +172,8 @@ before(async () => {
     ['ticket:view', 'ALL'],
     ['ticket:create', 'ALL'],
     ['ticket:update', 'ALL'],
+    // Assignment moved to its own guarded endpoint with US-48.
+    ['ticket:assign', 'ALL'],
   ]);
 
   const manager = await makeUser(roleId);
@@ -192,8 +194,8 @@ after(async () => {
 test('AC1 — creation, assignment, reassignment and priority all appear', async () => {
   const ticket = await newTicket();
 
-  await call('PATCH', `/tickets/${ticket.id}`, { body: { assigneeId: userId } });
-  await call('PATCH', `/tickets/${ticket.id}`, { body: { assigneeId: otherUserId } });
+  await call('PATCH', `/tickets/${ticket.id}/assignee`, { body: { assigneeId: userId } });
+  await call('PATCH', `/tickets/${ticket.id}/assignee`, { body: { assigneeId: otherUserId } });
   await call('PATCH', `/tickets/${ticket.id}`, { body: { priority: 'URGENT' } });
 
   const page = await call<TicketHistoryEntry[]>('GET', `/tickets/${ticket.id}/history`);
@@ -374,4 +376,73 @@ test('the detail payload still carries history inline', async () => {
 
   assert.equal(detail.body.data!.history[0]!.eventType, 'CREATED');
   assert.equal(detail.body.data!.history[0]!.automationRule, null);
+});
+
+// ---------------------------------------------------------------------------
+// US-48 — what assignment adds to the recorder
+// ---------------------------------------------------------------------------
+
+test('US-48 — clearing an assignee records UNASSIGNED, not ASSIGNED', async () => {
+  const ticket = await newTicket();
+
+  await call('PATCH', `/tickets/${ticket.id}/assignee`, { body: { assigneeId: userId } });
+  await call('PATCH', `/tickets/${ticket.id}/assignee`, { body: { assigneeId: null } });
+
+  const page = await call<TicketHistoryEntry[]>('GET', `/tickets/${ticket.id}/history`);
+  const assignmentEvents = page.body
+    .data!.filter((entry) => entry.field === 'assigneeId')
+    .map((entry) => entry.eventType);
+
+  // Newest first. `UNASSIGNED` existed in the enum from US-6 and nothing wrote
+  // it, so a ticket handed back read as a ticket handed over.
+  assert.deepEqual(assignmentEvents, ['UNASSIGNED', 'ASSIGNED']);
+});
+
+test('US-48 — an id-valued change carries a label a person can read', async () => {
+  const ticket = await newTicket();
+
+  await call('PATCH', `/tickets/${ticket.id}/assignee`, { body: { assigneeId: userId } });
+  await call('PATCH', `/tickets/${ticket.id}/assignee`, { body: { assigneeId: otherUserId } });
+
+  const page = await call<TicketHistoryEntry[]>('GET', `/tickets/${ticket.id}/history`);
+  const reassignment = page.body.data!.find((entry) => entry.fromValue === userId)!;
+
+  // The ids stay, because a report wants them and an id survives a rename. The
+  // labels are what a timeline can show.
+  assert.equal(reassignment.toValue, otherUserId);
+  assert.match(reassignment.fromLabel!, /^Hana Historian/);
+  assert.match(reassignment.toLabel!, /^Hana Historian/);
+});
+
+test('US-48 — a label written now is not rewritten when the name changes later', async () => {
+  const ticket = await newTicket();
+
+  await call('PATCH', `/tickets/${ticket.id}/assignee`, { body: { assigneeId: otherUserId } });
+
+  const before = await call<TicketHistoryEntry[]>('GET', `/tickets/${ticket.id}/history`);
+  const recorded = before.body.data!.find((entry) => entry.field === 'assigneeId')!.toLabel;
+
+  await prisma.user.update({ where: { id: otherUserId }, data: { lastName: `Renamed-${run}` } });
+
+  const after = await call<TicketHistoryEntry[]>('GET', `/tickets/${ticket.id}/history`);
+  const stillSays = after.body.data!.find((entry) => entry.field === 'assigneeId')!.toLabel;
+
+  // The whole reason the label is stored rather than joined: history describes
+  // what was true when it happened.
+  assert.equal(stillSays, recorded);
+  assert.ok(!stillSays!.includes('Renamed'));
+});
+
+test('US-48 — a change with nothing to translate stores no label', async () => {
+  const ticket = await newTicket();
+
+  await call('PATCH', `/tickets/${ticket.id}`, { body: { priority: 'URGENT' } });
+
+  const page = await call<TicketHistoryEntry[]>('GET', `/tickets/${ticket.id}/history`);
+  const priority = page.body.data!.find((entry) => entry.field === 'priority')!;
+
+  // A priority is already legible, so writing a label for it would put a key in
+  // the metadata of every entry for no reader.
+  assert.equal(priority.fromLabel, null);
+  assert.equal(priority.toLabel, null);
 });

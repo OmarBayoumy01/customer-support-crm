@@ -21,6 +21,10 @@ function entry(overrides: Partial<TicketHistoryEntry> = {}): TicketHistoryEntry 
     field: 'priority',
     fromValue: 'MEDIUM',
     toValue: 'HIGH',
+    // Null for an enum field: a priority is already legible. US-48's labels
+    // exist for the fields whose value is an id.
+    fromLabel: null,
+    toLabel: null,
     actorName: 'Aisha Haddad',
     automationRule: null,
     createdAt: '2026-08-20T09:15:00.000Z',

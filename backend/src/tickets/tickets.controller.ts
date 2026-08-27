@@ -2,6 +2,7 @@ import { Body, Controller, Get, HttpCode, Param, Patch, Post, Query } from '@nes
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorSchema,
+  AssignableAgentSchema,
   AssignedTicketCountSchema,
   buildPaginationMeta,
   TicketCountsSchema,
@@ -11,6 +12,7 @@ import {
   TicketSchema,
   toSkipTake,
   type ApiPaginated,
+  type AssignableAgent,
   type AssignedTicketCount,
   type Ticket,
   type TicketCounts,
@@ -29,6 +31,7 @@ import {
   zodToOpenApi,
 } from '../openapi/index.js';
 import {
+  AssignTicketDto,
   CreateTicketDto,
   CreateTicketMessageDto,
   PaginationQueryDto,
@@ -124,6 +127,34 @@ export class TicketsController {
     @CurrentUser() user: CurrentUserPayload | undefined,
   ): Promise<AssignedTicketCount> {
     return this.tickets.assignedCount(await this.actorFrom(user));
+  }
+
+  /**
+   * The assignee picker's options — US-48, AC2 and AC5.
+   *
+   * Declared before `:id` for the same reason as `counts`: Nest matches routes
+   * in declaration order, and `/tickets/assignees` would otherwise resolve as a
+   * ticket whose id is "assignees".
+   *
+   * Guarded by `ticket:assign` rather than `ticket:view`. Who is available and
+   * how loaded they are is the information you need in order to *assign*, and
+   * offering it to everybody who can read a ticket would be publishing the
+   * team's workload to the whole platform.
+   */
+  @Get('assignees')
+  @RequirePermission('ticket:assign')
+  @ApiOperation({
+    summary: 'Who this caller may assign a ticket to',
+    description:
+      'Candidates are whoever holds `ticket:update` — derived from the permission catalogue ' +
+      'rather than from a list of role names — narrowed by the caller’s own `ticket:assign` ' +
+      'scope in the query. Each carries their open ticket count, and an inactive user comes ' +
+      'back marked unavailable rather than omitted: a ticket whose assignee was since ' +
+      'deactivated still has to render their name.',
+  })
+  @ApiZodResponse(200, AssignableAgentSchema, 'The candidates')
+  async assignees(@CurrentUser() user: CurrentUserPayload | undefined): Promise<AssignableAgent[]> {
+    return this.tickets.assignees(await this.actorFrom(user));
   }
 
   @Get(':id')
@@ -270,6 +301,11 @@ export class TicketsController {
    * **Status is not here.** Moving a ticket through its lifecycle is US-47's
    * transition endpoint, which validates that the move is legal; accepting it
    * here would be a second, unguarded door onto the same state machine.
+   *
+   * **Nor is the assignee, since US-48.** It used to be, and that was a real
+   * hole rather than an untidiness: this route is guarded by `ticket:update`,
+   * which every agent holds, so an agent could reassign a colleague's ticket
+   * without holding `ticket:assign` at all.
    */
   @Patch(':id')
   @RequirePermission('ticket:update')
@@ -282,5 +318,35 @@ export class TicketsController {
     @CurrentUser() user: CurrentUserPayload | undefined,
   ): Promise<Ticket> {
     return this.tickets.update(id, body, await this.actorFrom(user));
+  }
+
+  /**
+   * Assign, reassign, or unassign — US-48, AC1, AC3 and AC4.
+   *
+   * Its own route with its own guard, which is the whole of AC4 on the server
+   * side: the frontend hides the control from somebody without `ticket:assign`,
+   * and this refuses them if they ask anyway. The permission gate is here; who
+   * they may assign *to* is checked in the service against the same query that
+   * builds the picker.
+   */
+  @Patch(':id/assignee')
+  @RequirePermission('ticket:assign')
+  @ApiOperation({
+    summary: 'Set or clear a ticket’s assignee',
+    description:
+      'A null assignee unassigns, returning the ticket to the Unassigned queue while ' +
+      'leaving its department — and so its visibility to the team — untouched. Assigning ' +
+      'to somebody outside the caller’s scope, or to an inactive user, is refused.',
+  })
+  @ApiZodBody(AssignTicketDto)
+  @ApiZodResponse(200, TicketSchema, 'Updated')
+  @ApiResponse({ status: 404, schema: zodToOpenApi(ApiErrorSchema) })
+  @ApiResponse({ status: 422, schema: zodToOpenApi(ApiErrorSchema) })
+  async assign(
+    @Param('id') id: string,
+    @Body() body: AssignTicketDto,
+    @CurrentUser() user: CurrentUserPayload | undefined,
+  ): Promise<Ticket> {
+    return this.tickets.assign(id, body.assigneeId, await this.actorFrom(user));
   }
 }

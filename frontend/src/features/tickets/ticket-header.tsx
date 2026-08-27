@@ -4,11 +4,11 @@ import { useTranslation } from 'react-i18next';
 import type { TicketDetail } from '@crm/shared';
 
 import { StatusBadge, formatRemaining } from '@/components/domain/indicators';
-import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
+import { TicketAssignee } from './ticket-assignee';
 import { TicketClassification } from './ticket-classification';
 
 /**
@@ -111,11 +111,11 @@ export interface TicketHeaderProps {
  * workspace that hides the assignee behind two clicks is a workspace where
  * tickets sit unassigned.
  *
- * **Status and assignee are still read-only.** Changing each of them is a story
- * with its own rules — US-47 validates that a status move is legal, US-48 owns
- * assignment — and rendering a control that silently does nothing would be
- * worse than rendering the value. Priority and category became real controls
- * with US-49.
+ * **Status is still read-only.** Moving a ticket through its lifecycle is
+ * US-47's, which validates that the move is legal, and rendering a control that
+ * silently does nothing would be worse than rendering the value. Priority and
+ * category became real controls with US-49, and the assignee with US-48 — which
+ * renders this same badge for anybody without `ticket:assign`.
  */
 export function TicketHeader({ ticket, className }: TicketHeaderProps): React.JSX.Element {
   const { t, i18n } = useTranslation();
@@ -145,18 +145,13 @@ export function TicketHeader({ ticket, className }: TicketHeaderProps): React.JS
 
           {/*
             AC1's inline controls, and AC6's "never behind a dialog".
-            Priority and category became real controls with US-49; status is
-            US-47's and assignment is US-48's.
+            Priority and category became real controls with US-49, the assignee
+            with US-48. Status is still US-47's.
           */}
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge status={ticket.status} />
             <TicketClassification ticket={ticket} />
-            <Badge variant="outline" className="font-normal">
-              <span className="text-ink-muted">{t('ticket.queue.column.assignee')}</span>
-              <span className="text-ink">
-                {ticket.assigneeName ?? t('ticket.queue.unassigned')}
-              </span>
-            </Badge>
+            <TicketAssignee ticket={ticket} />
           </div>
         </div>
 

@@ -43,6 +43,18 @@ let assignedUserId: string;
 /** Another agent, to prove the first cannot see their tickets. */
 let otherUserId: string;
 
+// --- US-48 fixtures -------------------------------------------------------
+/** A manager whose `ticket:assign` reaches their own department only. */
+let teamToken: string;
+/** A second department, so "their own department" can be shown to mean something. */
+let otherDepartmentId: string;
+/** A candidate in that other department. */
+let outsiderUserId: string;
+/** A deactivated candidate — AC5. */
+let inactiveUserId: string;
+/** A portal customer who has been over-granted `ticket:update`. */
+let portalUserId: string;
+
 async function makeRole(
   name: string,
   grants: readonly (readonly [PermissionKey, PermissionScope])[],
@@ -70,7 +82,10 @@ async function makeRole(
   return role.id;
 }
 
-async function makeUser(roleId: string): Promise<{ id: string; token: string }> {
+async function makeUser(
+  roleId: string,
+  options: { departmentId?: string | null; isActive?: boolean } = {},
+): Promise<{ id: string; token: string }> {
   created += 1;
 
   const user = await prisma.user.create({
@@ -79,7 +94,8 @@ async function makeUser(roleId: string): Promise<{ id: string; token: string }> 
       passwordHash: await passwords.hash('irrelevant'),
       firstName: 'Tick',
       lastName: `Tester${String(created)}`,
-      departmentId,
+      departmentId: options.departmentId === undefined ? departmentId : options.departmentId,
+      ...(options.isActive === undefined ? {} : { isActive: options.isActive }),
       roles: { create: { roleId } },
     },
     select: { id: true },
@@ -147,6 +163,25 @@ async function newTicket(
   return result.body.data!;
 }
 
+/**
+ * Assignment goes through its own endpoint — US-48.
+ *
+ * A helper because a dozen tests across US-40, US-42 and US-48 need an assigned
+ * ticket as a *starting position*, and they used to arrange one by sending
+ * `assigneeId` to `PATCH /tickets/:id`. That route no longer accepts it, and the
+ * reason it no longer does is one of this story's criteria.
+ */
+async function setAssignee(
+  ticketId: string,
+  assigneeId: string | null,
+  token = allToken,
+): Promise<{ status: number; body: Envelope<Ticket> }> {
+  return call<Ticket>('PATCH', `/tickets/${ticketId}/assignee`, {
+    token,
+    body: { assigneeId },
+  });
+}
+
 before(async () => {
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
   app = moduleRef.createNestApplication();
@@ -176,7 +211,9 @@ before(async () => {
     ['ticket:view', 'ALL'],
     ['ticket:create', 'ALL'],
     ['ticket:update', 'ALL'],
+    ['ticket:assign', 'ALL'],
   ]);
+  // Deliberately without `ticket:assign` — that gap is US-48's AC4.
   const agentRole = await makeRole('tkt-agent', [
     ['ticket:view', 'ASSIGNED'],
     ['ticket:create', 'ALL'],
@@ -194,6 +231,45 @@ before(async () => {
   assignedUserId = agent.id;
 
   otherUserId = (await makeUser(agentRole)).id;
+
+  // --- US-48 --------------------------------------------------------------
+
+  const teamManagerRole = await makeRole('tkt-team-manager', [
+    // `ticket:view` at ALL on purpose: this fixture is about the reach of
+    // `ticket:assign`, and scoping the read as well would make a failed
+    // assignment indistinguishable from a ticket the manager cannot see.
+    ['ticket:view', 'ALL'],
+    ['ticket:update', 'ALL'],
+    ['ticket:assign', 'TEAM'],
+  ]);
+
+  teamToken = (await makeUser(teamManagerRole)).token;
+
+  const otherDepartment = await prisma.department.create({
+    data: { code: `TKT2-${run}`, nameEn: 'Billing', nameAr: 'الفواتير' },
+    select: { id: true },
+  });
+  otherDepartmentId = otherDepartment.id;
+
+  outsiderUserId = (await makeUser(agentRole, { departmentId: otherDepartmentId })).id;
+  inactiveUserId = (await makeUser(agentRole, { isActive: false })).id;
+
+  // A portal user who also holds `ticket:update`, which the seeded `customer`
+  // role does not. The permission clause alone would let this one through; the
+  // `customerProfile` clause is what keeps a customer out of the picker when
+  // somebody over-grants a role.
+  const portalUser = await makeUser(agentRole);
+  portalUserId = portalUser.id;
+
+  await prisma.customer.create({
+    data: {
+      firstName: 'Portal',
+      lastName: `User-${run}`,
+      email: `portal-${run}@example.com`,
+      userId: portalUserId,
+    },
+    select: { id: true },
+  });
 });
 
 after(async () => {
@@ -279,10 +355,7 @@ test('AC2 — unassigned is its own filter, since a query string cannot carry nu
   await newTicket({ subject: `${marker} free` });
   const taken = await newTicket({ subject: `${marker} taken` });
 
-  await call('PATCH', `/tickets/${taken.id}`, {
-    token: allToken,
-    body: { assigneeId: assignedUserId },
-  });
+  await setAssignee(taken.id, assignedUserId);
 
   const { body } = await call<Ticket[]>('GET', `/tickets?q=${marker}&unassigned=true`, {
     token: allToken,
@@ -414,14 +487,8 @@ test('AC4 — an agent scoped to ASSIGNED sees only their own tickets', async ()
   const mine = await newTicket({ subject: `${marker} mine` });
   const theirs = await newTicket({ subject: `${marker} theirs` });
 
-  await call('PATCH', `/tickets/${mine.id}`, {
-    token: allToken,
-    body: { assigneeId: assignedUserId },
-  });
-  await call('PATCH', `/tickets/${theirs.id}`, {
-    token: allToken,
-    body: { assigneeId: otherUserId },
-  });
+  await setAssignee(mine.id, assignedUserId);
+  await setAssignee(theirs.id, otherUserId);
 
   const { body } = await call<Ticket[]>('GET', `/tickets?q=${marker}`, { token: assignedToken });
 
@@ -434,10 +501,7 @@ test('AC4 — the scope cannot be paged past, because it is in the same query', 
 
   for (let i = 0; i < 4; i += 1) {
     const ticket = await newTicket({ subject: `${marker} ${String(i)}` });
-    await call('PATCH', `/tickets/${ticket.id}`, {
-      token: allToken,
-      body: { assigneeId: otherUserId },
-    });
+    await setAssignee(ticket.id, otherUserId);
   }
 
   const { body } = await call<Ticket[]>('GET', `/tickets?q=${marker}&page=1&pageSize=50`, {
@@ -452,10 +516,7 @@ test('AC4 — the scope cannot be paged past, because it is in the same query', 
 
 test('AC4 — a ticket outside the scope answers 404, not 403', async () => {
   const theirs = await newTicket();
-  await call('PATCH', `/tickets/${theirs.id}`, {
-    token: allToken,
-    body: { assigneeId: otherUserId },
-  });
+  await setAssignee(theirs.id, otherUserId);
 
   const { status } = await call('GET', `/tickets/${theirs.id}`, { token: assignedToken });
 
@@ -511,10 +572,7 @@ test('AC5 — a field change records the field, both values, the actor and the t
 test('AC5 — a reassignment is recorded as an assignment, not a generic edit', async () => {
   const ticket = await newTicket();
 
-  await call('PATCH', `/tickets/${ticket.id}`, {
-    token: allToken,
-    body: { assigneeId: assignedUserId },
-  });
+  await setAssignee(ticket.id, assignedUserId);
 
   const entry = await prisma.ticketHistory.findFirstOrThrow({
     where: { ticketId: ticket.id, field: 'assigneeId' },
@@ -561,10 +619,7 @@ test('status cannot be changed through PATCH — that is US-47’s guarded trans
 
 test('US-42 AC4 — the counts endpoint answers all six views in one request', async () => {
   const mine = await newTicket();
-  await call('PATCH', `/tickets/${mine.id}`, {
-    token: allToken,
-    body: { assigneeId: assignedUserId },
-  });
+  await setAssignee(mine.id, assignedUserId);
 
   const { status, body } = await call<Record<string, number>>('GET', '/tickets/counts', {
     token: allToken,
@@ -582,10 +637,7 @@ test('US-42 AC4 — the counts endpoint answers all six views in one request', a
 test('US-42 AC4 — the counts carry the caller’s scope, like every other read', async () => {
   const ticket = await newTicket();
 
-  await call('PATCH', `/tickets/${ticket.id}`, {
-    token: allToken,
-    body: { assigneeId: otherUserId },
-  });
+  await setAssignee(ticket.id, otherUserId);
 
   const manager = await call<Record<string, number>>('GET', '/tickets/counts', { token: allToken });
   const agent = await call<Record<string, number>>('GET', '/tickets/counts', {
@@ -600,7 +652,7 @@ test('US-42 AC4 — the counts carry the caller’s scope, like every other read
 test('US-42 AC4 — a named view filters the list the same way its count does', async () => {
   const ticket = await newTicket();
 
-  await call('PATCH', `/tickets/${ticket.id}`, { token: allToken, body: { assigneeId: null } });
+  await setAssignee(ticket.id, null);
 
   const list = await call<Ticket[]>('GET', '/tickets?view=unassigned&pageSize=100', {
     token: allToken,
@@ -614,10 +666,7 @@ test('US-42 AC4 — a named view filters the list the same way its count does', 
 test('US-42 — the assigned count is what the sidebar badge shows', async () => {
   const ticket = await newTicket();
 
-  await call('PATCH', `/tickets/${ticket.id}`, {
-    token: allToken,
-    body: { assigneeId: assignedUserId },
-  });
+  await setAssignee(ticket.id, assignedUserId);
 
   const { status, body } = await call<{ total: number; atRisk: number }>(
     'GET',
@@ -1030,4 +1079,290 @@ test('US-49 AC5 — both changes appear in history with old and new values', asy
 
   assert.equal(categoryEntry.eventType, 'CATEGORY_CHANGED');
   assert.equal(categoryEntry.toValue, category.id);
+});
+
+// ---------------------------------------------------------------------------
+// US-48 — assign and reassign
+// ---------------------------------------------------------------------------
+
+interface AssignableAgentRow {
+  id: string;
+  name: string;
+  openTicketCount: number;
+  isAvailable: boolean;
+  departmentName: string | null;
+}
+
+interface HistoryRow {
+  eventType: string;
+  field: string | null;
+  fromValue: string | null;
+  toValue: string | null;
+  fromLabel: string | null;
+  toLabel: string | null;
+  actorName: string | null;
+}
+
+test('US-48 AC1 — assigning updates the ticket and records who did it', async () => {
+  const ticket = await newTicket();
+
+  const { status, body } = await setAssignee(ticket.id, assignedUserId);
+
+  assert.equal(status, 200, JSON.stringify(body));
+  assert.equal(body.data?.assigneeId, assignedUserId);
+
+  const history = await call<HistoryRow[]>('GET', `/tickets/${ticket.id}/history`, {
+    token: allToken,
+  });
+
+  const entry = history.body.data!.find((row) => row.field === 'assigneeId')!;
+
+  assert.equal(entry.eventType, 'ASSIGNED');
+  assert.equal(entry.toValue, assignedUserId);
+  // "a history entry records who reassigned it" — the actor, not the assignee.
+  assert.ok(entry.actorName !== null);
+});
+
+test('US-48 AC4 — an agent with ticket:update but not ticket:assign is refused', async () => {
+  const ticket = await newTicket();
+  await setAssignee(ticket.id, assignedUserId);
+
+  const { status } = await setAssignee(ticket.id, otherUserId, assignedToken);
+
+  // The hole this story closes: `ticket:update` is not `ticket:assign`, and the
+  // agent holds only the first.
+  assert.equal(status, 403);
+
+  const row = await prisma.ticket.findUniqueOrThrow({
+    where: { id: ticket.id },
+    select: { assigneeId: true },
+  });
+
+  assert.equal(row.assigneeId, assignedUserId);
+});
+
+test('US-48 AC4 — PATCH /tickets/:id can no longer assign at all', async () => {
+  const ticket = await newTicket();
+
+  // The old door. It answers 200 because the field is simply not part of the
+  // schema any more; what matters is that nothing moved.
+  await call('PATCH', `/tickets/${ticket.id}`, {
+    token: assignedToken,
+    body: { assigneeId: assignedUserId },
+  });
+
+  const row = await prisma.ticket.findUniqueOrThrow({
+    where: { id: ticket.id },
+    select: { assigneeId: true },
+  });
+
+  assert.equal(row.assigneeId, null);
+});
+
+test('US-48 AC3 — unassigning returns the ticket to the Unassigned queue', async () => {
+  const marker = `Unassign-${randomUUID().slice(0, 6)}`;
+  const ticket = await newTicket({ subject: `${marker} handed back` });
+
+  await setAssignee(ticket.id, assignedUserId);
+  const { status, body } = await setAssignee(ticket.id, null);
+
+  assert.equal(status, 200, JSON.stringify(body));
+  assert.equal(body.data?.assigneeId, null);
+
+  const queue = await call<Ticket[]>('GET', `/tickets?q=${marker}&view=unassigned`, {
+    token: allToken,
+  });
+
+  assert.equal(queue.body.pagination?.total, 1);
+  assert.equal(queue.body.data?.[0]?.id, ticket.id);
+});
+
+test('US-48 AC3 — an unassignment is recorded as UNASSIGNED, not as an assignment', async () => {
+  const ticket = await newTicket();
+
+  await setAssignee(ticket.id, assignedUserId);
+  await setAssignee(ticket.id, null);
+
+  const history = await call<HistoryRow[]>('GET', `/tickets/${ticket.id}/history`, {
+    token: allToken,
+  });
+
+  const entries = history.body.data!.filter((row) => row.field === 'assigneeId');
+
+  // Newest first. `UNASSIGNED` had been in the enum since US-6 with nothing
+  // writing it, so "returned to the queue" used to read as "given to somebody".
+  assert.equal(entries[0]?.eventType, 'UNASSIGNED');
+  assert.equal(entries[0]?.toValue, null);
+  assert.equal(entries[1]?.eventType, 'ASSIGNED');
+});
+
+test('US-48 AC3 — an unassigned ticket is still visible to the team', async () => {
+  const marker = `TeamSees-${randomUUID().slice(0, 6)}`;
+  const ticket = await newTicket({ subject: `${marker} orphan`, departmentId });
+
+  await setAssignee(ticket.id, assignedUserId);
+  await setAssignee(ticket.id, null);
+
+  const seen = await call<Ticket[]>('GET', `/tickets?q=${marker}`, { token: teamToken });
+
+  // Unassigning clears the owner and touches nothing else — the department is
+  // what the team's scope matches on, and it is untouched.
+  assert.equal(seen.body.pagination?.total, 1);
+
+  const row = await prisma.ticket.findUniqueOrThrow({
+    where: { id: ticket.id },
+    select: { departmentId: true },
+  });
+
+  assert.equal(row.departmentId, departmentId);
+});
+
+test('US-48 AC2 — each candidate carries their open ticket count', async () => {
+  const first = await newTicket();
+  const second = await newTicket();
+  const closed = await newTicket();
+
+  await setAssignee(first.id, assignedUserId);
+  await setAssignee(second.id, assignedUserId);
+  await setAssignee(closed.id, assignedUserId);
+
+  // Resolved work is not workload. The count uses the same definition of "open"
+  // the queue's views do.
+  await prisma.ticket.update({ where: { id: closed.id }, data: { status: 'RESOLVED' } });
+
+  const { status, body } = await call<AssignableAgentRow[]>('GET', '/tickets/assignees', {
+    token: allToken,
+  });
+
+  assert.equal(status, 200, JSON.stringify(body));
+
+  const candidate = body.data!.find((row) => row.id === assignedUserId)!;
+
+  assert.ok(candidate.openTicketCount >= 2);
+
+  const counted = await prisma.ticket.count({
+    where: {
+      assigneeId: assignedUserId,
+      status: { notIn: ['RESOLVED', 'CLOSED'] },
+      deletedAt: null,
+    },
+  });
+
+  assert.equal(candidate.openTicketCount, counted);
+});
+
+test('US-48 AC2 — the assign scope narrows the candidates in the query', async () => {
+  const all = await call<AssignableAgentRow[]>('GET', '/tickets/assignees', { token: allToken });
+  const team = await call<AssignableAgentRow[]>('GET', '/tickets/assignees', { token: teamToken });
+
+  // An administrator scoped ALL sees the other department's agent; a manager
+  // scoped TEAM does not — and not because the list was filtered afterwards.
+  assert.ok(all.body.data!.some((row) => row.id === outsiderUserId));
+  assert.ok(!team.body.data!.some((row) => row.id === outsiderUserId));
+  assert.ok(team.body.data!.some((row) => row.id === assignedUserId));
+});
+
+test('US-48 AC4 — an agent cannot even read the candidate list', async () => {
+  const { status } = await call('GET', '/tickets/assignees', { token: assignedToken });
+
+  assert.equal(status, 403);
+});
+
+test('US-48 AC5 — an inactive candidate is marked unavailable, not omitted', async () => {
+  const { body } = await call<AssignableAgentRow[]>('GET', '/tickets/assignees', {
+    token: allToken,
+  });
+
+  const inactive = body.data!.find((row) => row.id === inactiveUserId);
+
+  // Returned so a ticket already assigned to them still renders a name, and
+  // marked so the picker can refuse to offer them.
+  assert.ok(inactive !== undefined);
+  assert.equal(inactive.isAvailable, false);
+
+  const active = body.data!.find((row) => row.id === assignedUserId)!;
+
+  assert.equal(active.isAvailable, true);
+});
+
+test('US-48 AC5 — assigning to an inactive user is refused by the server', async () => {
+  const ticket = await newTicket();
+
+  const { status, body } = await setAssignee(ticket.id, inactiveUserId);
+
+  // The picker disables the row; this is what makes it true for every caller.
+  assert.equal(status, 422);
+  assert.equal(body.error?.code, 'UNPROCESSABLE');
+});
+
+test('US-48 AC4 — assigning outside the assign scope is refused', async () => {
+  const ticket = await newTicket({ departmentId });
+
+  const { status, body } = await setAssignee(ticket.id, outsiderUserId, teamToken);
+
+  // Holding `ticket:assign` says nothing about *whom* you may assign to.
+  assert.equal(status, 422);
+  assert.equal(body.error?.code, 'UNPROCESSABLE');
+});
+
+test('US-48 AC2 — a portal customer is never a candidate', async () => {
+  const { body } = await call<AssignableAgentRow[]>('GET', '/tickets/assignees', {
+    token: allToken,
+  });
+
+  // This one holds `ticket:update` as well, so the permission clause alone
+  // would have let them through.
+  assert.ok(!body.data!.some((row) => row.id === portalUserId));
+});
+
+test('US-48 AC6 — the history entry names both owners, not their ids', async () => {
+  const ticket = await newTicket();
+
+  await setAssignee(ticket.id, assignedUserId);
+  await setAssignee(ticket.id, otherUserId);
+
+  const history = await call<HistoryRow[]>('GET', `/tickets/${ticket.id}/history`, {
+    token: allToken,
+  });
+
+  const reassignment = history.body.data!.find((row) => row.fromValue === assignedUserId)!;
+
+  // "the new assignee sees who owned it previously" — a UUID does not say that.
+  assert.equal(reassignment.toValue, otherUserId);
+  assert.ok(reassignment.fromLabel !== null);
+  assert.ok(reassignment.toLabel !== null);
+  // A name, not the id it sits beside.
+  assert.ok(!reassignment.fromLabel.includes('-'));
+});
+
+test('US-48 AC6 — internal notes survive a reassignment', async () => {
+  const ticket = await newTicket();
+
+  await setAssignee(ticket.id, assignedUserId);
+  await addMessage(ticket.id, { body: 'Already threatening a chargeback.', isInternal: true });
+  await addMessage(ticket.id, { body: 'We are looking into it.', isInternal: false });
+
+  await setAssignee(ticket.id, otherUserId);
+
+  const detail = await call<TicketDetail>('GET', `/tickets/${ticket.id}`, { token: allToken });
+
+  // The handover is the moment the context matters most. Nothing here touches
+  // Message, but the criterion is a promise to the person taking the ticket.
+  assert.equal(detail.body.data!.messages.filter((message) => message.isInternal).length, 1);
+  assert.equal(detail.body.data!.messages.length, 2);
+});
+
+test('US-48 — re-sending the current assignee records nothing', async () => {
+  const ticket = await newTicket();
+
+  await setAssignee(ticket.id, assignedUserId);
+  await setAssignee(ticket.id, assignedUserId);
+
+  const entries = await prisma.ticketHistory.count({
+    where: { ticketId: ticket.id, field: 'assigneeId' },
+  });
+
+  // The same rule `recordChanges` follows: a field that did not move leaves no
+  // trace, or the timeline is unreadable within a week.
+  assert.equal(entries, 1);
 });

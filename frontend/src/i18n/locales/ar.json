@@ -217,6 +217,18 @@
       "uncategorised": "بدون تصنيف",
       "saved": "تم تحديث التذكرة.",
       "routed": "تم تحديث التذكرة. ستُوجَّه الآن إلى {{department}}."
+    },
+    "assignee": {
+      "assigned": "تم التعيين إلى {{name}}.",
+      "unassigned": "تم إلغاء التعيين. عادت التذكرة إلى قائمة غير المعيَّنة.",
+      "openCount_zero": "{{count}} مفتوحة",
+      "openCount_one": "تذكرة مفتوحة واحدة",
+      "openCount_two": "تذكرتان مفتوحتان",
+      "openCount_few": "{{count}} تذاكر مفتوحة",
+      "openCount_many": "{{count}} تذكرة مفتوحة",
+      "openCount_other": "{{count}} تذكرة مفتوحة",
+      "unavailable": "غير متاح",
+      "unknown": "المسؤول السابق"
     }
   },
   "states": {

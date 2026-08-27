@@ -39,6 +39,15 @@ export interface TicketHistoryEntry {
   field: string | null;
   fromValue: string | null;
   toValue: string | null;
+  /**
+   * The same two values as a person reads them — US-48, AC6.
+   *
+   * Set where `fromValue` / `toValue` hold an id, and null where the value is
+   * already legible. Written at the time of the change, so a rename later does
+   * not rewrite the entry.
+   */
+  fromLabel: string | null;
+  toLabel: string | null;
   /** The person. Null when an automation did it — exactly one of the two. */
   actorName: string | null;
   /** The rule. Null when a person did it — US-50, AC3. */
@@ -149,8 +158,16 @@ function Entry({ entry }: { entry: TicketHistoryEntry }): React.JSX.Element {
   const timestamp = useTimestamp();
   const Icon = iconFor(entry);
 
-  const from = label(entry.field, entry.fromValue);
-  const to = label(entry.field, entry.toValue);
+  /**
+   * The stored label wins over the stored value — US-48, AC6.
+   *
+   * Fields that reference something (assignee, category, department) keep an id
+   * in `fromValue` / `toValue`, and *"Assignee moved from 0192c… to 0192d…"* does
+   * not tell the new owner who had it before. The label was written beside the
+   * id at the time of the change, so it is the name as it stood then.
+   */
+  const from = entry.fromLabel ?? label(entry.field, entry.fromValue);
+  const to = entry.toLabel ?? label(entry.field, entry.toValue);
 
   const description =
     entry.eventType === 'CREATED'

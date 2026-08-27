@@ -209,6 +209,14 @@
       "uncategorised": "Uncategorised",
       "saved": "Ticket updated.",
       "routed": "Ticket updated. It now routes to {{department}}."
+    },
+    "assignee": {
+      "assigned": "Assigned to {{name}}.",
+      "unassigned": "Assignee removed. The ticket is back in the Unassigned queue.",
+      "openCount_one": "{{count}} open",
+      "openCount_other": "{{count}} open",
+      "unavailable": "Unavailable",
+      "unknown": "Former assignee"
     }
   },
   "states": {

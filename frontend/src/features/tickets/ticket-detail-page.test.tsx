@@ -103,6 +103,8 @@ function detail(overrides: Partial<TicketDetail> = {}): TicketDetail {
         field: null,
         fromValue: null,
         toValue: null,
+        fromLabel: null,
+        toLabel: null,
         actorName: 'Huda Mansour',
         automationRule: null,
         createdAt: new Date(Date.now() - 6 * HOUR).toISOString(),

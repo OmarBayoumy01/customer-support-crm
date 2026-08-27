@@ -13,6 +13,16 @@ export interface HistoryEntry {
   fromValue?: string | undefined;
   toValue?: string | undefined;
   /**
+   * The two values as a person reads them — US-48, AC6.
+   *
+   * Set these when `fromValue` / `toValue` are ids. Stored inside `metadata`
+   * rather than in columns of their own: `TicketHistory` is append-only and
+   * migrating it is the most expensive kind of change, and a label is a
+   * rendering concern rather than a fact anything queries on.
+   */
+  fromLabel?: string | null | undefined;
+  toLabel?: string | null | undefined;
+  /**
    * The automation responsible, when nothing human was — US-50, AC3.
    *
    * Set this **instead of** `actorUserId`. An SLA escalation attributed to
@@ -26,6 +36,29 @@ export interface HistoryEntry {
 
 /** Where the rule name lives inside `metadata`. One place, so readers agree. */
 export const AUTOMATION_METADATA_KEY = 'automationRule';
+
+/**
+ * Where the human-readable form of `fromValue` / `toValue` lives — US-48, AC6.
+ *
+ * The values themselves stay as ids: a report wants the id, and an id survives a
+ * rename. The label is what a timeline shows, and it is stored beside the id
+ * rather than resolved on read because history is append-only — it records what
+ * was true when it happened, and a join would rewrite the past every time
+ * somebody changed their name.
+ */
+export const FROM_LABEL_METADATA_KEY = 'fromLabel';
+export const TO_LABEL_METADATA_KEY = 'toLabel';
+
+/** Pulls a stored label back out, for either end of the change. */
+export function labelOf(metadata: unknown, key: string): string | null {
+  if (typeof metadata !== 'object' || metadata === null) {
+    return null;
+  }
+
+  const value = (metadata as Record<string, unknown>)[key];
+
+  return typeof value === 'string' ? value : null;
+}
 
 /** Pulls the rule name back out of a stored entry. */
 export function automationRuleOf(metadata: unknown): string | null {
@@ -80,6 +113,23 @@ const EVENT_FOR_FIELD: Record<string, TicketEventType> = {
 };
 
 /**
+ * Which event a field change is, once the new value is known — US-48, AC3.
+ *
+ * The table above cannot answer this alone: clearing an assignee is not an
+ * assignment. `UNASSIGNED` has been in `TicketEventType` since US-6 and nothing
+ * wrote it until now, so *"returned to the Unassigned queue"* was recorded as
+ * `ASSIGNED` with an empty `toValue` — which reads, in the one record kept for
+ * settling disputes, as somebody having been given the ticket.
+ */
+export function eventFor(field: string, next: unknown): TicketEventType {
+  if (field === 'assigneeId' && (next === null || next === undefined)) {
+    return 'UNASSIGNED';
+  }
+
+  return EVENT_FOR_FIELD[field] ?? 'STATUS_CHANGED';
+}
+
+/**
  * The per-ticket timeline — US-40 AC5, extended by US-50.
  *
  * Append-only. `TicketHistory` has no `updatedAt` and no `deletedAt`, which US-6
@@ -98,13 +148,28 @@ export class TicketHistoryService {
   async record(entry: HistoryEntry): Promise<void> {
     // Exactly one attribution. An automated change with an actor attached would
     // read as a person having done it, which is the thing AC3 forbids.
-    const metadata =
+    const base =
       entry.automationRule === undefined
         ? entry.metadata
         : {
             ...(entry.metadata as object | undefined),
             [AUTOMATION_METADATA_KEY]: entry.automationRule,
           };
+
+    // Only the labels that were actually given. Writing `null`s would put keys
+    // in the metadata of every entry that has no id to translate.
+    const labels: Record<string, string> = {};
+
+    if (entry.fromLabel != null) {
+      labels[FROM_LABEL_METADATA_KEY] = entry.fromLabel;
+    }
+
+    if (entry.toLabel != null) {
+      labels[TO_LABEL_METADATA_KEY] = entry.toLabel;
+    }
+
+    const metadata =
+      Object.keys(labels).length === 0 ? base : { ...(base as object | undefined), ...labels };
 
     try {
       await this.prisma.ticketHistory.create({
@@ -173,6 +238,8 @@ export class TicketHistoryService {
         field: row.field,
         fromValue: row.fromValue,
         toValue: row.toValue,
+        fromLabel: labelOf(row.metadata, FROM_LABEL_METADATA_KEY),
+        toLabel: labelOf(row.metadata, TO_LABEL_METADATA_KEY),
         actorName: row.actor === null ? null : `${row.actor.firstName} ${row.actor.lastName}`,
         automationRule: automationRuleOf(row.metadata),
         createdAt: row.createdAt.toISOString(),
@@ -207,7 +274,7 @@ export class TicketHistoryService {
       await this.record({
         ticketId,
         actorUserId,
-        eventType: EVENT_FOR_FIELD[field] ?? 'STATUS_CHANGED',
+        eventType: eventFor(field, next),
         field,
         fromValue: asText(previous),
         toValue: asText(next),
