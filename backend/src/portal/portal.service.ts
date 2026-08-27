@@ -186,6 +186,39 @@ export class PortalService {
       ...(query.status === undefined ? {} : { status: { in: internalStatusesFor(query.status) } }),
     };
 
+    /**
+     * AC2's search — subject and number, in the query — US-84.
+     *
+     * **Not the description and not the message bodies.** A customer recognises
+     * a request by its subject line or by the number they were given, and
+     * searching message text would have a portal query reading rows that the
+     * internal-note filter exists to keep out of reach.
+     *
+     * The number is matched when the term is one, because "1042" is how a
+     * customer refers to a request out loud.
+     */
+    if (query.q !== undefined && query.q !== '') {
+      const asNumber = Number.parseInt(query.q, 10);
+
+      where.OR = [
+        { subject: { contains: query.q, mode: 'insensitive' } },
+        ...(Number.isNaN(asNumber) ? [] : [{ number: asNumber }]),
+      ];
+    }
+
+    /**
+     * AC2's date filter, on the day the request was opened.
+     *
+     * Both ends are optional, so "since March" and "before April" are each a
+     * sentence a customer might mean on their own.
+     */
+    if (query.createdFrom !== undefined || query.createdTo !== undefined) {
+      where.createdAt = {
+        ...(query.createdFrom === undefined ? {} : { gte: new Date(query.createdFrom) }),
+        ...(query.createdTo === undefined ? {} : { lte: new Date(query.createdTo) }),
+      };
+    }
+
     const [rows, total] = await Promise.all([
       this.prisma.notDeleted.ticket.findMany({
         where,

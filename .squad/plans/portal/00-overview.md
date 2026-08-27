@@ -11,6 +11,7 @@ and together they close the loop: a customer raises a request and sees the answe
 | 39  | `39-story-customer-scoped-portal-api.md` | Build the customer-scoped portal API | US-82 | US-40 |
 | 40  | `40-story-sign-in-to-the-customer-portal.md` | Sign in to the customer portal | US-21 | US-14, US-82 |
 | 41  | `41-story-submit-a-support-request.md` | Submit a support request | US-86 | US-82 |
+| 42  | `42-story-track-my-requests.md` | Track my requests in the portal | US-84 | US-82 |
 
 ## Why this feature exists as its own module
 
@@ -62,8 +63,11 @@ against the serialised JSON.
   scope. Its request schema has no `customerId`, `channel`, `departmentId`, `tags` or
   `status`: a contract with nothing to disagree about beats a check that the body matches
   the token.
-- **US-84** and **US-85** are the screens over this API. If they need a field, it is added to
-  the allowlist deliberately — which is the point of the allowlist.
+- **US-84** ✅ is the list screen. It added `q`, `createdFrom` and `createdTo` to the list
+  query — and nothing else, because AC2 says only search, status and date and the contract
+  is how that becomes true. `q` searches the subject and number, never message bodies.
+- **US-85** is the last screen. If it needs a field, it is added to the allowlist
+  deliberately — which is the point of the allowlist.
 - **US-21** ✅ built the sign-in over this boundary: `POST /auth/portal/login` issues the
   `crm-portal` token, and a staff account is refused 422 because it has no linked
   `Customer` row — the same fact this API scopes on.

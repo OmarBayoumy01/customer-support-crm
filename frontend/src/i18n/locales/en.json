@@ -370,8 +370,6 @@
       "greeting": "Hello, {{name}}",
       "greetingAnonymous": "Hello",
       "subtitle": "Everything you have asked us, and where it stands.",
-      "requestsLabel": "Your requests",
-      "comingSoon": "Your requests will be listed here shortly.",
       "newRequest": "New request"
     },
     "submit": {
@@ -411,6 +409,38 @@
         "number": "It is request number {{number}}. Quote that if you call us.",
         "updates": "Updates will go to {{email}}.",
         "home": "Back to my requests"
+      }
+    },
+    "requests": {
+      "title": "My requests",
+      "number": "Request #{{number}}",
+      "needsReply": "Your reply needed",
+      "category": "Category",
+      "noCategory": "No category",
+      "opened": "Opened",
+      "openedOn": "Opened {{date}}",
+      "lastUpdate": "Last update",
+      "updatedOn": "Updated {{date}}",
+      "search": "Search",
+      "searchPlaceholder": "Subject or request number",
+      "statusLabel": "Status",
+      "anyStatus": "Any status",
+      "openedSince": "Opened since",
+      "empty": "You have not asked us anything yet.",
+      "emptyHint": "When you do, it will appear here so you can follow it.",
+      "noMatches": "Nothing matches those filters.",
+      "clearFilters": "Clear filters",
+      "error": "We could not load your requests just now.",
+      "retry": "Try again",
+      "showing": "Showing {{count}} of {{total}}",
+      "previous": "Previous",
+      "next": "Next",
+      "status": {
+        "OPEN": "Open",
+        "IN_PROGRESS": "In progress",
+        "WAITING_ON_YOU": "Waiting on you",
+        "RESOLVED": "Resolved",
+        "CLOSED": "Closed"
       }
     }
   }

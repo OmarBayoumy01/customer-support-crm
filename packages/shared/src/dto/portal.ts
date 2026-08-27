@@ -140,11 +140,26 @@ export const PortalTicketDetailSchema = PortalTicketSchema.extend({
 
 export type PortalTicketDetail = z.infer<typeof PortalTicketDetailSchema>;
 
-/** Paging for the customer's own list. Kept minimal on purpose. */
+/**
+ * How a customer narrows their own list — US-84, AC2.
+ *
+ * **AC2 says only search, status and date, and this schema is how that becomes
+ * true.** There is nowhere to put a department, a branch, an assignee or a
+ * channel, so a customer cannot filter by one — the same allowlist argument
+ * US-82 made about the response, applied to the request.
+ *
+ * `q` searches the **subject and the number** and nothing else. A customer
+ * recognises a request by its subject line or by the number they were given;
+ * searching message bodies would have a portal query reading rows that the
+ * internal-note filter exists to keep out of reach.
+ */
 export const PortalTicketListQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
   pageSize: z.coerce.number().int().positive().max(50).default(20),
   status: PortalTicketStatusSchema.optional(),
+  q: z.string().trim().max(200).optional(),
+  createdFrom: z.string().datetime().optional(),
+  createdTo: z.string().datetime().optional(),
 });
 
 export type PortalTicketListQuery = z.infer<typeof PortalTicketListQuerySchema>;

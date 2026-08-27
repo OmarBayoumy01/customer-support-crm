@@ -4,17 +4,18 @@ import { LifeBuoy, LogOut, Plus } from 'lucide-react';
 
 import { LanguageToggle } from '@/components/language-toggle';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { useAuth } from '@/features/auth/auth-context';
+import { PortalRequests } from './portal-requests';
 import { useLogout } from '@/features/auth/use-logout';
 
 /**
  * Where a signed-in customer lands — US-21, AC1.
  *
- * **Deliberately a landing page and not a request list.** US-84 owns the list
- * and US-86 the submit control; this story's job is that a customer arrives
- * *here* rather than in the staff application, and it fetches nothing so that
- * nothing about it has to be revisited when those two arrive.
+ * **This is the "Portal My Tickets" screen.** US-21 put a placeholder card here
+ * saying the list was coming; US-84 replaced it with the real one, and US-86
+ * supplied the action beside the heading. US-83's separate portal home is
+ * deferred, so a customer's landing page *is* their request list — which is
+ * what they came for anyway.
  *
  * Its own shell rather than the staff `AppLayout`: the sidebar, the queue badge
  * and the global search are staff furniture, and putting a customer inside them
@@ -63,7 +64,6 @@ export function PortalHomePage(): React.JSX.Element {
             <p className="text-ink-muted mt-1">{t('portal.home.subtitle')}</p>
           </div>
 
-          {/* The one action on this page until US-84 gives it a list. */}
           <Button asChild className="gap-2">
             <Link to="/portal/new">
               <Plus aria-hidden="true" className="size-4" />
@@ -72,16 +72,10 @@ export function PortalHomePage(): React.JSX.Element {
           </Button>
         </div>
 
-        {/*
-          Says plainly that the list is not here yet rather than showing an
-          empty table that looks broken. US-84 replaces this card.
-        */}
-        <Card role="region" aria-label={t('portal.home.requestsLabel')} className="mt-8">
-          <CardContent className="p-6">
-            <h2 className="text-section font-semibold">{t('portal.home.requestsLabel')}</h2>
-            <p className="text-ink-muted text-body mt-2">{t('portal.home.comingSoon')}</p>
-          </CardContent>
-        </Card>
+        {/* US-84 — the placeholder card US-21 left here is now the real list. */}
+        <div className="mt-8">
+          <PortalRequests />
+        </div>
       </main>
     </div>
   );

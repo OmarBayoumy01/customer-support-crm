@@ -382,8 +382,6 @@
       "greeting": "مرحبًا، {{name}}",
       "greetingAnonymous": "مرحبًا",
       "subtitle": "كل ما طلبته منا، وحالة كل طلب.",
-      "requestsLabel": "طلباتك",
-      "comingSoon": "ستظهر طلباتك هنا قريبًا.",
       "newRequest": "طلب جديد"
     },
     "submit": {
@@ -423,6 +421,38 @@
         "number": "رقم الطلب {{number}}. اذكره إذا تواصلت معنا.",
         "updates": "ستُرسل التحديثات إلى {{email}}.",
         "home": "الرجوع إلى طلباتي"
+      }
+    },
+    "requests": {
+      "title": "طلباتي",
+      "number": "الطلب رقم {{number}}",
+      "needsReply": "يلزم ردّك",
+      "category": "التصنيف",
+      "noCategory": "بدون تصنيف",
+      "opened": "تاريخ الإنشاء",
+      "openedOn": "أُنشئ في {{date}}",
+      "lastUpdate": "آخر تحديث",
+      "updatedOn": "حُدّث في {{date}}",
+      "search": "بحث",
+      "searchPlaceholder": "الموضوع أو رقم الطلب",
+      "statusLabel": "الحالة",
+      "anyStatus": "كل الحالات",
+      "openedSince": "منشأة بعد",
+      "empty": "لم تطلب منا شيئًا بعد.",
+      "emptyHint": "عندما تفعل، سيظهر هنا لتتابعه.",
+      "noMatches": "لا نتائج مطابقة لهذه التصفية.",
+      "clearFilters": "مسح التصفية",
+      "error": "لم نتمكن من تحميل طلباتك الآن.",
+      "retry": "إعادة المحاولة",
+      "showing": "يُعرض {{count}} من {{total}}",
+      "previous": "السابق",
+      "next": "التالي",
+      "status": {
+        "OPEN": "مفتوح",
+        "IN_PROGRESS": "قيد المعالجة",
+        "WAITING_ON_YOU": "بانتظار ردّك",
+        "RESOLVED": "تم حله",
+        "CLOSED": "مغلق"
       }
     }
   }
