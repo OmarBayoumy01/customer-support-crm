@@ -3,7 +3,7 @@
 Entry point for the **SLA** feature: the clock the whole product is judged by. Four of the
 twenty-eight stories in [`../00-mvp-scope.md`](../00-mvp-scope.md) live here — US-67, US-68,
 US-69, US-71 — and the ticket API has been carrying `slaState: 'none'` since US-40 waiting
-for them.
+for them. US-69 lives with the tickets feature (plan 37) because it is the ticket header.
 
 ## Stories
 
@@ -11,6 +11,7 @@ for them.
 | --- | -------------------------------- | ------------------ | ---------- | ---------- |
 | 27  | `27-story-define-sla-policies.md` | Define SLA policies | US-67      | US-6       |
 | 29  | `29-story-calculate-sla-clocks-accurately.md` | Calculate SLA clocks accurately | US-68 | US-67, US-10 |
+| 38  | `38-story-escalate-tickets-automatically.md` | Escalate tickets automatically on SLA thresholds | US-71 | US-68 |
 
 ## The MVP simplification, stated once
 
