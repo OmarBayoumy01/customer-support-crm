@@ -16,6 +16,7 @@ in [`../00-mvp-scope.md`](../00-mvp-scope.md) touch it.
 | 34  | `34-story-set-ticket-category-and-priority.md` | Set ticket category and priority | US-49 | US-45 |
 | 35  | `35-story-assign-and-reassign-tickets.md` | Assign and reassign tickets | US-48 | US-45 |
 | 36  | `36-story-change-ticket-status.md` | Change ticket status through valid transitions | US-47 | US-45 |
+| 37  | `37-story-see-sla-status-on-a-ticket.md` | See SLA status on a ticket | US-69 | US-68, US-45 |
 
 ## No schema change
 

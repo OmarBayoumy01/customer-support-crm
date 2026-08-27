@@ -69,6 +69,10 @@ const TICKET_SELECT = {
   firstResponseBreached: true,
   resolutionDueAt: true,
   resolutionBreached: true,
+  // US-69, AC4. The pause columns have been maintained by US-68 since it was
+  // written and read by nothing until now.
+  slaPausedAt: true,
+  slaPausedMs: true,
   createdAt: true,
   updatedAt: true,
   customer: {
@@ -76,6 +80,9 @@ const TICKET_SELECT = {
   },
   assignee: { select: { firstName: true, lastName: true } },
   category: { select: { nameEn: true, nameAr: true } },
+  // One indexed join for what the policy promises — AC4 asks for the target, and
+  // deriving it from createdAt to the deadline is wrong by the banked pause.
+  slaPolicy: { select: { firstResponseMinutes: true, resolutionMinutes: true } },
 } as const;
 
 type TicketRow = Prisma.TicketGetPayload<{ select: typeof TICKET_SELECT }>;
@@ -208,6 +215,10 @@ export class TicketsService {
         firstResponseBreached: row.firstResponseBreached,
         resolutionBreached: row.resolutionBreached,
         secondsRemaining: null,
+        pausedAt: row.slaPausedAt?.toISOString() ?? null,
+        pausedMs: row.slaPausedMs,
+        responseTargetMinutes: row.slaPolicy?.firstResponseMinutes ?? null,
+        resolutionTargetMinutes: row.slaPolicy?.resolutionMinutes ?? null,
       };
     }
 
@@ -230,6 +241,10 @@ export class TicketsService {
       firstResponseBreached: row.firstResponseBreached,
       resolutionBreached: row.resolutionBreached,
       secondsRemaining: Math.round(remainingMs / 1000),
+      pausedAt: row.slaPausedAt?.toISOString() ?? null,
+      pausedMs: row.slaPausedMs,
+      responseTargetMinutes: row.slaPolicy?.firstResponseMinutes ?? null,
+      resolutionTargetMinutes: row.slaPolicy?.resolutionMinutes ?? null,
     };
   }
 
@@ -526,7 +541,10 @@ export class TicketsService {
         resolvedAt: true,
         closedAt: true,
         reopenCount: true,
-        slaPolicy: { select: { nameEn: true } },
+        // The name for the header, the minutes for AC4’s target — US-69.
+        slaPolicy: {
+          select: { nameEn: true, firstResponseMinutes: true, resolutionMinutes: true },
+        },
         // Newest first here, reversed below: "the most recent thirty" is a
         // descending query, and the timeline reads oldest-to-newest.
         messages: {

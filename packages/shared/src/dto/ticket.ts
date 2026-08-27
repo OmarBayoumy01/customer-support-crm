@@ -239,6 +239,26 @@ export const TicketSlaSchema = z.object({
   resolutionBreached: z.boolean(),
   /** Negative once the target has passed. Null when no policy applies. */
   secondsRemaining: z.number().int().nullable(),
+  /**
+   * Since when the resolution clock has been stopped — US-69, AC4.
+   *
+   * Non-null while the ticket sits in `PENDING_CUSTOMER`. US-68 has maintained
+   * this column since it was written and nothing has ever read it: a countdown
+   * that keeps running while its clock is paused is a lie, in the queue as much
+   * as on the ticket.
+   */
+  pausedAt: z.string().datetime().nullable(),
+  /** How long the clock has been stopped in total, in milliseconds — AC4. */
+  pausedMs: z.number().int().nonnegative(),
+  /**
+   * What the governing policy actually promises — US-69, AC4.
+   *
+   * Sent rather than inferred from `createdAt` to the deadline, because that
+   * difference is wrong by exactly the banked pause. Null when no policy
+   * applies.
+   */
+  responseTargetMinutes: z.number().int().positive().nullable(),
+  resolutionTargetMinutes: z.number().int().positive().nullable(),
 });
 
 export const TicketSchema = z.object({

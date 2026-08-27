@@ -1612,3 +1612,36 @@ test('US-47 AC3 — firstRespondedAt is the fact the resolve warning reads', asy
   // which is exactly "no agent reply exists on the ticket".
   assert.ok(after.body.data!.sla.firstRespondedAt !== null);
 });
+
+// ---------------------------------------------------------------------------
+// US-69 — what the timer needs from the payload
+// ---------------------------------------------------------------------------
+
+test('US-69 AC4 — the SLA payload carries the target and the paused total', async () => {
+  const ticket = await newTicket({ priority: 'LOW' });
+
+  const fresh = await call<TicketDetail>('GET', `/tickets/${ticket.id}`, { token: allToken });
+  const sla = fresh.body.data!.sla;
+
+  // The target comes from the policy rather than being inferred from createdAt
+  // to the deadline, which is wrong by exactly the banked pause.
+  assert.equal(typeof sla.resolutionTargetMinutes, 'number');
+  assert.equal(sla.pausedAt, null);
+  assert.equal(sla.pausedMs, 0);
+
+  await setStatus(ticket.id, 'PENDING_CUSTOMER');
+
+  const paused = await call<TicketDetail>('GET', `/tickets/${ticket.id}`, { token: allToken });
+
+  // Stopped now, so the timer can say so instead of counting down against a
+  // clock that is not running.
+  assert.ok(paused.body.data!.sla.pausedAt !== null);
+
+  await setStatus(ticket.id, 'OPEN');
+
+  const resumed = await call<TicketDetail>('GET', `/tickets/${ticket.id}`, { token: allToken });
+
+  // US-68 banks the interval on resume; this is the first reader it has ever had.
+  assert.equal(resumed.body.data!.sla.pausedAt, null);
+  assert.ok(resumed.body.data!.sla.pausedMs >= 0);
+});

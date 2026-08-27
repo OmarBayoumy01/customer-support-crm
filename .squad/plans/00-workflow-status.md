@@ -30,23 +30,24 @@ The target flow, with the story that owns each step and its real state:
 | Read the conversation | US-46 | ✅ in review |
 | Reply / internal note | US-1 | ✅ in review |
 | SLA clock runs | US-67, US-68 | ✅ in review (backend) |
-| Agent *sees* the clock on a ticket | **US-69** | ❌ not started |
+| Agent *sees* the clock on a ticket | US-69 | ✅ in review |
 | Escalate on breach | **US-71** | ❌ not started |
 | Resolve | US-47 | ✅ in review |
 | Customer sees the result | **US-84** | ❌ not started |
 | Customer replies again | **US-85** | ❌ not started |
 | Manager reports on it | **US-55, US-58** | ❌ not started |
 
-**17 of 28 stories are done** (waves 0, 1 and seven of ten in wave 2). Every finished story is
+**18 of 28 stories are done** (waves 0, 1 and eight of ten in wave 2). Every finished story is
 `In review` in Notion — never `Done`, which is the human's call.
 
 **What is demonstrable today:** sign in as a seeded agent → browse and filter the queue → open
 a ticket → change priority and category → assign or unassign → read the timeline → reply or
-add an internal note → move the status through a validated lifecycle. All against real data
-from the seed, all through the real API.
+add an internal note → move the status through a validated lifecycle, watching both SLA
+timers tick down and change state as they go. All against real data from the seed, all
+through the real API.
 
-**What is not:** nothing enters the system from a customer, SLA state is invisible on the
-ticket itself, no escalation happens, and there is no dashboard or report.
+**What is not:** nothing enters the system from a customer, no escalation happens when a
+clock passes, and there is no dashboard or report.
 
 ---
 
@@ -61,7 +62,7 @@ ticket itself, no escalation happens, and there is no dashboard or report.
 | **Categorisation** | `GET /categories`, both controls save on change, `Category.departmentId` routing hint applied server-side | Category management UI — deferred to US-113 | US-49 ✅ | US-45 |
 | **Assignment** | `PATCH /tickets/:id/assignee` behind `ticket:assign`, candidate list with workload + availability, scope enforced in the query | Round-robin / load balancing — out of scope | US-48 ✅ | US-45 |
 | **Communication** | Timeline, reply composer, internal-note mode, `Message.isInternal` written and the API filter written | Attachments (needs S3) | US-1, 46 ✅ · US-51 deferred | US-46 |
-| **SLA** | Policies seeded, clocks computed, pause on Pending Customer, stop on Resolved, breach sweep worker on the existing BullMQ/Redis | **Ticket-level display** | **US-69** ❌ · US-67, 68 ✅ · US-70, 75 deferred | US-68, US-45 |
+| **SLA** | Policies seeded, clocks computed, pause/stop, breach sweep worker on the existing BullMQ/Redis, live ticking timers on the ticket with target, deadline and paused time | — | US-67, 68, 69 ✅ · US-70, 75 deferred | — |
 | **Escalation** | `SlaEscalationStep` modelled; sweep worker exists | **Everything else** | **US-71** ❌ | US-68 |
 | **Resolution** | Validated transitions, `resolvedAt`/`closedAt`/`reopenCount`, reopen rule built | Reopen *trigger* — needs US-85 | US-47 ✅ | US-45 |
 | **Ticket history** | Every mutation recorded, actor or automation attributed, names stored beside ids, append-only enforced by a trigger | — | US-50 ✅ | US-40 |
@@ -73,23 +74,22 @@ ticket itself, no escalation happens, and there is no dashboard or report.
 
 ## What is left, in the order to do it
 
-Eleven stories. The order below is the critical path, not the story numbers.
+Ten stories. The order below is the critical path, not the story numbers.
 
 | # | Story | Why here | Size |
 | - | ----- | -------- | ---- |
-| 1 | **US-69** See SLA status on a ticket | Makes "monitor SLA" visible. `SlaMeter` and the header clocks already exist | small |
-| 2 | **US-71** Escalate automatically on SLA thresholds | The one automation step in the journey. Backend only; the sweep worker exists | small–medium |
-| 3 | **US-21** Sign in to the customer portal | Opens the customer half. Portal accounts come from the seed | small |
-| 4 | **US-82** Customer-scoped portal API | **Carries non-negotiable rule #1** — internal notes filtered in the query, with the regression test | medium |
-| 5 | **US-86** Submit a support request | "Customer submits" — the real entry point | medium |
-| 6 | **US-84** Track my requests | "The customer sees the result" | small |
-| 7 | **US-85** Read and reply to my request | Closes the loop, and supplies US-47's reopen trigger | medium |
-| 8 | **US-55** Agent dashboard | First screen after sign-in; currently a placeholder | medium |
-| 9 | **US-58** Manager dashboard | **This is the "Report" step.** P11 Reports is entirely V2 | medium |
-| 10 | US-41 Create a ticket as an agent | Second entry point. **The loop closes without it** | medium |
-| 11 | US-35 View a customer profile | The customer as a thing you can open. **The loop closes without it** | medium |
+| 1 | **US-71** Escalate automatically on SLA thresholds | The one automation step in the journey. Backend only; the sweep worker exists | small–medium |
+| 2 | **US-21** Sign in to the customer portal | Opens the customer half. Portal accounts come from the seed | small |
+| 3 | **US-82** Customer-scoped portal API | **Carries non-negotiable rule #1** — internal notes filtered in the query, with the regression test | medium |
+| 4 | **US-86** Submit a support request | "Customer submits" — the real entry point | medium |
+| 5 | **US-84** Track my requests | "The customer sees the result" | small |
+| 6 | **US-85** Read and reply to my request | Closes the loop, and supplies US-47's reopen trigger | medium |
+| 7 | **US-55** Agent dashboard | First screen after sign-in; currently a placeholder | medium |
+| 8 | **US-58** Manager dashboard | **This is the "Report" step.** P11 Reports is entirely V2 | medium |
+| 9 | US-41 Create a ticket as an agent | Second entry point. **The loop closes without it** | medium |
+| 10 | US-35 View a customer profile | The customer as a thing you can open. **The loop closes without it** | medium |
 
-**If credits are the binding constraint, stop after 9.** Items 10 and 11 are the two remaining
+**If credits are the binding constraint, stop after 8.** Items 9 and 10 are the two remaining
 wave-2 stories and both are genuine capabilities, but neither is on the critical path: tickets
 enter through the portal, and the customer is already visible from the ticket's context panel.
 That is a scope decision for the human, flagged rather than taken.
@@ -129,6 +129,8 @@ That is a scope decision for the human, flagged rather than taken.
 | US-48 | AC1 agent is notified | No notification channel exists | US-62 |
 | US-48 | AC5 out of office | **Not modelled in the schema at all** | a story that owns agent availability |
 | US-47 | AC5 reopen trigger | `onCustomerReply` built and tested; nothing writes a customer message | US-85 |
+| US-69 | AC6 "and dashboards" | Verified on the ticket and the queue; there are no dashboards yet | US-55, US-58 |
+| US-69 | AC4 paused *periods* | The schema banks a total plus the current pause, not a list of intervals | a schema change nobody needs yet |
 
 ---
 
@@ -177,7 +179,7 @@ eslint, prettier and a full typecheck, so a commit is itself a verification gate
 
 Per `CLAUDE.md`, one story at a time: pull the Notion story → fill an intake under
 `.squad/stories/<feature>/<slug>/` → write a numbered plan under `.squad/plans/<feature>/`
-(**the tickets feature is at 36**; plan numbers are a global sequence) → **stop for human
+(**the tickets feature is at 37**; plan numbers are a global sequence) → **stop for human
 review of the plan** → implement → verify each AC individually → set Notion to `In review`
 → commit → update this file's status table.
 

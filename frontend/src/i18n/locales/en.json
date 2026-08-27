@@ -76,7 +76,16 @@
       "dueSoon": "Due soon",
       "breached": "Breached",
       "remaining": "{{time}} left",
-      "overBy": "{{time}} over"
+      "overBy": "{{time}} over",
+      "met": "Met",
+      "timer": {
+        "response": "First response",
+        "resolution": "Resolution",
+        "dueIn": "{{label}} due in {{time}}",
+        "overdueBy": "{{label}} overdue by {{time}}",
+        "met": "{{label}} met",
+        "none": "{{label}}: no target"
+      }
     },
     "channel": {
       "email": "Email",
@@ -160,7 +169,10 @@
         "resolution": "Resolution",
         "dueAt": "Due",
         "policy": "Policy",
-        "noPolicy": "None"
+        "noPolicy": "None",
+        "target": "Target",
+        "paused": "Paused",
+        "pausedSince": "Since {{time}}"
       },
       "conversation": {
         "title": "Conversation",

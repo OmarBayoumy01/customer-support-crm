@@ -132,6 +132,25 @@ export const PRIORITY_PRESENTATION: Record<TicketPriority, Presentation> = {
   },
 };
 
+/**
+ * How an SLA reads once it is finished with — US-69, AC3.
+ *
+ * AC3 names four states and `SlaState` has three plus `none`, so this one is a
+ * **presentation** state rather than a server one: a response target that was
+ * met, or a resolution clock on a ticket that is resolved. Neither is a state of
+ * the SLA the server should be asked to compute — both are already facts on the
+ * payload — and grey is the signal that the number has stopped mattering.
+ *
+ * The tokens are the ones `STATUS_PRESENTATION.NEW` uses, rather than a new
+ * grey: colour is rationed, and a finished clock is the least urgent thing on
+ * the screen.
+ */
+export const SLA_MET_PRESENTATION: Presentation = {
+  labelKey: 'ticket.sla.met',
+  icon: CheckCircle2,
+  className: 'text-ink-muted bg-secondary border-line',
+};
+
 export const SLA_PRESENTATION: Record<SlaState, Presentation> = {
   ok: {
     labelKey: 'ticket.sla.onTrack',

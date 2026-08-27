@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
 import {
   PRIORITY_PRESENTATION,
+  SLA_MET_PRESENTATION,
   SLA_PRESENTATION,
   slaStateFor,
   STATUS_PRESENTATION,
@@ -113,29 +114,44 @@ export interface SlaProps {
 export function SlaMeter({
   targetSeconds,
   elapsedSeconds,
+  met = false,
   className,
-}: SlaProps): React.JSX.Element {
+}: SlaProps & {
+  /**
+   * The clock has stopped for good — US-69, AC3.
+   *
+   * Without this a resolved ticket in the queue's Closed tab shows a green
+   * countdown against a clock that is no longer running, which is the same lie
+   * the ticket header used to tell.
+   */
+  met?: boolean;
+}): React.JSX.Element {
   const { t } = useTranslation();
 
-  const fraction = targetSeconds <= 0 ? 1 : elapsedSeconds / targetSeconds;
+  const fraction = met ? 1 : targetSeconds <= 0 ? 1 : elapsedSeconds / targetSeconds;
   const state = slaStateFor(fraction);
   const remaining = targetSeconds - elapsedSeconds;
-  const presentation = SLA_PRESENTATION[state];
+  const presentation = met ? SLA_MET_PRESENTATION : SLA_PRESENTATION[state];
 
-  const fill = {
-    ok: 'bg-sla-ok',
-    warn: 'bg-sla-warn',
-    breach: 'bg-sla-breach',
-  }[state];
+  const fill = met
+    ? 'bg-ink-faint'
+    : {
+        ok: 'bg-sla-ok',
+        warn: 'bg-sla-warn',
+        breach: 'bg-sla-breach',
+      }[state];
 
-  const text = {
-    ok: 'text-sla-ok',
-    warn: 'text-sla-warn',
-    breach: 'text-sla-breach',
-  }[state];
+  const text = met
+    ? 'text-ink-muted'
+    : {
+        ok: 'text-sla-ok',
+        warn: 'text-sla-warn',
+        breach: 'text-sla-breach',
+      }[state];
 
-  const label =
-    remaining >= 0
+  const label = met
+    ? t(SLA_MET_PRESENTATION.labelKey)
+    : remaining >= 0
       ? t('ticket.sla.remaining', { time: formatRemaining(remaining) })
       : t('ticket.sla.overBy', { time: formatRemaining(remaining) });
 

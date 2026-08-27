@@ -76,7 +76,16 @@
       "dueSoon": "تقترب من الموعد",
       "breached": "تجاوزت المدة",
       "remaining": "متبقٍ {{time}}",
-      "overBy": "تجاوز {{time}}"
+      "overBy": "تجاوز {{time}}",
+      "met": "تم الالتزام",
+      "timer": {
+        "response": "أول رد",
+        "resolution": "الحل",
+        "dueIn": "{{label}} خلال {{time}}",
+        "overdueBy": "{{label}} متأخر بـ {{time}}",
+        "met": "تم {{label}} في الوقت",
+        "none": "{{label}}: بلا هدف"
+      }
     },
     "channel": {
       "email": "البريد الإلكتروني",
@@ -164,7 +173,10 @@
         "resolution": "الحل",
         "dueAt": "الموعد",
         "policy": "السياسة",
-        "noPolicy": "لا توجد"
+        "noPolicy": "لا توجد",
+        "target": "الهدف",
+        "paused": "موقوف",
+        "pausedSince": "منذ {{time}}"
       },
       "conversation": {
         "title": "المحادثة",

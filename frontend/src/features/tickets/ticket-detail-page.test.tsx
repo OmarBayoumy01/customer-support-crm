@@ -67,6 +67,10 @@ function detail(overrides: Partial<TicketDetail> = {}): TicketDetail {
     sla: {
       state: 'breach',
       firstRespondedAt: null,
+      pausedAt: null,
+      pausedMs: 0,
+      responseTargetMinutes: 30,
+      resolutionTargetMinutes: 240,
       firstResponseDueAt: new Date(Date.now() - 3 * HOUR).toISOString(),
       resolutionDueAt: new Date(Date.now() - HOUR).toISOString(),
       firstResponseBreached: true,
@@ -228,8 +232,10 @@ describe('AC2 — SLA without scrolling', () => {
 
     await screen.findByRole('heading', { name: /Refund approved/ });
 
-    expect(screen.getByText('First response')).toBeInTheDocument();
-    expect(screen.getByText('Resolution')).toBeInTheDocument();
+    // US-69 phrases each clock as a sentence rather than a heading above a bare
+    // figure, so the label appears inside it.
+    expect(screen.getByText(/^First response /)).toBeInTheDocument();
+    expect(screen.getByText(/^Resolution /)).toBeInTheDocument();
 
     // Over its target, said in words rather than only in red.
     expect(screen.getAllByText(/over/).length).toBeGreaterThan(0);
