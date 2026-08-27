@@ -371,7 +371,47 @@
       "greetingAnonymous": "Hello",
       "subtitle": "Everything you have asked us, and where it stands.",
       "requestsLabel": "Your requests",
-      "comingSoon": "Your requests will be listed here shortly."
+      "comingSoon": "Your requests will be listed here shortly.",
+      "newRequest": "New request"
+    },
+    "submit": {
+      "title": "Ask us for help",
+      "subtitle": "Tell us what is happening and we will pick it up.",
+      "subject": "What do you need help with?",
+      "subjectPlaceholder": "A short summary",
+      "category": "What is it about?",
+      "notSure": "I am not sure",
+      "urgency": "How urgent is it?",
+      "urgencyPlaceholder": "Choose one",
+      "urgencyOptions": {
+        "whenever": "Whenever you can get to it",
+        "soon": "I need help soon",
+        "blocked": "It is stopping me working"
+      },
+      "description": "Tell us more",
+      "descriptionPlaceholder": "What happened, and what you expected instead",
+      "contact": "How should we reach you?",
+      "contactOptions": {
+        "email": "Email",
+        "whatsapp": "WhatsApp",
+        "sms": "Text message"
+      },
+      "send": "Send request",
+      "sending": "Sending…",
+      "cancel": "Cancel",
+      "noArticles": "Fill this in and we will take it from here.",
+      "errors": {
+        "subject": "Please tell us what you need help with.",
+        "description": "Please tell us what is happening.",
+        "urgency": "Please let us know how urgent it is.",
+        "failed": "We could not send that just now. Please try again."
+      },
+      "done": {
+        "title": "We have your request",
+        "number": "It is request number {{number}}. Quote that if you call us.",
+        "updates": "Updates will go to {{email}}.",
+        "home": "Back to my requests"
+      }
     }
   }
 }

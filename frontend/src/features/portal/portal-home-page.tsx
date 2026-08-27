@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
-import { LifeBuoy, LogOut } from 'lucide-react';
+import { Link } from 'react-router';
+import { LifeBuoy, LogOut, Plus } from 'lucide-react';
 
 import { LanguageToggle } from '@/components/language-toggle';
 import { Button } from '@/components/ui/button';
@@ -52,12 +53,24 @@ export function PortalHomePage(): React.JSX.Element {
       </header>
 
       <main className="mx-auto max-w-3xl px-6 py-10">
-        <h1 className="text-page font-semibold">
-          {user === null
-            ? t('portal.home.greetingAnonymous')
-            : t('portal.home.greeting', { name: user.firstName })}
-        </h1>
-        <p className="text-ink-muted mt-1">{t('portal.home.subtitle')}</p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-page font-semibold">
+              {user === null
+                ? t('portal.home.greetingAnonymous')
+                : t('portal.home.greeting', { name: user.firstName })}
+            </h1>
+            <p className="text-ink-muted mt-1">{t('portal.home.subtitle')}</p>
+          </div>
+
+          {/* The one action on this page until US-84 gives it a list. */}
+          <Button asChild className="gap-2">
+            <Link to="/portal/new">
+              <Plus aria-hidden="true" className="size-4" />
+              {t('portal.home.newRequest')}
+            </Link>
+          </Button>
+        </div>
 
         {/*
           Says plainly that the list is not here yet rather than showing an

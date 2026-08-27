@@ -125,6 +125,11 @@ export {
   PortalTicketSchema,
   PortalTicketDetailSchema,
   PortalTicketListQuerySchema,
+  PortalUrgencySchema,
+  PortalCategorySchema,
+  SubmitPortalTicketSchema,
+  PORTAL_URGENCY,
+  URGENCY_PRIORITY,
   PORTAL_STATUS,
   toPortalStatus,
   internalStatusesFor,
@@ -134,6 +139,9 @@ export {
   type PortalTicket,
   type PortalTicketDetail,
   type PortalTicketListQuery,
+  type PortalUrgency,
+  type PortalCategory,
+  type SubmitPortalTicket,
 } from './dto/portal.js';
 
 export {

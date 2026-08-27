@@ -1,15 +1,20 @@
 import { Injectable, Logger } from '@nestjs/common';
 import {
+  URGENCY_PRIORITY,
   internalStatusesFor,
   toPortalStatus,
   type PortalMessage,
   type PortalTicket,
   type PortalTicketDetail,
+  type PortalCategory,
   type PortalTicketListQuery,
+  type SubmitPortalTicket,
 } from '@crm/shared';
 
 import { ApiException } from '../common/index.js';
 import { PrismaService } from '../prisma/index.js';
+import { CategoriesService } from '../categories/index.js';
+import { TicketsService } from '../tickets/index.js';
 import type { Prisma } from '../generated/prisma/client.js';
 
 /**
@@ -84,7 +89,23 @@ const RECENT_MESSAGE_COUNT = 30;
 export class PortalService {
   private readonly logger = new Logger(PortalService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly categoryList: CategoriesService,
+    /**
+     * Reused for the business rules a ticket must have and nothing else — US-86.
+     *
+     * `TicketsService.create` owns the sequential number from Postgres's own
+     * sequence, the `CREATED` history entry and the SLA clock start. Those are
+     * rules about what a ticket *is*, not about who may make one, and
+     * reimplementing them here would be two clocks and two numbering schemes.
+     *
+     * **It imports no authorisation.** `create` has never done permission work —
+     * its caller's guard does — and the `customerId` it receives here is the one
+     * this service resolved from the portal token.
+     */
+    private readonly ticketRules: TicketsService,
+  ) {}
 
   /**
    * The `Customer` behind a portal token — AC1, and it fails closed.
@@ -259,5 +280,109 @@ export class PortalService {
     ]);
 
     return { messages: rows.map((row) => PortalService.toMessage(row)), total };
+  }
+
+  /**
+   * The categories a customer may file under — US-86, AC1.
+   *
+   * Reuses `CategoriesService.list` for the rows and then **narrows them**: the
+   * staff `Category` carries `departmentId`, `departmentName` and
+   * `defaultPriority`, which is the internal routing detail US-82's allowlist
+   * exists to keep out. A customer who can see which team a category routes to is
+   * a customer who can shop for one.
+   */
+  async categories(locale: 'EN' | 'AR' = 'EN'): Promise<PortalCategory[]> {
+    const rows = await this.categoryList.list();
+
+    return rows.map((row) => ({
+      id: row.id,
+      name: locale === 'AR' ? row.nameAr : row.nameEn,
+    }));
+  }
+
+  /**
+   * A customer raises a request — US-86.
+   *
+   * **`customerId` is a parameter, resolved by the controller from the portal
+   * token, and there is nowhere in `SubmitPortalTicket` to put one.** That is the
+   * whole ownership guarantee: not a check that the body matches the token, but a
+   * contract with no field to disagree about.
+   *
+   * Four things the server decides and the customer cannot ask for:
+   *
+   * - `channel: 'WEB'` — it *arrived* through the portal. An observed fact, not a
+   *   preference, and not the same thing as the contact method they prefer.
+   * - `departmentId` / `branchId` — internal routing. A customer choosing a
+   *   department is a customer choosing whose SLA target they get.
+   * - `tags` — an internal vocabulary.
+   * - `status` — the schema's `NEW`. Triage is staff work.
+   *
+   * The priority comes from `URGENCY_PRIORITY`, which has no `URGENT` entry, so
+   * no accepted input produces the tightest SLA target.
+   */
+  async submit(
+    /**
+     * Both halves come from the token: the customer the request belongs to, and
+     * the user who raised it. Neither is ever read from the body.
+     */
+    actor: { customerId: string; userId: string },
+    input: SubmitPortalTicket,
+    locale: 'EN' | 'AR' = 'EN',
+  ): Promise<PortalTicketDetail> {
+    const { customerId } = actor;
+    if (input.categoryId !== undefined) {
+      // Existing **and active**: a stale id should be refused rather than filed
+      // under a category nobody is watching any more.
+      const category = await this.prisma.notDeleted.category.findFirst({
+        where: { id: input.categoryId, isActive: true },
+        select: { id: true },
+      });
+
+      if (category === null) {
+        throw ApiException.unprocessable('That category is not available.');
+      }
+    }
+
+    /**
+     * AC1's preferred contact method, recorded where the domain already models
+     * it — `Customer.preferredChannel`.
+     *
+     * **Nothing is sent to it.** Recording a preference is not integrating with a
+     * channel; the channels themselves are P13.
+     */
+    if (input.preferredContact !== undefined) {
+      await this.prisma.customer.update({
+        where: { id: customerId },
+        data: { preferredChannel: input.preferredContact },
+      });
+    }
+
+    const created = await this.ticketRules.create(
+      {
+        customerId,
+        subject: input.subject,
+        description: input.description,
+        ...(input.categoryId === undefined ? {} : { categoryId: input.categoryId }),
+        priority: URGENCY_PRIORITY[input.urgency],
+        channel: 'WEB',
+      },
+      // Used only to attribute the `CREATED` history entry, which is correct:
+      // the customer really did create it.
+      { userId: actor.userId, departmentId: null },
+    );
+
+    this.logger.log(`Portal request #${String(created.number)} raised by customer ${customerId}`);
+
+    /**
+     * Read back through the portal's own path rather than mapping `create`'s
+     * return value.
+     *
+     * `TicketsService.create` returns the **staff** `Ticket` — the SLA block, the
+     * assignee, the department, the internal status. Going back through
+     * `ticket()` means the submit response and the read response are the same
+     * allowlisted shape by construction, rather than by two functions agreeing
+     * with each other for as long as somebody keeps them in step.
+     */
+    return this.ticket(customerId, created.id, locale);
   }
 }

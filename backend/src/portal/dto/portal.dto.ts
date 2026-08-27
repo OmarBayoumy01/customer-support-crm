@@ -1,4 +1,8 @@
-import { PaginationQuerySchema, PortalTicketListQuerySchema } from '@crm/shared';
+import {
+  PaginationQuerySchema,
+  PortalTicketListQuerySchema,
+  SubmitPortalTicketSchema,
+} from '@crm/shared';
 
 import { createZodDto } from '../../common/index.js';
 
@@ -7,3 +11,6 @@ export class PortalTicketListQueryDto extends createZodDto(PortalTicketListQuery
 
 /** Paging for the conversation endpoint, which needs no filters of its own. */
 export class PortalPaginationQueryDto extends createZodDto(PaginationQuerySchema) {}
+
+/** What a customer may submit — US-86. Note what the schema has no room for. */
+export class SubmitPortalTicketDto extends createZodDto(SubmitPortalTicketSchema) {}

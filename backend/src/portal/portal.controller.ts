@@ -1,23 +1,45 @@
-import { Controller, Get, Param, Query, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Param,
+  Post,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
 import {
   ApiErrorSchema,
+  PortalCategorySchema,
   PortalTicketDetailSchema,
   PortalTicketSchema,
   buildPaginationMeta,
   toSkipTake,
   type ApiPaginated,
+  type PortalCategory,
   type PortalTicket,
   type PortalTicketDetail,
 } from '@crm/shared';
 
 import { CurrentUser, Public, type CurrentUserPayload } from '../auth/index.js';
-import { ApiZodQuery, ApiZodResponse, BEARER_AUTH_NAME, zodToOpenApi } from '../openapi/index.js';
+import {
+  ApiZodBody,
+  ApiZodQuery,
+  ApiZodResponse,
+  BEARER_AUTH_NAME,
+  zodToOpenApi,
+} from '../openapi/index.js';
 import { PortalAuthGuard } from './portal-auth.guard.js';
 import { PortalThrottleService } from './portal-throttle.service.js';
 import { PortalService } from './portal.service.js';
-import { PortalPaginationQueryDto, PortalTicketListQueryDto } from './dto/portal.dto.js';
+import {
+  PortalPaginationQueryDto,
+  PortalTicketListQueryDto,
+  SubmitPortalTicketDto,
+} from './dto/portal.dto.js';
 
 /**
  * The customer-facing API — US-82.
@@ -53,12 +75,16 @@ export class PortalController {
    * account being protected, and it is checked after the identity is resolved so
    * an unauthenticated flood is stopped by the guard first.
    */
-  private async scopeFor(user: CurrentUserPayload | undefined, request: Request): Promise<string> {
-    const customerId = await this.portal.customerIdFor(user?.userId ?? '');
+  private async scopeFor(
+    user: CurrentUserPayload | undefined,
+    request: Request,
+  ): Promise<{ customerId: string; userId: string }> {
+    const userId = user?.userId ?? '';
+    const customerId = await this.portal.customerIdFor(userId);
 
     await this.throttle.check({ customerId, ip: request.ip });
 
-    return customerId;
+    return { customerId, userId };
   }
 
   @Get('tickets')
@@ -76,7 +102,7 @@ export class PortalController {
     @CurrentUser() user: CurrentUserPayload | undefined,
     @Req() request: Request,
   ): Promise<ApiPaginated<PortalTicket>> {
-    const customerId = await this.scopeFor(user, request);
+    const { customerId } = await this.scopeFor(user, request);
     const { tickets, total } = await this.portal.tickets(customerId, query);
 
     return {
@@ -101,7 +127,7 @@ export class PortalController {
     @CurrentUser() user: CurrentUserPayload | undefined,
     @Req() request: Request,
   ): Promise<PortalTicketDetail> {
-    const customerId = await this.scopeFor(user, request);
+    const { customerId } = await this.scopeFor(user, request);
 
     return this.portal.ticket(customerId, id);
   }
@@ -128,7 +154,7 @@ export class PortalController {
     @CurrentUser() user: CurrentUserPayload | undefined,
     @Req() request: Request,
   ): Promise<ApiPaginated<PortalTicketDetail['messages'][number]>> {
-    const customerId = await this.scopeFor(user, request);
+    const { customerId } = await this.scopeFor(user, request);
 
     // Refuses a request that is not the caller's before any message is read.
     await this.portal.ticket(customerId, id);
@@ -140,5 +166,62 @@ export class PortalController {
       data: messages,
       pagination: buildPaginationMeta({ page: query.page, pageSize: query.pageSize, total }),
     };
+  }
+
+  /**
+   * The categories a customer may file under — US-86, AC1.
+   *
+   * Its own route rather than the staff `GET /categories`, which is guarded by
+   * `ticket:view` and returns the department and default priority a customer has
+   * no business seeing.
+   */
+  @Get('categories')
+  @ApiOperation({
+    summary: 'The categories a request can be filed under',
+    description:
+      'Id and name only. The staff list additionally carries the department and default ' +
+      'priority, which is internal routing.',
+  })
+  @ApiZodResponse(200, PortalCategorySchema, 'The categories')
+  async categories(
+    @CurrentUser() user: CurrentUserPayload | undefined,
+    @Req() request: Request,
+  ): Promise<PortalCategory[]> {
+    await this.scopeFor(user, request);
+
+    return this.portal.categories();
+  }
+
+  /**
+   * A customer raises a request — US-86.
+   *
+   * **The customer is the token’s, and the body has nowhere to say otherwise.**
+   * `SubmitPortalTicketSchema` has no `customerId`, no `channel`, no
+   * `departmentId`, no `tags` and no `status` — so this is not a check that the
+   * body agrees with the token, it is a contract with nothing to disagree about.
+   *
+   * Inherits the guard, the audience and the throttle from `scopeFor`, like every
+   * other route on this controller.
+   */
+  @Post('tickets')
+  @HttpCode(201)
+  @ApiOperation({
+    summary: 'Raise a support request',
+    description:
+      'The request is filed against the signed-in customer, arrives on the WEB channel, ' +
+      'and starts at NEW for staff to triage. Urgency is plain wording mapped to a ' +
+      'priority server-side; the tightest priority is not reachable from the portal.',
+  })
+  @ApiZodBody(SubmitPortalTicketDto)
+  @ApiZodResponse(201, PortalTicketDetailSchema, 'Raised')
+  @ApiResponse({ status: 422, schema: zodToOpenApi(ApiErrorSchema) })
+  async submit(
+    @Body() body: SubmitPortalTicketDto,
+    @CurrentUser() user: CurrentUserPayload | undefined,
+    @Req() request: Request,
+  ): Promise<PortalTicketDetail> {
+    const actor = await this.scopeFor(user, request);
+
+    return this.portal.submit(actor, body);
   }
 }

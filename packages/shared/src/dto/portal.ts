@@ -19,7 +19,8 @@
  */
 import { z } from 'zod';
 
-import { TicketStatusSchema, type TicketStatus } from './ticket.js';
+import { ChannelSchema } from './customer.js';
+import { TicketStatusSchema, type TicketPriority, type TicketStatus } from './ticket.js';
 
 /**
  * What a customer is told about where their request stands — US-82, AC3.
@@ -158,3 +159,76 @@ export type PortalTicketListQuery = z.infer<typeof PortalTicketListQuerySchema>;
 export function internalStatusesFor(status: PortalTicketStatus): TicketStatus[] {
   return TicketStatusSchema.options.filter((internal) => PORTAL_STATUS[internal] === status);
 }
+
+/**
+ * How urgent the customer says it is — US-86, AC2.
+ *
+ * **Plain words on the wire, not priority names.** The customer never sees
+ * `LOW`/`MEDIUM`/`HIGH` and never sends them; the mapping below is the only
+ * place the two vocabularies meet.
+ */
+export const PORTAL_URGENCY = ['whenever', 'soon', 'blocked'] as const;
+
+export const PortalUrgencySchema = z.enum(PORTAL_URGENCY);
+
+export type PortalUrgency = z.infer<typeof PortalUrgencySchema>;
+
+/**
+ * Plain urgency to internal priority — AC2's "mapped to priority behind the
+ * scenes".
+ *
+ * **`URGENT` is deliberately unreachable.** Every customer's problem is urgent
+ * to them, and a self-service field that sets the tightest SLA target is a field
+ * that is always set to the tightest SLA target. Raising a ticket to `URGENT` is
+ * triage, which US-49 gives agents. Because this map has no `URGENT` value, the
+ * API cannot be talked into one — there is no accepted input that produces it.
+ */
+export const URGENCY_PRIORITY: Record<PortalUrgency, TicketPriority> = {
+  whenever: 'LOW',
+  soon: 'MEDIUM',
+  blocked: 'HIGH',
+};
+
+/**
+ * A category as the portal offers it — US-86, AC1.
+ *
+ * `id` and a resolved `name`, and nothing else. The staff `Category` also
+ * carries `departmentId`, `departmentName` and `defaultPriority`, which is
+ * exactly the internal routing detail the allowlist exists to keep out: a
+ * customer does not need to know which team a category routes to, and telling
+ * them invites them to shop for one.
+ */
+export const PortalCategorySchema = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+});
+
+export type PortalCategory = z.infer<typeof PortalCategorySchema>;
+
+/**
+ * What a customer may submit — US-86.
+ *
+ * **Everything a customer must not choose is absent from this schema**, which is
+ * stronger than validating it away: `customerId` (resolved from the token, and a
+ * body field here would be one customer filing against another), `channel` (it
+ * arrived through the portal — an observed fact, not a preference),
+ * `departmentId`, `branchId`, `tags` and `status`. A request cannot ask for any
+ * of them because the contract has nowhere to put them.
+ */
+export const SubmitPortalTicketSchema = z.object({
+  subject: z.string().trim().min(3).max(200),
+  description: z.string().trim().min(1).max(20_000),
+  /** Optional: a customer who does not know the category should not be stuck. */
+  categoryId: z.string().uuid().optional(),
+  urgency: PortalUrgencySchema,
+  /**
+   * How they would like to be reached — AC1's "preferred contact method".
+   *
+   * Recorded on the customer record. **Nothing is sent to it:** recording a
+   * preference is not integrating with a channel, and the channels themselves
+   * are P13.
+   */
+  preferredContact: ChannelSchema.optional(),
+});
+
+export type SubmitPortalTicket = z.infer<typeof SubmitPortalTicketSchema>;

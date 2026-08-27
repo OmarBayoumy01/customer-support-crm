@@ -10,6 +10,7 @@ and together they close the loop: a customer raises a request and sees the answe
 | --- | ---- | ----- | ---------- | ---------- |
 | 39  | `39-story-customer-scoped-portal-api.md` | Build the customer-scoped portal API | US-82 | US-40 |
 | 40  | `40-story-sign-in-to-the-customer-portal.md` | Sign in to the customer portal | US-21 | US-14, US-82 |
+| 41  | `41-story-submit-a-support-request.md` | Submit a support request | US-86 | US-82 |
 
 ## Why this feature exists as its own module
 
@@ -56,8 +57,11 @@ against the serialised JSON.
 
 ## What the next stories inherit
 
-- **US-86** adds `POST /portal/tickets` to this controller and inherits the guard, the
-  throttle and the scope.
+- **US-86** ✅ added `POST /portal/tickets` and `GET /portal/categories`, both through the
+  same `scopeFor` — so the write inherits the guard, the audience, the throttle and the
+  scope. Its request schema has no `customerId`, `channel`, `departmentId`, `tags` or
+  `status`: a contract with nothing to disagree about beats a check that the body matches
+  the token.
 - **US-84** and **US-85** are the screens over this API. If they need a field, it is added to
   the allowlist deliberately — which is the point of the allowlist.
 - **US-21** ✅ built the sign-in over this boundary: `POST /auth/portal/login` issues the
