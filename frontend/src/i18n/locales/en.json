@@ -316,9 +316,7 @@
     },
     "showPassword": "Show password",
     "hidePassword": "Hide password",
-    "capsLock": "Caps Lock is on",
-    "portalPrompt": "A customer?",
-    "portalLink": "Use the portal sign-in"
+    "capsLock": "Caps Lock is on"
   },
   "dashboard": {
     "title": "My workload",
@@ -380,19 +378,6 @@
     "selectedCount_other": "{{count}} selected"
   },
   "portal": {
-    "signIn": {
-      "headline": "Your requests, in one place.",
-      "subhead": "Sign in to see where each of your requests stands and pick up the conversation."
-    },
-    "login": {
-      "title": "Sign in",
-      "subtitle": "Reach your support requests.",
-      "staffPrompt": "Work here?",
-      "staffLink": "Use the staff sign-in",
-      "errors": {
-        "staffAccount": "This is a staff account. Please use the staff sign-in instead."
-      }
-    },
     "home": {
       "brand": "Support",
       "signOut": "Sign out",

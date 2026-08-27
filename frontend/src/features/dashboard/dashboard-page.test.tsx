@@ -33,6 +33,7 @@ const TICKET_ID = '01923456-89ab-7cde-8f01-2345678900t1';
 const SESSION: LoginResponse = {
   accessToken: 'a.test.token',
   expiresIn: 900,
+  audience: 'crm-staff',
   user: {
     id: USER_ID,
     email: 'agent@crm.local',

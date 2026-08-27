@@ -8,6 +8,7 @@
 import { z } from 'zod';
 
 import { EffectivePermissionsSchema } from './permissions.js';
+import { TokenAudienceSchema } from './tokens.js';
 
 /** Matches `Locale` in the Prisma schema. */
 export const LocaleSchema = z.enum(['EN', 'AR']);
@@ -83,6 +84,22 @@ export const LoginResponseSchema = z.object({
    * silent refresh without having to decode the token to find out.
    */
   expiresIn: z.number().int().positive(),
+
+  /**
+   * Which application this token is for — **decided by the account, not asked
+   * for by the client.**
+   *
+   * There is one login form. A person types their email and password, and the
+   * server answers with the audience their account belongs to: `crm-portal` for
+   * an account with a linked customer record, `crm-staff` otherwise. The client
+   * uses it to decide where to land, and cannot influence it — there is no
+   * request field for it and no second endpoint to prefer.
+   *
+   * It is reported rather than inferred from `roles` because roles are
+   * configuration an administrator can reassign, and which application somebody
+   * belongs in must not be.
+   */
+  audience: TokenAudienceSchema,
 
   user: AuthenticatedUserSchema,
 

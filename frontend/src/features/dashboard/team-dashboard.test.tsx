@@ -40,6 +40,7 @@ function sessionFor(permissions: Record<string, string[]>, roles: string[]): Log
   return {
     accessToken: 'a.test.token',
     expiresIn: 900,
+    audience: 'crm-staff',
     user: {
       id: MANAGER_ID,
       email: 'manager@crm.local',

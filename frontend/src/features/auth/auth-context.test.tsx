@@ -20,6 +20,7 @@ import { useAuth } from './auth-context';
 const RESPONSE: LoginResponse = {
   accessToken: 'a.very.secret.token',
   expiresIn: 900,
+  audience: 'crm-staff',
   user: {
     id: '01923456-89ab-7cde-8f01-234567890abc',
     email: 'agent@crm.local',

@@ -2,8 +2,10 @@
 
 **Requested:** simplify the mental model to three business personas and five ticket statuses,
 without breaking anything already working.
-**Status:** report only. **No code has been changed.** Step 11 of the brief's critical rule
-is not started.
+**Status:** the status simplification itself is **not started** — step 11 of the brief's
+critical rule is untouched. §7.1 has since been fixed, differently and more simply than §8
+proposed: there is now **one login form** and the audience is derived from the account. See
+the note in §7.1.
 
 Written against commit `5cca64b`.
 
@@ -180,49 +182,22 @@ That is what you hit. **The customer reply itself is not broken:** I replied thr
 `POST /portal/tickets/:id/messages` as both portal accounts and got 201, with the reply
 appearing in the thread — including on the ticket where you had replied as Amina.
 
-Against the brief — *"The customer must NEVER access staff dashboards"* — this is a real
-boundary gap. The fix is small and symmetrical: refuse an account with a linked `Customer`
-row at the staff login, with its own error code so the sign-in screen can send them to the
-portal. **Not done — awaiting your go-ahead**, since it is a security-boundary change and
-US-21's AC2 only ever specified the one direction.
+Against the brief — *"The customer must NEVER access staff dashboards"* — this was a real
+boundary gap.
 
-### 7.2 Staff cannot create a ticket at all
+**Resolved, and not the way §8 step 0 proposed.** Step 0 was going to add the mirror
+refusal: a customer at the staff login gets a 422 pointing them at the portal form. The
+decision instead was to **remove the second form altogether**. There is now one endpoint,
+`POST /auth/login`, and it derives the audience from the account — a linked `Customer` row
+means a `crm-portal` token, anything else a `crm-staff` one — reporting it in `audience` so
+the client knows which application to open.
 
-The header's Create menu (`header.tsx:62`) renders "Create ticket" as a **dead dropdown
-item** — no handler, no route. `POST /tickets` exists and is guarded; only the UI is
-missing. That is **US-41**, one of the two unstarted MVP stories. It is why you could not
-make a ticket from the staff side; the portal path works.
+That is stricter than the refusal would have been: there is no door to knock on with the
+wrong account, no request field naming an audience, and no second endpoint to prefer. The
+boundary itself is unchanged, because it never was the form — it is the token, and each
+application's strategy still refuses the other's.
 
----
+**US-21's AC2 is superseded** ("a staff account on the portal form is refused, pointing at
+the staff login"). There is no portal form. AC1 survives as written and is still tested: a
+customer lands on the portal, never on the staff dashboard.
 
-## 8. Recommended sequencing
-
-Not one change. Four, each independently verifiable:
-
-| # | Change | Why separate | Risk |
-| - | ------ | ------------ | ---- |
-| 0 | Staff login refuses customer accounts (§7.1) | Independent of the statuses, fixes a live boundary gap today | Low |
-| 1 | **`ESCALATED` → escalation data** | Self-contained: columns already exist and are already written. Touches the sweep, two queue definitions, one dashboard clause | Low–medium |
-| 2 | **Rename `OPEN`→`IN_PROGRESS`, `PENDING_CUSTOMER`→`WAITING_FOR_CUSTOMER`; drop `PENDING_INTERNAL`** | Pure rename plus one dead state. One migration, wide but mechanical | Medium — the enum swap and 7 indexes |
-| 3 | **The new transitions** (§4, steps 2/4/7) | **Behaviour, not naming.** Step 4 changes SLA arithmetic and needs your explicit decision | High — moves every SLA figure |
-
-Doing 1 and 2 as one migration is tempting and I would not: if an SLA number looks wrong
-afterwards, you want to know whether the escalation change or the rename caused it.
-
----
-
-## 9. Decisions I need from you before step 11
-
-1. **Step 4 and the SLA clock.** Should an agent's customer-facing reply move the ticket to
-   `WAITING_FOR_CUSTOMER` and thereby **pause the resolution clock**? It follows from the
-   brief, and it will change breach counts across the board. *(My recommendation: yes for
-   the status, and keep the pause — it is the honest reading of "waiting on them" — but it
-   should be your call, stated, because it rewrites the SLA story.)*
-2. **Step 7's customer close.** In scope now, or left to US-90? It needs a new portal
-   endpoint and UI — the only genuinely new surface in this brief.
-3. **Fix 7.1 now?** Small, and it closes the boundary the persona model depends on.
-4. **`changeStatusToEscalated`** — rename the column (a migration) or leave the name and
-   change only its meaning?
-
-Nothing in this report has been implemented. Say which of 0–3 to start and I will plan that
-one story properly before touching code.

@@ -12,34 +12,27 @@ export const AFTER_LOGIN_PATH = '/dashboard';
 export const AFTER_PORTAL_LOGIN_PATH = '/portal';
 
 /**
- * Which sign-in this is — US-21.
+ * One login form, and the server says where you belong.
  *
- * The audience a token gets is decided by **which endpoint is called**, never by
- * a field in the body, so the variant picks the path rather than a parameter.
+ * There used to be two endpoints, because the audience a token gets is decided
+ * by which one was called. That is still true of the *token*, but it is now
+ * decided from the account rather than from the URL: a person types their email
+ * and password once and the response's `audience` says which application they
+ * have signed in to.
+ *
+ * So there is nothing for the client to choose here — no variant, no parameter,
+ * and no way to ask for the other application. The landing path is read off the
+ * answer.
  */
-export type LoginVariant = 'staff' | 'portal';
-
-const ENDPOINTS: Record<LoginVariant, string> = {
-  staff: '/auth/login',
-  portal: '/auth/portal/login',
-};
-
-const LANDING: Record<LoginVariant, string> = {
-  staff: AFTER_LOGIN_PATH,
-  portal: AFTER_PORTAL_LOGIN_PATH,
-};
-
-async function postLogin(credentials: LoginRequest, variant: LoginVariant): Promise<LoginResponse> {
-  const payload = await apiPost<unknown>(ENDPOINTS[variant], credentials);
+async function postLogin(credentials: LoginRequest): Promise<LoginResponse> {
+  const payload = await apiPost<unknown>('/auth/login', credentials);
 
   // Parsed, not cast. The server is the authority on this shape, and a silent
   // mismatch here would surface later as an undefined somewhere unrelated.
   return LoginResponseSchema.parse(payload);
 }
 
-export function useLogin(
-  variant: LoginVariant = 'staff',
-): UseMutationResult<LoginResponse, ApiRequestError, LoginRequest> {
+export function useLogin(): UseMutationResult<LoginResponse, ApiRequestError, LoginRequest> {
   const { signIn } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -54,14 +47,30 @@ export function useLogin(
   const intended = (location.state as { from?: string } | null)?.from;
 
   return useMutation<LoginResponse, ApiRequestError, LoginRequest>({
-    mutationFn: async (credentials) => postLogin(credentials, variant),
+    mutationFn: postLogin,
     onSuccess: (response) => {
       signIn(response);
+
+      const landing =
+        response.audience === 'crm-portal' ? AFTER_PORTAL_LOGIN_PATH : AFTER_LOGIN_PATH;
+
+      /**
+       * The remembered destination still wins — but only if it belongs to the
+       * application this account signed in to.
+       *
+       * A customer who followed a staff link, was bounced to the form, and
+       * signed in must not be sent on to a staff route that will refuse them:
+       * the server would answer 401 and the screen would read as broken. Staff
+       * are not restricted the other way, because every staff account may open
+       * the portal's own pages — it has none they can reach.
+       */
+      const honourIntended =
+        intended !== undefined &&
+        (response.audience !== 'crm-portal' || intended.startsWith('/portal'));
+
       // `replace`, so the back button does not return to a login form the user
       // has already used.
-      // AC4 needs no code of its own: the preserved destination already wins
-      // over the landing page, for the portal exactly as for staff.
-      void navigate(intended ?? LANDING[variant], { replace: true });
+      void navigate(honourIntended ? intended : landing, { replace: true });
     },
     // No retry. A 401 is an answer, not a failure to get one, and retrying
     // wrong credentials walks the account straight into AC5's lockout.

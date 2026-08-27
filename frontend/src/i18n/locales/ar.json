@@ -328,9 +328,7 @@
     },
     "showPassword": "إظهار كلمة المرور",
     "hidePassword": "إخفاء كلمة المرور",
-    "capsLock": "مفتاح Caps Lock مُفعّل",
-    "portalPrompt": "هل أنت عميل؟",
-    "portalLink": "استخدم دخول العملاء"
+    "capsLock": "مفتاح Caps Lock مُفعّل"
   },
   "dashboard": {
     "title": "أعمالي",
@@ -392,19 +390,6 @@
     "selectedCount_other": "تم تحديد {{count}}"
   },
   "portal": {
-    "signIn": {
-      "headline": "طلباتك في مكان واحد.",
-      "subhead": "سجّل الدخول لمتابعة حالة كل طلب ومواصلة المحادثة."
-    },
-    "login": {
-      "title": "تسجيل الدخول",
-      "subtitle": "تابع طلبات الدعم الخاصة بك.",
-      "staffPrompt": "هل تعمل لدينا؟",
-      "staffLink": "استخدم دخول الموظفين",
-      "errors": {
-        "staffAccount": "هذا حساب موظف. الرجاء استخدام دخول الموظفين."
-      }
-    },
     "home": {
       "brand": "الدعم",
       "signOut": "تسجيل الخروج",

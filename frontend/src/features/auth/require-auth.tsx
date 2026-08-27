@@ -12,11 +12,12 @@ import { useAuth } from './auth-context';
  */
 export function RequireAuth({
   /**
-   * Which sign-in to send an unauthenticated visitor to — US-21.
+   * Which sign-in to send an unauthenticated visitor to.
    *
-   * Defaults to the staff login, so every existing route is unchanged. Portal
-   * routes pass `/portal/login`: bouncing a customer into the staff form would
-   * be the "navigating the staff application" the story exists to avoid.
+   * There is only one now — the audience is decided from the account rather
+   * than from which form was used — so nothing overrides this. It stays a
+   * parameter because a second entrance (an invite link, a magic link) would
+   * otherwise have to reach in here to add one.
    */
   loginPath = '/login',
 }: {

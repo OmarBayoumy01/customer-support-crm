@@ -76,13 +76,17 @@ export function AppRoutes(): React.JSX.Element {
           customer signing in lands here and never sees the sidebar, the queue
           badge or the staff dashboard, which is AC1 as written.
 
-          `loginPath` sends an unauthenticated visitor to the portal form:
-          bouncing them to the staff login would be exactly the "navigating the
-          staff application" the story exists to avoid.
+          **There is no portal sign-in form any more.** There is one door at
+          `/login` and the server decides, from the account, which application
+          the token belongs to — so an unauthenticated visitor here goes to the
+          same form as everybody else, and arrives back here because that is
+          where their account belongs. The old path is kept as a redirect: it
+          has been handed out, and a bookmark that 404s is a worse answer than
+          one that works.
         */}
-        <Route path="/portal/login" element={<LoginPage variant="portal" />} />
+        <Route path="/portal/login" element={<Navigate to="/login" replace />} />
 
-        <Route element={<RequireAuth loginPath="/portal/login" />}>
+        <Route element={<RequireAuth />}>
           <Route path="/portal" element={<PortalHomePage />} />
           <Route path="/portal/new" element={<PortalSubmitPage />} />
           <Route path="/portal/requests/:id" element={<PortalRequestPage />} />

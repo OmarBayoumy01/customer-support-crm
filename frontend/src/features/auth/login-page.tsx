@@ -2,7 +2,6 @@ import { useCallback, useMemo, useState } from 'react';
 import { useForm, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router';
 import { AlertCircle, Eye, EyeOff, Headphones, LoaderCircle } from 'lucide-react';
 import { LoginRequestSchema, type LoginRequest } from '@crm/shared';
 
@@ -13,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import type { ApiRequestError } from '@/lib/api-client';
 import { cn } from '@/lib/utils';
 import { ServiceStatus } from './service-status';
-import { useLogin, type LoginVariant } from './use-login';
+import { useLogin } from './use-login';
 
 /**
  * Turns a failed request into something a person can read.
@@ -24,20 +23,20 @@ import { useLogin, type LoginVariant } from './use-login';
  * — AC2 is that the two are indistinguishable, and rendering different copy for
  * them here would leak from the UI what the API was careful not to.
  */
-function messageKeyFor(error: ApiRequestError, variant: LoginVariant): string {
+function messageKeyFor(error: ApiRequestError): string {
   switch (error.code) {
     case 'UNAUTHENTICATED':
       return 'login.errors.invalidCredentials';
     /**
-     * The portal's one specific refusal — US-21, AC2.
+     * Nothing this form does answers 422 any more.
      *
-     * Only the portal endpoint can answer this, and the code is what
-     * distinguishes it from `FORBIDDEN`'s "deactivated". On the staff form it
-     * would be a shape the endpoint never returns, so it falls through to the
-     * generic message rather than claiming something untrue.
+     * It used to: there were two login endpoints, and each refused the other
+     * kind of account. There is one now, and it decides which application an
+     * account belongs to instead of refusing it, so this code would only
+     * arrive as a surprise — which is what the generic message is for.
      */
     case 'UNPROCESSABLE':
-      return variant === 'portal' ? 'portal.login.errors.staffAccount' : 'login.errors.unexpected';
+      return 'login.errors.unexpected';
     case 'FORBIDDEN':
       return 'login.errors.inactiveAccount';
     case 'RATE_LIMITED':
@@ -61,9 +60,8 @@ function messageKeyFor(error: ApiRequestError, variant: LoginVariant): string {
  * one deliberately heavy field, which is what gives the single indigo accent on
  * the form beside it something to be bright against.
  */
-function DeskPanel({ variant }: { variant: LoginVariant }): React.JSX.Element {
+function DeskPanel(): React.JSX.Element {
   const { t } = useTranslation();
-  const prefix = variant === 'portal' ? 'portal.signIn' : 'signIn';
 
   return (
     <aside className="bg-ink hidden flex-col justify-between p-10 lg:flex">
@@ -77,41 +75,33 @@ function DeskPanel({ variant }: { variant: LoginVariant }): React.JSX.Element {
           The one large piece of type on the screen. Not a slogan — a plain
           statement of what the person is about to open.
         */}
-        <p className="text-[1.75rem] leading-9 font-semibold text-white">
-          {t(`${prefix}.headline`)}
-        </p>
-        <p className="text-body mt-3 text-white/55">{t(`${prefix}.subhead`)}</p>
+        <p className="text-[1.75rem] leading-9 font-semibold text-white">{t('signIn.headline')}</p>
+        <p className="text-body mt-3 text-white/55">{t('signIn.subhead')}</p>
       </div>
 
       {/*
-        The desk's own operational state is a staff concern. A customer cannot
-        act on it, and showing them the platform's internals on a sign-in screen
-        is the opposite of what the portal is for.
+        One form serves both applications now, so a customer sees this too. It
+        says whether the desk is up, which is the question anybody staring at a
+        failed sign-in has, whichever side of it they are on — and it reports
+        nothing beyond that.
       */}
-      {variant === 'portal' ? <div /> : <ServiceStatus />}
+      <ServiceStatus />
     </aside>
   );
 }
 
-export interface LoginPageProps {
-  /**
-   * Which sign-in this is — US-21.
-   *
-   * One component for both audiences on purpose. The form, the shared-schema
-   * resolver, the caps-lock hint, the reveal control and the error mapping are
-   * identical, and **duplicating two hundred lines so a heading can differ is
-   * how the two drift** — one gets a fix and the other does not.
-   *
-   * What the variant changes: the copy, the panel, the link to the other
-   * sign-in, and one entry in the error map.
-   */
-  variant?: LoginVariant;
-}
-
-export function LoginPage({ variant = 'staff' }: LoginPageProps = {}): React.JSX.Element {
+/**
+ * The sign-in screen — one form for everybody.
+ *
+ * It used to take a `variant`, because there were two endpoints and the token
+ * audience was decided by which was called. The audience is now decided from
+ * the **account**, so there is one door, one set of copy, and nothing for the
+ * person signing in to know in advance: `useLogin` reads the answer and sends
+ * them to the staff workspace or to the portal accordingly.
+ */
+export function LoginPage(): React.JSX.Element {
   const { t } = useTranslation();
-  const login = useLogin(variant);
-  const copy = variant === 'portal' ? 'portal.login' : 'login';
+  const login = useLogin();
   const [revealed, setRevealed] = useState(false);
   const [capsLock, setCapsLock] = useState(false);
 
@@ -173,7 +163,7 @@ export function LoginPage({ variant = 'staff' }: LoginPageProps = {}): React.JSX
 
   return (
     <div className="grid min-h-screen lg:grid-cols-[minmax(0,26rem)_1fr]">
-      <DeskPanel variant={variant} />
+      <DeskPanel />
 
       <main className="flex items-center justify-center p-6">
         <div className="w-full max-w-sm">
@@ -184,8 +174,8 @@ export function LoginPage({ variant = 'staff' }: LoginPageProps = {}): React.JSX
                 <Headphones aria-hidden="true" className="text-ink size-5" />
                 <span className="text-section font-semibold">{t('common.appName')}</span>
               </div>
-              <h1 className="text-page font-semibold">{t(`${copy}.title`)}</h1>
-              <p className="text-ink-muted mt-1">{t(`${copy}.subtitle`)}</p>
+              <h1 className="text-page font-semibold">{t('login.title')}</h1>
+              <p className="text-ink-muted mt-1">{t('login.subtitle')}</p>
             </div>
             <LanguageToggle />
           </div>
@@ -201,7 +191,7 @@ export function LoginPage({ variant = 'staff' }: LoginPageProps = {}): React.JSX
               className="border-sla-breach/30 bg-sla-breach-soft text-sla-breach mb-5 flex items-start gap-2 rounded-md border px-3 py-2.5"
             >
               <AlertCircle aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-              <span className="text-body">{t(messageKeyFor(login.error, variant))}</span>
+              <span className="text-body">{t(messageKeyFor(login.error))}</span>
             </div>
           ) : null}
 
@@ -302,22 +292,6 @@ export function LoginPage({ variant = 'staff' }: LoginPageProps = {}): React.JSX
               {isSubmitting ? t('login.submitting') : t('login.submit')}
             </Button>
           </form>
-
-          {/*
-            AC2 says the refusal points to the staff login, so there has to be
-            something to point at. A link both ways, because somebody who
-            reaches the wrong form needs the right one rather than an
-            instruction to go and find it.
-          */}
-          <p className="text-meta text-ink-muted mt-6 text-center">
-            {t(variant === 'portal' ? 'portal.login.staffPrompt' : 'login.portalPrompt')}{' '}
-            <Link
-              to={variant === 'portal' ? '/login' : '/portal/login'}
-              className="text-ink underline underline-offset-2"
-            >
-              {t(variant === 'portal' ? 'portal.login.staffLink' : 'login.portalLink')}
-            </Link>
-          </p>
         </div>
       </main>
     </div>

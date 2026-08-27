@@ -93,6 +93,7 @@ const SUCCESS_ENVELOPE = {
   data: {
     accessToken: 'a.test.token',
     expiresIn: 900,
+    audience: 'crm-staff' as const,
     user: {
       id: USER_ID,
       email: VALID_EMAIL,

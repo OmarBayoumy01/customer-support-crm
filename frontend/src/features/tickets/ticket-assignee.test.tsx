@@ -84,6 +84,7 @@ function sessionWith(permissions: EffectivePermissions['permissions']): LoginRes
   return {
     accessToken: 'a.test.token',
     expiresIn: 900,
+    audience: 'crm-staff',
     user: {
       id: USER_ID,
       email: 'manager@crm.local',

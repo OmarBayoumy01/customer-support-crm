@@ -27,17 +27,6 @@ const GENERIC_FAILURE = 'Email or password is incorrect.';
 const INACTIVE_ACCOUNT = 'This account has been deactivated. Please contact an administrator.';
 
 /**
- * The one thing the portal login says that the staff login does not — US-21, AC2.
- *
- * It reveals that the account exists, which US-14's AC2 otherwise forbids. Safe
- * for the same reason the deactivated-account message is safe: it is only
- * reachable by somebody who has already proved they know the password. See
- * step 5.5 in `login`.
- */
-const STAFF_ACCOUNT_ON_PORTAL =
-  'This is a staff account. Please sign in through the staff workspace instead.';
-
-/**
  * Signing in — US-14.
  *
  * The order of the steps below is load-bearing and each one is tied to a
@@ -63,13 +52,6 @@ export class AuthService {
   async login(
     credentials: LoginRequest,
     origin: RequestOrigin,
-    audience: TokenAudience = 'crm-staff',
-    /**
-     * Portal sign-in only — US-21, AC2.
-     *
-     * Off by default, so the staff path US-14 built is byte-for-byte unchanged.
-     */
-    options: { requirePortalAccount?: boolean } = {},
   ): Promise<{ response: LoginResponse; refreshToken: string }> {
     const { email, password } = credentials;
 
@@ -126,39 +108,36 @@ export class AuthService {
     }
 
     /**
-     * 5.5 — the portal refuses staff accounts, and only the portal — US-21, AC2.
+     * 5.5 — which application this account belongs to.
      *
-     * **What makes an account a portal account is a linked `Customer` row**, the
+     * **One login form, and the server decides.** Nobody should have to know
+     * which of two URLs their account was filed under: they type their email
+     * and password and arrive where they belong. So the audience is derived
+     * here, from the account — there is no request field for it and no second
+     * endpoint that could ask for the other one.
+     *
+     * **What makes an account a portal account is a linked `Customer` row** — the
      * same fact US-82 scopes every portal query on. Not a role name: roles are
-     * configuration, and which door an account may use should not be something
-     * an administrator can change by reassigning one.
+     * configuration, and which application somebody belongs in must not be
+     * something an administrator changes by reassigning one.
      *
-     * Placed here on purpose, and both halves of the placement matter:
+     * **The boundary is unchanged, and it was never the form.** It is the
+     * token: a `crm-portal` token is refused by every staff route and a
+     * `crm-staff` token by every portal route, both at the strategy. What has
+     * gone is the second door, and with it the possibility of walking through
+     * the wrong one — which used to end in a screenful of permission errors.
      *
-     * - **After the password**, for exactly the reason step 5 gives. A specific
-     *   message reachable before the password is an account-enumeration oracle;
-     *   this one is only reachable by somebody who already knows it.
-     * - **Before the session is created**, so a refused portal login leaves no
-     *   session row and sets no refresh cookie.
-     *
-     * `UNPROCESSABLE` rather than `FORBIDDEN` because the client switches on the
-     * code and `FORBIDDEN` already means "deactivated" on the login form. The
-     * two must stay distinguishable, and this is the code the project reserves
-     * for "understood, but refused by a business rule".
+     * Read **after** the password, so the lookup tells an attacker nothing,
+     * and **before** the session, so the audience stamped on the session and
+     * the one in the token cannot disagree.
      */
-    if (options.requirePortalAccount === true) {
-      const customer = await this.prisma.notDeleted.customer.findFirst({
+    const isPortalAccount =
+      (await this.prisma.notDeleted.customer.findFirst({
         where: { userId: user.id },
         select: { id: true },
-      });
+      })) !== null;
 
-      if (customer === null) {
-        await this.audit('LOGIN_FAILED', user.id, origin, 'staff account on portal login');
-        this.logger.warn(`Portal login refused for non-customer account ${user.id}`);
-
-        throw new ApiException('UNPROCESSABLE', STAFF_ACCOUNT_ON_PORTAL);
-      }
-    }
+    const audience: TokenAudience = isPortalAccount ? 'crm-portal' : 'crm-staff';
 
     // 6 — Success.
     await this.throttle.clear(email, origin.ip);
@@ -207,6 +186,9 @@ export class AuthService {
       response: {
         accessToken,
         expiresIn: this.tokens.accessTokenTtlSeconds,
+        // Where this account belongs. The client routes on it and cannot ask
+        // for a different one.
+        audience,
         user: authenticated,
         permissions,
       },

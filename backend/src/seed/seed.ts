@@ -107,12 +107,12 @@ async function seedDevelopmentUsers(prisma: PrismaClient): Promise<void> {
     /**
      * The portal account needs a `Customer` row, or it cannot sign in at all.
      *
-     * US-21 decided that what makes an account a portal account is a linked
-     * customer and **not** a role name — roles are configuration, and which
-     * door an account may use should not be something an administrator can
-     * change by reassigning one. Which means the seeded `customer` role on its
-     * own gets refused at `/auth/portal/login`, and the documented development
-     * account for the customer role would be the one account nobody can use.
+     * There is one login form, and the server decides which application an
+     * account belongs to from **whether a `Customer` row is linked to it** —
+     * US-21 decided that, and not a role name, because roles are configuration
+     * and which application somebody belongs in should not change when an
+     * administrator reassigns one. Without the link this account would sign in
+     * and be handed the staff workspace, where it can do nothing.
      *
      * Deliberately carries no tickets: it is the account to try submitting a
      * request from, and its empty state is worth seeing.

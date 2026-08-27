@@ -21,7 +21,7 @@ The target flow, with the story that owns each step and its real state:
 
 | Step | Story | State |
 | ---- | ----- | ----- |
-| Customer signs in (portal) | US-21 | ✅ in review |
+| Customer signs in (one form, `/login`) | US-21 | ✅ in review |
 | Customer submits a request | US-86 | ✅ in review |
 | Agent sees it in the queue | US-42 | ✅ in review |
 | Agent opens the workspace | US-45 | ✅ in review |
@@ -144,6 +144,7 @@ That is a scope decision for the human, flagged rather than taken.
 | US-86 | AC1 attachments, AC6 limits | Object storage is US-51, deferred — no file picker that cannot upload | US-51 |
 | US-86 | AC3 article deflection | The knowledge base is all of P09, cut; US-76 is the story's own dependency | P09 |
 | US-86 | AC4 "view it" link | Still absent from the confirmation, though the screen now exists — the list is one tap away and the confirmation links there | a cheap follow-up |
+| US-21 | AC2 the portal form refuses a staff account | **Superseded.** There is one login form now; the audience is derived from the account, so there is no second door to refuse anybody at. The token boundary is unchanged and still tested | — |
 | US-21 | AC3 guest browsing | The knowledge base is all of P09 (cut) and "register" is US-20 (deferred); there is no submit control to gate either | P09 and US-20 |
 | US-58 | AC1 customer satisfaction | No rating column, no endpoint that could set one, and US-88 deferred. Omitted from the payload rather than sent as a null somebody would render as "0%" | US-88 |
 | US-58 | AC2 "charts" | Rendered as accessible labelled bar rows. Recharts is in the stack list but **not installed**, and the scope document rules a charts library out for this story. A deviation in medium, not in content | a story that adds charting |

@@ -18,6 +18,8 @@ const realAdapter = http.defaults.adapter;
 const SESSION = {
   accessToken: 'refreshed.access.token',
   expiresIn: 900,
+  // The refresh carries the session's own audience through the rotation.
+  audience: 'crm-staff',
   user: {
     id: '01923456-89ab-7cde-8f01-234567890abc',
     email: 'agent@crm.local',

@@ -132,6 +132,9 @@ export class RefreshService {
       response: {
         accessToken,
         expiresIn: this.tokens.accessTokenTtlSeconds,
+        // The session's own audience, carried through the rotation. A refresh
+        // must never move an account between applications.
+        audience,
         user: {
           id: user.id,
           email: user.email,

@@ -37,6 +37,7 @@ const CATEGORY_ID = '01923456-89ab-7cde-8f01-2345678900c1';
 const SESSION: LoginResponse = {
   accessToken: 'a.test.token',
   expiresIn: 900,
+  audience: 'crm-portal',
   user: {
     id: USER_ID,
     email: 'nadia@example.com',
