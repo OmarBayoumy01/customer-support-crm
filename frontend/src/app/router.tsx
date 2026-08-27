@@ -3,6 +3,8 @@ import { Navigate, Outlet, Route, Routes } from 'react-router';
 
 import { AppShell } from '@/components/shell/app-shell';
 import { RouteErrorBoundary } from '@/app/route-error-boundary';
+import type { TokenAudience } from '@crm/shared';
+
 import { RouteFallback } from '@/components/states/route-fallback';
 import { useAuth } from '@/features/auth/auth-context';
 import { RequireAuth } from '@/features/auth/require-auth';
@@ -61,8 +63,15 @@ function ShellOutlet(): React.JSX.Element {
   );
 }
 
+/** Where the front door leads, once there is an answer to give. */
+function landingPath(isAuthenticated: boolean, audience: TokenAudience | null): string {
+  if (!isAuthenticated) return '/login';
+
+  return audience === 'crm-portal' ? '/portal' : '/dashboard';
+}
+
 export function AppRoutes(): React.JSX.Element {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isRestoring, audience } = useAuth();
 
   return (
     <Suspense fallback={<RouteFallback />}>
@@ -132,9 +141,24 @@ export function AppRoutes(): React.JSX.Element {
           </Route>
         </Route>
 
+        {/*
+          The front door.
+
+          Three answers, not two: while the boot-time refresh is still deciding
+          there is no honest one to give, and sending somebody to the login
+          screen in that half-second is what made a browser refresh look like a
+          sign-out. A signed-in customer goes to the portal — the staff
+          dashboard would refuse every request it made.
+        */}
         <Route
           path="/"
-          element={<Navigate to={isAuthenticated ? '/dashboard' : '/login'} replace />}
+          element={
+            isRestoring ? (
+              <RouteFallback />
+            ) : (
+              <Navigate to={landingPath(isAuthenticated, audience)} replace />
+            )
+          }
         />
       </Routes>
     </Suspense>

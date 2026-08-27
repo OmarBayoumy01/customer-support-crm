@@ -1,5 +1,6 @@
 import { Navigate, Outlet, useLocation } from 'react-router';
 
+import { RouteFallback } from '@/components/states/route-fallback';
 import { useAuth } from './auth-context';
 
 /**
@@ -23,8 +24,21 @@ export function RequireAuth({
 }: {
   loginPath?: string;
 } = {}): React.JSX.Element {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isRestoring } = useAuth();
   const location = useLocation();
+
+  /**
+   * Wait for the boot-time refresh before deciding — US-15.
+   *
+   * On a browser refresh there is no token in memory yet and the cookie is
+   * still being exchanged for one. Redirecting on that half-second is what
+   * made F5 look like a sign-out, and it also loses the page the user was on:
+   * the redirect below records `from`, but by then they have already seen a
+   * login form they did not ask for.
+   */
+  if (isRestoring) {
+    return <RouteFallback />;
+  }
 
   if (!isAuthenticated) {
     // The attempted path is carried along so US-15 can return the user to it

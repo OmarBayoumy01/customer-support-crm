@@ -19,6 +19,7 @@ import { AppSidebar } from '@/components/shell/sidebar';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { AppProviders } from '../../app/providers';
+import { refreshHttp, resetRefreshState } from '../../lib/refresh-client';
 import { publishSession, resetSessionStore } from '../../lib/session-store';
 import { AdminPage } from '../admin/admin-page';
 import { DashboardPage } from '../dashboard/dashboard-page';
@@ -73,18 +74,30 @@ function renderAt(path: string, session: LoginResponse | null): void {
 }
 
 beforeEach(async () => {
+  /**
+   * The boot-time refresh, refused.
+   *
+   * A signed-out visitor now gets one attempt at restoring a session from
+   * the cookie before anything redirects them — see `auth-context.test.tsx`.
+   * Left to reach the network it would hang, and every assertion below about
+   * a redirect would be a race against it.
+   */
+  resetRefreshState();
+  refreshHttp.defaults.adapter = () => Promise.reject(new Error('no cookie'));
   resetSessionStore();
   await i18n.changeLanguage('en');
 });
 
 describe('AC1 — protected routes', () => {
-  test('an unauthenticated visitor is sent to the login screen', () => {
+  test('an unauthenticated visitor is sent to the login screen', async () => {
     renderAt('/dashboard', null);
 
-    expect(screen.getByText('login screen')).toBeInTheDocument();
+    // Awaited: the cookie exchange gets its turn first, which is what keeps a
+    // browser refresh from looking like a sign-out.
+    expect(await screen.findByText('login screen')).toBeInTheDocument();
   });
 
-  test('the intended destination is preserved for after sign-in', () => {
+  test('the intended destination is preserved for after sign-in', async () => {
     // `RequireAuth` puts it in route state; `useLogin` reads it back. Someone
     // who followed a link to a ticket should arrive at that ticket, not at a
     // dashboard they then have to search from.
@@ -101,7 +114,7 @@ describe('AC1 — protected routes', () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByTestId('from')).toHaveTextContent('/admin?tab=users');
+    expect(await screen.findByTestId('from')).toHaveTextContent('/admin?tab=users');
   });
 });
 
@@ -216,12 +229,12 @@ describe('AC4 — typing the URL of a restricted page', () => {
     expect(screen.getByText(/Administration screens arrive/)).toBeInTheDocument();
   });
 
-  test('an unauthenticated visitor is sent to sign in rather than told they lack access', () => {
+  test('an unauthenticated visitor is sent to sign in rather than told they lack access', async () => {
     renderAt('/admin', null);
 
     // They might well hold the permission — we do not know who they are yet, so
     // "denied" would be a guess.
-    expect(screen.getByText('login screen')).toBeInTheDocument();
+    expect(await screen.findByText('login screen')).toBeInTheDocument();
   });
 });
 
