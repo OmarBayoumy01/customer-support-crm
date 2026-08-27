@@ -21,7 +21,7 @@ The target flow, with the story that owns each step and its real state:
 
 | Step | Story | State |
 | ---- | ----- | ----- |
-| Customer signs in (portal) | **US-21** | ❌ not started |
+| Customer signs in (portal) | US-21 | ✅ in review |
 | Customer submits a request | **US-86** | ❌ not started |
 | Agent sees it in the queue | US-42 | ✅ in review |
 | Agent opens the workspace | US-45 | ✅ in review |
@@ -38,7 +38,7 @@ The target flow, with the story that owns each step and its real state:
 | Customer replies again | **US-85** | ❌ not started |
 | Manager reports on it | **US-55, US-58** | ❌ not started |
 
-**20 of 28 stories are done** (waves 0 and 1, eight of ten in wave 2, wave 3, and the portal API). Every finished story is
+**21 of 28 stories are done** (waves 0 and 1, eight of ten in wave 2, wave 3, and two of five in wave 4). Every finished story is
 `In review` in Notion — never `Done`, which is the human's call.
 
 **What is demonstrable today:** sign in as a seeded agent → browse and filter the queue → open
@@ -67,7 +67,7 @@ report. Escalation happens but cannot notify anybody — see the flags.
 | **Escalation** | The seeded 75/90/100% ladder is read every minute inside the existing sweep; the breach rung moves the ticket to `ESCALATED`, stamps `escalatedAt`/`escalatedToId`, and records history attributed to the rule. Idempotent per rung | Notifications — **US-62**, deferred | US-71 ✅ | — |
 | **Resolution** | Validated transitions, `resolvedAt`/`closedAt`/`reopenCount`, reopen rule built | Reopen *trigger* — needs US-85 | US-47 ✅ | US-45 |
 | **Ticket history** | Every mutation recorded, actor or automation attributed, names stored beside ids, append-only enforced by a trigger | — | US-50 ✅ | US-40 |
-| **Portal** | **The customer-scoped API and its boundary**: own module, own passport strategy pinned to `crm-portal`, allowlist DTOs, per-account and per-IP rate limit, and rule #1 enforced in the query with its regression test | Sign-in screen, submit, and the two screens | US-82 ✅ · **US-21, 86, 84, 85** ❌ | US-40, US-120 |
+| **Portal** | The customer-scoped API and its boundary (own module, own `crm-portal` strategy, allowlist DTOs, rate limit, rule #1 in the query with its regression test), plus sign-in at `/portal/login` and a landing page | Submitting a request, and the two request screens | US-82, 21 ✅ · **US-86, 84, 85** ❌ | US-40, US-120 |
 | **Dashboard** | Placeholder page, sidebar badge already live | **All metrics** | **US-55** ❌ | US-40 |
 | **Reports** | Nothing | **The manager dashboard** — this *is* the "Report" step | **US-58** ❌ | US-40 |
 
@@ -75,20 +75,19 @@ report. Escalation happens but cannot notify anybody — see the flags.
 
 ## What is left, in the order to do it
 
-Eight stories. The order below is the critical path, not the story numbers.
+Seven stories. The order below is the critical path, not the story numbers.
 
 | # | Story | Why here | Size |
 | - | ----- | -------- | ---- |
-| 1 | **US-21** Sign in to the customer portal | Opens the customer half. Portal accounts come from the seed | small |
-| 2 | **US-86** Submit a support request | "Customer submits" — the real entry point | medium |
-| 3 | **US-84** Track my requests | "The customer sees the result" | small |
-| 4 | **US-85** Read and reply to my request | Closes the loop, and supplies US-47's reopen trigger | medium |
-| 5 | **US-55** Agent dashboard | First screen after sign-in; currently a placeholder | medium |
-| 6 | **US-58** Manager dashboard | **This is the "Report" step.** P11 Reports is entirely V2 | medium |
-| 7 | US-41 Create a ticket as an agent | Second entry point. **The loop closes without it** | medium |
-| 8 | US-35 View a customer profile | The customer as a thing you can open. **The loop closes without it** | medium |
+| 1 | **US-86** Submit a support request | "Customer submits" — the real entry point | medium |
+| 2 | **US-84** Track my requests | "The customer sees the result" | small |
+| 3 | **US-85** Read and reply to my request | Closes the loop, and supplies US-47's reopen trigger | medium |
+| 4 | **US-55** Agent dashboard | First screen after sign-in; currently a placeholder | medium |
+| 5 | **US-58** Manager dashboard | **This is the "Report" step.** P11 Reports is entirely V2 | medium |
+| 6 | US-41 Create a ticket as an agent | Second entry point. **The loop closes without it** | medium |
+| 7 | US-35 View a customer profile | The customer as a thing you can open. **The loop closes without it** | medium |
 
-**If credits are the binding constraint, stop after 6.** Items 7 and 8 are the two remaining
+**If credits are the binding constraint, stop after 5.** Items 6 and 7 are the two remaining
 wave-2 stories and both are genuine capabilities, but neither is on the critical path: tickets
 enter through the portal, and the customer is already visible from the ticket's context panel.
 That is a scope decision for the human, flagged rather than taken.
@@ -119,6 +118,9 @@ That is a scope decision for the human, flagged rather than taken.
 - **Portal routes carry `@Public()` *and* `@UseGuards(PortalAuthGuard)`.** The first is
   needed to bypass the staff-pinned global guard; the first *without* the second is an open
   endpoint. The 401 test is what catches that.
+- **A token's audience is decided by which endpoint minted it**, never by a field in the
+  request body — a body parameter would let a staff login ask for a portal token. Portal
+  accounts are identified by the `Customer.userId` link, not by a role.
 - **One queue.** BullMQ on the existing Redis. `SlaSweepWorker` is the pattern to follow.
 - **History is append-only**, enforced by a database trigger, and labels are captured at write
   time so a later rename cannot rewrite the past.
@@ -139,6 +141,7 @@ That is a scope decision for the human, flagged rather than taken.
 | US-47 | AC5 reopen trigger | `onCustomerReply` built and tested; nothing writes a customer message | US-85 |
 | US-71 | AC1, AC2 notifications | Each rung records history and logs its recipient; no channel exists | US-62 |
 | US-71 | AC4 Tickets Requiring Attention | Escalated tickets surface in the queue's `escalated` view | US-58 |
+| US-21 | AC3 guest browsing | The knowledge base is all of P09 (cut) and "register" is US-20 (deferred); there is no submit control to gate either | P09 and US-20 |
 | US-69 | AC6 "and dashboards" | Verified on the ticket and the queue; there are no dashboards yet | US-55, US-58 |
 | US-69 | AC4 paused *periods* | The schema banks a total plus the current pause, not a list of intervals | a schema change nobody needs yet |
 

@@ -314,7 +314,9 @@
     },
     "showPassword": "Show password",
     "hidePassword": "Hide password",
-    "capsLock": "Caps Lock is on"
+    "capsLock": "Caps Lock is on",
+    "portalPrompt": "A customer?",
+    "portalLink": "Use the portal sign-in"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -347,5 +349,29 @@
     "clearSelection": "Clear selection",
     "selectedCount_one": "{{count}} selected",
     "selectedCount_other": "{{count}} selected"
+  },
+  "portal": {
+    "signIn": {
+      "headline": "Your requests, in one place.",
+      "subhead": "Sign in to see where each of your requests stands and pick up the conversation."
+    },
+    "login": {
+      "title": "Sign in",
+      "subtitle": "Reach your support requests.",
+      "staffPrompt": "Work here?",
+      "staffLink": "Use the staff sign-in",
+      "errors": {
+        "staffAccount": "This is a staff account. Please use the staff sign-in instead."
+      }
+    },
+    "home": {
+      "brand": "Support",
+      "signOut": "Sign out",
+      "greeting": "Hello, {{name}}",
+      "greetingAnonymous": "Hello",
+      "subtitle": "Everything you have asked us, and where it stands.",
+      "requestsLabel": "Your requests",
+      "comingSoon": "Your requests will be listed here shortly."
+    }
   }
 }

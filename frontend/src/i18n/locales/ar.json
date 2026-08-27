@@ -326,7 +326,9 @@
     },
     "showPassword": "إظهار كلمة المرور",
     "hidePassword": "إخفاء كلمة المرور",
-    "capsLock": "مفتاح Caps Lock مُفعّل"
+    "capsLock": "مفتاح Caps Lock مُفعّل",
+    "portalPrompt": "هل أنت عميل؟",
+    "portalLink": "استخدم دخول العملاء"
   },
   "dashboard": {
     "title": "لوحة التحكم",
@@ -359,5 +361,29 @@
     "clearSelection": "إلغاء التحديد",
     "selectedCount_one": "تم تحديد واحد",
     "selectedCount_other": "تم تحديد {{count}}"
+  },
+  "portal": {
+    "signIn": {
+      "headline": "طلباتك في مكان واحد.",
+      "subhead": "سجّل الدخول لمتابعة حالة كل طلب ومواصلة المحادثة."
+    },
+    "login": {
+      "title": "تسجيل الدخول",
+      "subtitle": "تابع طلبات الدعم الخاصة بك.",
+      "staffPrompt": "هل تعمل لدينا؟",
+      "staffLink": "استخدم دخول الموظفين",
+      "errors": {
+        "staffAccount": "هذا حساب موظف. الرجاء استخدام دخول الموظفين."
+      }
+    },
+    "home": {
+      "brand": "الدعم",
+      "signOut": "تسجيل الخروج",
+      "greeting": "مرحبًا، {{name}}",
+      "greetingAnonymous": "مرحبًا",
+      "subtitle": "كل ما طلبته منا، وحالة كل طلب.",
+      "requestsLabel": "طلباتك",
+      "comingSoon": "ستظهر طلباتك هنا قريبًا."
+    }
   }
 }

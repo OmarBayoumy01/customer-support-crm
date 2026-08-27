@@ -9,6 +9,7 @@ and together they close the loop: a customer raises a request and sees the answe
 | NN  | File | Title | Tracker id | Depends on |
 | --- | ---- | ----- | ---------- | ---------- |
 | 39  | `39-story-customer-scoped-portal-api.md` | Build the customer-scoped portal API | US-82 | US-40 |
+| 40  | `40-story-sign-in-to-the-customer-portal.md` | Sign in to the customer portal | US-21 | US-14, US-82 |
 
 ## Why this feature exists as its own module
 
@@ -59,4 +60,6 @@ against the serialised JSON.
   throttle and the scope.
 - **US-84** and **US-85** are the screens over this API. If they need a field, it is added to
   the allowlist deliberately — which is the point of the allowlist.
-- **US-21** is the sign-in screen. The audience it will use is already enforced here.
+- **US-21** ✅ built the sign-in over this boundary: `POST /auth/portal/login` issues the
+  `crm-portal` token, and a staff account is refused 422 because it has no linked
+  `Customer` row — the same fact this API scopes on.

@@ -7,6 +7,7 @@ import { RouteFallback } from '@/components/states/route-fallback';
 import { useAuth } from '@/features/auth/auth-context';
 import { RequireAuth } from '@/features/auth/require-auth';
 import { RequirePermission } from '@/features/auth/require-permission';
+import { PortalHomePage } from '@/features/portal/portal-home-page';
 
 /**
  * Feature routes are code-split — US-25, AC2.
@@ -64,6 +65,23 @@ export function AppRoutes(): React.JSX.Element {
     <Suspense fallback={<RouteFallback />}>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+
+        {/*
+          The customer portal — US-21.
+
+          A branch of its own rather than routes inside the staff shell. A
+          customer signing in lands here and never sees the sidebar, the queue
+          badge or the staff dashboard, which is AC1 as written.
+
+          `loginPath` sends an unauthenticated visitor to the portal form:
+          bouncing them to the staff login would be exactly the "navigating the
+          staff application" the story exists to avoid.
+        */}
+        <Route path="/portal/login" element={<LoginPage variant="portal" />} />
+
+        <Route element={<RequireAuth loginPath="/portal/login" />}>
+          <Route path="/portal" element={<PortalHomePage />} />
+        </Route>
 
         <Route element={<RequireAuth />}>
           <Route element={<ShellOutlet />}>

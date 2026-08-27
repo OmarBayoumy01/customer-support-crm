@@ -92,6 +92,58 @@ export class AuthController {
   }
 
   /**
+   * Signs a customer in to the portal — US-21.
+   *
+   * A route of its own rather than an audience field on the staff request, and
+   * that is the point: which audience a token gets is decided by **which
+   * endpoint was called**, not by anything the caller sends. A body parameter
+   * would let a staff login ask for a portal token.
+   *
+   * Everything else is the staff path: the same DTO, the same throttle, the same
+   * generic 401, the same refresh cookie. The only difference is
+   * `requirePortalAccount`, which is AC2.
+   */
+  @Public()
+  @Post('portal/login')
+  @HttpCode(200)
+  @ApiOperation({
+    summary: 'Sign in to the customer portal',
+    description:
+      'Issues a `crm-portal` token, which the staff API refuses and the portal API requires. ' +
+      'An account with no linked customer record is refused 422 with a message pointing at ' +
+      'the staff login — reachable only with the correct password, so it is not an ' +
+      'account-enumeration oracle.',
+  })
+  @ApiZodBody(LoginRequestDto)
+  @ApiZodResponse(200, LoginResponseSchema, 'Signed in')
+  @ApiResponse({
+    status: 401,
+    description: 'Email or password incorrect — deliberately does not say which',
+    schema: zodToOpenApi(ApiErrorSchema),
+  })
+  @ApiResponse({
+    status: 422,
+    description: 'A staff account was used on the portal login form',
+    schema: zodToOpenApi(ApiErrorSchema),
+  })
+  async portalLogin(
+    @Body() body: LoginRequestDto,
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<LoginResponse> {
+    const { response: payload, refreshToken } = await this.auth.login(
+      body,
+      originOf(request),
+      'crm-portal',
+      { requirePortalAccount: true },
+    );
+
+    this.setRefreshCookie(response, refreshToken);
+
+    return payload;
+  }
+
+  /**
    * Exchanges the refresh cookie for a new pair — US-15.
    *
    * `@Public()` because the whole point is that it is reachable with an expired

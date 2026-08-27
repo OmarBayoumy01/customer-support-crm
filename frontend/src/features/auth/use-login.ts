@@ -8,15 +8,38 @@ import { useAuth } from './auth-context';
 /** Where a signed-in staff member lands. AC1's "and land on the dashboard". */
 export const AFTER_LOGIN_PATH = '/dashboard';
 
-async function postLogin(credentials: LoginRequest): Promise<LoginResponse> {
-  const payload = await apiPost<unknown>('/auth/login', credentials);
+/** Where a signed-in customer lands — US-21, AC1: "never on the staff dashboard". */
+export const AFTER_PORTAL_LOGIN_PATH = '/portal';
+
+/**
+ * Which sign-in this is — US-21.
+ *
+ * The audience a token gets is decided by **which endpoint is called**, never by
+ * a field in the body, so the variant picks the path rather than a parameter.
+ */
+export type LoginVariant = 'staff' | 'portal';
+
+const ENDPOINTS: Record<LoginVariant, string> = {
+  staff: '/auth/login',
+  portal: '/auth/portal/login',
+};
+
+const LANDING: Record<LoginVariant, string> = {
+  staff: AFTER_LOGIN_PATH,
+  portal: AFTER_PORTAL_LOGIN_PATH,
+};
+
+async function postLogin(credentials: LoginRequest, variant: LoginVariant): Promise<LoginResponse> {
+  const payload = await apiPost<unknown>(ENDPOINTS[variant], credentials);
 
   // Parsed, not cast. The server is the authority on this shape, and a silent
   // mismatch here would surface later as an undefined somewhere unrelated.
   return LoginResponseSchema.parse(payload);
 }
 
-export function useLogin(): UseMutationResult<LoginResponse, ApiRequestError, LoginRequest> {
+export function useLogin(
+  variant: LoginVariant = 'staff',
+): UseMutationResult<LoginResponse, ApiRequestError, LoginRequest> {
   const { signIn } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -31,12 +54,14 @@ export function useLogin(): UseMutationResult<LoginResponse, ApiRequestError, Lo
   const intended = (location.state as { from?: string } | null)?.from;
 
   return useMutation<LoginResponse, ApiRequestError, LoginRequest>({
-    mutationFn: postLogin,
+    mutationFn: async (credentials) => postLogin(credentials, variant),
     onSuccess: (response) => {
       signIn(response);
       // `replace`, so the back button does not return to a login form the user
       // has already used.
-      void navigate(intended ?? AFTER_LOGIN_PATH, { replace: true });
+      // AC4 needs no code of its own: the preserved destination already wins
+      // over the landing page, for the portal exactly as for staff.
+      void navigate(intended ?? LANDING[variant], { replace: true });
     },
     // No retry. A 401 is an answer, not a failure to get one, and retrying
     // wrong credentials walks the account straight into AC5's lockout.

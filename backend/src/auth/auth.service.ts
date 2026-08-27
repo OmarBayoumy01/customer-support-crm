@@ -27,6 +27,17 @@ const GENERIC_FAILURE = 'Email or password is incorrect.';
 const INACTIVE_ACCOUNT = 'This account has been deactivated. Please contact an administrator.';
 
 /**
+ * The one thing the portal login says that the staff login does not — US-21, AC2.
+ *
+ * It reveals that the account exists, which US-14's AC2 otherwise forbids. Safe
+ * for the same reason the deactivated-account message is safe: it is only
+ * reachable by somebody who has already proved they know the password. See
+ * step 5.5 in `login`.
+ */
+const STAFF_ACCOUNT_ON_PORTAL =
+  'This is a staff account. Please sign in through the staff workspace instead.';
+
+/**
  * Signing in — US-14.
  *
  * The order of the steps below is load-bearing and each one is tied to a
@@ -53,6 +64,12 @@ export class AuthService {
     credentials: LoginRequest,
     origin: RequestOrigin,
     audience: TokenAudience = 'crm-staff',
+    /**
+     * Portal sign-in only — US-21, AC2.
+     *
+     * Off by default, so the staff path US-14 built is byte-for-byte unchanged.
+     */
+    options: { requirePortalAccount?: boolean } = {},
   ): Promise<{ response: LoginResponse; refreshToken: string }> {
     const { email, password } = credentials;
 
@@ -106,6 +123,41 @@ export class AuthService {
       await this.audit('LOGIN_FAILED', user.id, origin, 'account inactive');
       this.logger.warn(`Login refused for deactivated account ${user.id}`);
       throw new ApiException('FORBIDDEN', INACTIVE_ACCOUNT);
+    }
+
+    /**
+     * 5.5 — the portal refuses staff accounts, and only the portal — US-21, AC2.
+     *
+     * **What makes an account a portal account is a linked `Customer` row**, the
+     * same fact US-82 scopes every portal query on. Not a role name: roles are
+     * configuration, and which door an account may use should not be something
+     * an administrator can change by reassigning one.
+     *
+     * Placed here on purpose, and both halves of the placement matter:
+     *
+     * - **After the password**, for exactly the reason step 5 gives. A specific
+     *   message reachable before the password is an account-enumeration oracle;
+     *   this one is only reachable by somebody who already knows it.
+     * - **Before the session is created**, so a refused portal login leaves no
+     *   session row and sets no refresh cookie.
+     *
+     * `UNPROCESSABLE` rather than `FORBIDDEN` because the client switches on the
+     * code and `FORBIDDEN` already means "deactivated" on the login form. The
+     * two must stay distinguishable, and this is the code the project reserves
+     * for "understood, but refused by a business rule".
+     */
+    if (options.requirePortalAccount === true) {
+      const customer = await this.prisma.notDeleted.customer.findFirst({
+        where: { userId: user.id },
+        select: { id: true },
+      });
+
+      if (customer === null) {
+        await this.audit('LOGIN_FAILED', user.id, origin, 'staff account on portal login');
+        this.logger.warn(`Portal login refused for non-customer account ${user.id}`);
+
+        throw new ApiException('UNPROCESSABLE', STAFF_ACCOUNT_ON_PORTAL);
+      }
     }
 
     // 6 — Success.
