@@ -346,6 +346,148 @@ test('a request with no category at all is accepted', async () => {
 // The boundary — US-82 and US-21's properties, on a write
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// The initial state, and the fields a customer must not be able to set
+// ---------------------------------------------------------------------------
+
+test('the initial state is NEW, unassigned, numbered, and on the clock', async () => {
+  const { status, body } = await call<PortalTicketDetail>('POST', '/portal/tickets', {
+    token: portalToken,
+    body: submission({ categoryId: activeCategoryId }),
+  });
+
+  assert.equal(status, 201, JSON.stringify(body));
+
+  const detail = body.data!;
+
+  const row = await prisma.ticket.findUniqueOrThrow({
+    where: { id: detail.id },
+    select: {
+      number: true,
+      subject: true,
+      status: true,
+      assigneeId: true,
+      customerId: true,
+      slaPolicyId: true,
+      firstResponseDueAt: true,
+      resolutionDueAt: true,
+      firstRespondedAt: true,
+      resolvedAt: true,
+      closedAt: true,
+    },
+  });
+
+  // The whole of the intended initial state, in one place, because these are
+  // the facts every later story reads: a new request is nobody’s yet, and the
+  // clock is already running on it.
+  assert.equal(row.status, 'NEW');
+  assert.equal(row.assigneeId, null);
+  assert.equal(row.customerId, customerId);
+  assert.ok(row.number > 0);
+  assert.notEqual(row.slaPolicyId, null);
+  assert.notEqual(row.firstResponseDueAt, null);
+  assert.notEqual(row.resolutionDueAt, null);
+
+  // Nothing has happened to it yet.
+  assert.equal(row.firstRespondedAt, null);
+  assert.equal(row.resolvedAt, null);
+  assert.equal(row.closedAt, null);
+
+  // And the row is the response: the number the customer was given is the
+  // number in the database, not a display value invented on the way out.
+  assert.equal(detail.number, row.number);
+  assert.equal(detail.subject, row.subject);
+  assert.equal(detail.status, 'OPEN');
+  assert.equal(detail.assigneeFirstName, null);
+});
+
+test('nothing a customer sends can set a staff-only field', async () => {
+  // Well-formed ids that belong to nothing.
+  //
+  // A stronger probe than a real id: if any of these were honoured the insert
+  // would either record it — which the assertions below catch — or fail its
+  // foreign key, which the 201 catches. There is no way for the request to
+  // succeed *and* have been obeyed.
+  const agentId = randomUUID();
+  const otherDepartmentId = randomUUID();
+  const otherBranchId = randomUUID();
+
+  /**
+   * The whole internal vocabulary, in one request.
+   *
+   * None of these are in `SubmitPortalTicketSchema`, so Zod strips them before
+   * the service is reached — which is stronger than validating them away, and
+   * is why this test asserts on the **row** rather than on a rejection. A 201
+   * that quietly ignored them and a 422 are both acceptable answers; a ticket
+   * that honoured one of them is not.
+   */
+  const { status, body } = await call<PortalTicketDetail>('POST', '/portal/tickets', {
+    token: portalToken,
+    body: submission({
+      status: 'RESOLVED',
+      assigneeId: agentId,
+      assignedTo: agentId,
+      agentId,
+      priority: 'URGENT',
+      departmentId: otherDepartmentId,
+      branchId: otherBranchId,
+      isInternal: true,
+      senderType: 'AGENT',
+      channel: 'PHONE',
+      escalatedAt: new Date().toISOString(),
+      reopenCount: 7,
+    }),
+  });
+
+  assert.equal(status, 201, JSON.stringify(body));
+
+  const row = await prisma.ticket.findUniqueOrThrow({
+    where: { id: body.data!.id },
+    select: {
+      status: true,
+      assigneeId: true,
+      priority: true,
+      departmentId: true,
+      branchId: true,
+      channel: true,
+      escalatedAt: true,
+      reopenCount: true,
+    },
+  });
+
+  assert.equal(row.status, 'NEW');
+  assert.equal(row.assigneeId, null);
+  // From the urgency the customer chose, not from the priority they sent.
+  assert.equal(row.priority, 'MEDIUM');
+  assert.notEqual(row.departmentId, otherDepartmentId);
+  assert.notEqual(row.branchId, otherBranchId);
+  assert.equal(row.channel, 'WEB');
+  assert.equal(row.escalatedAt, null);
+  assert.equal(row.reopenCount, 0);
+
+  // Rule #1 from the other direction: a customer cannot author an internal
+  // note, and the request that tried to did not create one.
+  const internal = await prisma.message.count({
+    where: { ticketId: body.data!.id, isInternal: true },
+  });
+
+  assert.equal(internal, 0);
+});
+
+test('validation — an urgency the contract does not name is refused', async () => {
+  for (const urgency of ['URGENT', 'HIGH', 'immediately', '', null]) {
+    const { status, body } = await call('POST', '/portal/tickets', {
+      token: portalToken,
+      body: { ...submission(), urgency },
+    });
+
+    // Including the internal priority names: the mapping is one-way, and the
+    // customer vocabulary is the only thing this endpoint accepts.
+    assert.equal(status, 422, `urgency ${String(urgency)}: ${JSON.stringify(body)}`);
+    assert.equal(body.error?.code, 'VALIDATION_FAILED');
+  }
+});
+
 test('an unauthenticated submission is rejected', async () => {
   const { status, body } = await call('POST', '/portal/tickets', { body: submission() });
 
