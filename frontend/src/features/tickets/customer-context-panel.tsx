@@ -6,8 +6,10 @@ import type { Customer, Ticket } from '@crm/shared';
 import { StatusBadge } from '@/components/domain/indicators';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useAuth } from '@/features/auth/auth-context';
 import { cn } from '@/lib/utils';
 
 function Section({
@@ -19,8 +21,8 @@ function Section({
 }): React.JSX.Element {
   return (
     <>
-      <section className="p-4">
-        <h3 className="text-meta text-ink-muted mb-2 font-medium tracking-wide uppercase">
+      <section className="p-5">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
           {title}
         </h3>
         {children}
@@ -56,6 +58,11 @@ export function CustomerContextPanel({
   className,
 }: CustomerContextPanelProps): React.JSX.Element {
   const { t } = useTranslation();
+  const { permissions } = useAuth();
+
+  const isManager =
+    permissions?.roles.includes('manager') ||
+    permissions?.roles.includes('administrator');
 
   if (isLoading || customer === undefined) {
     return (
@@ -74,24 +81,19 @@ export function CustomerContextPanel({
   return (
     <div className={className}>
       <Section title={t('ticket.detail.context.customer')}>
-        <div className="space-y-2">
-          <div className="flex items-center gap-2.5">
-            <Avatar className="size-9">
-              <AvatarFallback className="text-meta">
-                {/*
-                  Initials, not a photograph. The platform has no avatar
-                  uploads, and a generic silhouette on every row says nothing —
-                  two letters at least distinguish one person from another.
-                */}
+        <div className="space-y-3">
+          <div className="flex items-center gap-3">
+            <Avatar className="size-10 border border-primary/20 bg-primary/10 text-primary">
+              <AvatarFallback className="font-semibold text-xs">
                 {initials(customer.firstName, customer.lastName)}
               </AvatarFallback>
             </Avatar>
-            <div className="min-w-0">
-              <p className="text-body text-ink font-medium">{displayName}</p>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-foreground truncate">{displayName}</p>
               {customer.companyName !== null && (
-                <p className="text-meta text-ink-muted flex items-center gap-1">
+                <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
                   <Icon aria-hidden="true" className="size-3 shrink-0" />
-                  {customer.companyName}
+                  <span className="truncate">{customer.companyName}</span>
                 </p>
               )}
             </div>
@@ -99,29 +101,28 @@ export function CustomerContextPanel({
 
           <div className="flex flex-wrap gap-1.5">
             {customer.isVip && (
-              // Text plus icon, like every other status on this platform.
               <Badge
                 variant="outline"
-                className="text-sla-warn bg-sla-warn-soft border-sla-warn/25"
+                className="gap-1 text-amber-700 dark:text-amber-300 bg-amber-500/10 border-amber-500/30 font-medium text-xs"
               >
-                <Star aria-hidden="true" />
+                <Star aria-hidden="true" className="size-3 fill-amber-500 text-amber-500" />
                 {t('ticket.detail.context.vip')}
               </Badge>
             )}
             {!customer.isActive && (
-              <Badge variant="outline" className="text-ink-muted font-normal">
+              <Badge variant="outline" className="text-xs text-muted-foreground">
                 {t('ticket.detail.context.inactive')}
               </Badge>
             )}
           </div>
 
-          <dl className="text-meta space-y-1">
+          <dl className="space-y-1.5 text-xs">
             {customer.email !== null && (
               <div className="flex items-center gap-2">
                 <dt className="sr-only">{t('ticket.detail.context.email')}</dt>
-                <Mail aria-hidden="true" className="text-ink-faint size-3.5 shrink-0" />
+                <Mail aria-hidden="true" className="text-muted-foreground size-3.5 shrink-0" />
                 <dd className="min-w-0 truncate">
-                  <a className="text-accent hover:underline" href={`mailto:${customer.email}`}>
+                  <a className="text-primary hover:underline" href={`mailto:${customer.email}`}>
                     {customer.email}
                   </a>
                 </dd>
@@ -130,9 +131,9 @@ export function CustomerContextPanel({
             {customer.phone !== null && (
               <div className="flex items-center gap-2">
                 <dt className="sr-only">{t('ticket.detail.context.phone')}</dt>
-                <Phone aria-hidden="true" className="text-ink-faint size-3.5 shrink-0" />
-                <dd className="tabular">
-                  <a className="text-accent hover:underline" href={`tel:${customer.phone}`}>
+                <Phone aria-hidden="true" className="text-muted-foreground size-3.5 shrink-0" />
+                <dd className="font-mono">
+                  <a className="text-primary hover:underline" href={`tel:${customer.phone}`}>
                     {customer.phone}
                   </a>
                 </dd>
@@ -140,47 +141,48 @@ export function CustomerContextPanel({
             )}
           </dl>
 
-          <Link
-            to={`/customers/${customer.id}`}
-            className="text-meta text-accent inline-flex items-center gap-1 hover:underline"
-          >
-            {t('ticket.detail.context.fullProfile')}
-            <ExternalLink aria-hidden="true" className="size-3" />
-          </Link>
+          {isManager && (
+            <Button asChild variant="outline" size="sm" className="w-full text-xs gap-1.5 shadow-2xs mt-1">
+              <Link to={`/customers/${customer.id}`}>
+                <span>{t('ticket.detail.context.fullProfile')}</span>
+                <ExternalLink aria-hidden="true" className="size-3 rtl:rotate-180" />
+              </Link>
+            </Button>
+          )}
         </div>
       </Section>
 
       <Section title={t('ticket.detail.context.history')}>
-        <dl className="text-meta grid grid-cols-2 gap-2">
-          <div>
-            <dt className="text-ink-muted">{t('ticket.detail.context.openTickets')}</dt>
-            <dd className="tabular text-body text-ink">{customer.stats.openTickets}</dd>
+        <dl className="grid grid-cols-2 gap-2.5">
+          <div className="rounded-xl border bg-muted/40 p-3">
+            <dt className="text-xs font-medium text-muted-foreground">{t('ticket.detail.context.openTickets')}</dt>
+            <dd className="tabular font-mono text-xl font-bold text-foreground mt-1">{customer.stats.openTickets}</dd>
           </div>
-          <div>
-            <dt className="text-ink-muted">{t('ticket.detail.context.totalTickets')}</dt>
-            <dd className="tabular text-body text-ink">{customer.stats.totalTickets}</dd>
+          <div className="rounded-xl border bg-muted/40 p-3">
+            <dt className="text-xs font-medium text-muted-foreground">{t('ticket.detail.context.totalTickets')}</dt>
+            <dd className="tabular font-mono text-xl font-bold text-foreground mt-1">{customer.stats.totalTickets}</dd>
           </div>
         </dl>
       </Section>
 
       <Section title={t('ticket.detail.context.recentTickets')}>
         {recentTickets === undefined ? (
-          <Skeleton className="h-16 w-full" />
+          <Skeleton className="h-16 w-full rounded-xl" />
         ) : recentTickets.length === 0 ? (
-          <p className="text-meta text-ink-muted">{t('ticket.detail.context.noOtherTickets')}</p>
+          <p className="text-xs text-muted-foreground">{t('ticket.detail.context.noOtherTickets')}</p>
         ) : (
           <ul className="space-y-2">
             {recentTickets.map((ticket) => (
               <li key={ticket.id}>
                 <Link
                   to={`/tickets/${ticket.id}`}
-                  className="hover:bg-secondary/60 -mx-1 block rounded px-1 py-0.5"
+                  className="group block rounded-xl border bg-card/60 p-2.5 shadow-2xs hover:bg-muted/60 transition-colors"
                 >
-                  <p className="text-meta text-ink line-clamp-1">{ticket.subject}</p>
-                  <span className="mt-0.5 flex items-center gap-2">
-                    <span className="tabular text-meta text-ink-faint">#{ticket.number}</span>
+                  <p className="text-xs font-medium text-foreground line-clamp-1 group-hover:text-primary transition-colors">{ticket.subject}</p>
+                  <div className="mt-1.5 flex items-center justify-between gap-2">
+                    <span className="font-mono text-xs text-muted-foreground">#{ticket.number}</span>
                     <StatusBadge status={ticket.status} />
-                  </span>
+                  </div>
                 </Link>
               </li>
             ))}
@@ -190,9 +192,11 @@ export function CustomerContextPanel({
 
       <Section title={t('ticket.detail.context.notes')}>
         {customer.notes === null || customer.notes === '' ? (
-          <p className="text-meta text-ink-muted">{t('ticket.detail.context.noNotes')}</p>
+          <p className="text-xs text-muted-foreground">{t('ticket.detail.context.noNotes')}</p>
         ) : (
-          <p className="text-meta text-ink whitespace-pre-line">{customer.notes}</p>
+          <div className="rounded-xl border border-muted-foreground/20 bg-muted/30 p-3 text-xs text-foreground whitespace-pre-line leading-relaxed">
+            {customer.notes}
+          </div>
         )}
       </Section>
     </div>

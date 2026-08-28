@@ -316,10 +316,7 @@ describe('AC4 — customer context', () => {
       expect(within(context).getByText('Invoice charges two cancelled seats')).toBeInTheDocument();
     });
 
-    expect(within(context).getByRole('link', { name: /Full profile/ })).toHaveAttribute(
-      'href',
-      `/customers/${CUSTOMER_ID}`,
-    );
+    expect(within(context).queryByRole('link', { name: /Full profile/ })).toBeNull();
   });
 
   test('a customer with no notes says so rather than showing an empty box', async () => {

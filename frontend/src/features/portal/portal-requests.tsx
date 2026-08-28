@@ -1,14 +1,36 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
-import { CalendarDays, Inbox, MessageSquareReply, Plus, Search, Tag } from 'lucide-react';
+import {
+  Calendar as CalendarIcon,
+  CalendarDays,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Inbox,
+  MessageSquareReply,
+  Plus,
+  Search,
+  Sparkles,
+  Tag,
+  X,
+} from 'lucide-react';
+import { format } from 'date-fns';
+import { ar, enUS } from 'date-fns/locale';
 import type { PortalTicket, PortalTicketListQuery, TicketStatus } from '@crm/shared';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import {
   Select,
   SelectContent,
@@ -34,8 +56,8 @@ const STATUS_ORDER: TicketStatus[] = [
   'RESOLVED',
 ];
 
-/** How many cards a page holds. Generous rows, so fewer of them. */
-const PAGE_SIZE = 10;
+/** How many cards a page holds. Set to 5 so page breaks occur sooner. */
+const PAGE_SIZE = 5;
 
 /**
  * One request, as a card — US-84, AC1.
@@ -48,195 +70,359 @@ const PAGE_SIZE = 10;
 function RequestCard({ ticket }: { ticket: PortalTicket }): React.JSX.Element {
   const { t, i18n } = useTranslation();
 
-  /** AC3 — awaiting my reply. */
   const needsReply = ticket.status === 'WAITING_FOR_CUSTOMER';
 
   const date = (iso: string): string =>
     new Intl.DateTimeFormat(i18n.language, { dateStyle: 'medium' }).format(new Date(iso));
 
+  const statusConfig = {
+    WAITING_FOR_CUSTOMER: {
+      badgeClass: 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400',
+      icon: MessageSquareReply,
+    },
+    WAITING_FOR_AGENT: {
+      badgeClass: 'border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-400',
+      icon: Clock,
+    },
+    RESOLVED: {
+      badgeClass: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
+      icon: CheckCircle2,
+    },
+    NEW: {
+      badgeClass: 'border-indigo-500/30 bg-indigo-500/10 text-indigo-700 dark:text-indigo-400',
+      icon: Sparkles,
+    },
+  }[ticket.status] ?? {
+    badgeClass: 'border-muted bg-muted text-muted-foreground',
+    icon: Inbox,
+  };
+
+  const StatusIcon = statusConfig.icon;
+
   return (
-    <Card
-      // AC3's edge marker is `border-s`, so in Arabic it is on the right — the
-      // same edge the reading starts from. Never `border-l`.
-      className={cn('gap-0 py-0', needsReply && 'border-s-4 border-s-sla-warn')}
-    >
-      <CardContent className="space-y-3 p-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="tabular text-meta text-ink-muted">
-              {t('portal.requests.number', { number: ticket.number })}
-            </p>
-            {/*
-              A link now that US-85 gives it somewhere to go. The whole heading
-              is the target rather than a "view" affordance elsewhere on the card.
-            */}
-            <h2 className="text-section mt-0.5 font-semibold">
-              <Link
-                to={`/portal/requests/${ticket.id}`}
-                className="text-ink hover:underline focus-visible:ring-ring rounded focus-visible:ring-2 focus-visible:outline-none"
-              >
-                {ticket.subject}
-              </Link>
-            </h2>
-          </div>
+    <Link to={`/portal/requests/${ticket.id}`} className="group block outline-none">
+      <Card
+        className={cn(
+          'relative overflow-hidden rounded-xl border bg-card p-0 shadow-xs transition-all duration-200',
+          'group-hover:border-primary/40 group-hover:shadow-md group-hover:bg-muted/15',
+          needsReply && 'border-s-4 border-s-amber-500',
+        )}
+      >
+        <CardContent className="p-5 sm:p-6">
+          {/* Top Row: Number, Category & Status Badge */}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded-md bg-muted text-muted-foreground">
+                {t('portal.requests.number', { number: ticket.number })}
+              </span>
 
-          <div className="flex flex-wrap items-center gap-2">
-            {/*
-              AC3 in words as well as by colour. The edge stripe alone would be
-              colour-only signalling, which the definition of done forbids.
-            */}
-            {needsReply ? (
-              <Badge className="border-sla-warn/25 bg-sla-warn-soft text-sla-warn gap-1">
-                <MessageSquareReply aria-hidden="true" className="size-3" />
-                {t('portal.requests.needsReply')}
+              <Badge variant="outline" className="gap-1 font-normal text-xs text-muted-foreground">
+                <Tag aria-hidden="true" className="size-3" />
+                {ticket.categoryName ?? t('portal.requests.noCategory')}
               </Badge>
-            ) : null}
+            </div>
 
-            <Badge variant="outline" className="font-normal">
-              {t(`portal.requests.status.${ticket.status}`)}
-            </Badge>
-          </div>
-        </div>
-
-        <dl className="text-meta text-ink-muted flex flex-wrap gap-x-5 gap-y-1">
-          <div className="flex items-center gap-1.5">
-            <Tag aria-hidden="true" className="size-3.5" />
-            <dt className="sr-only">{t('portal.requests.category')}</dt>
-            <dd>{ticket.categoryName ?? t('portal.requests.noCategory')}</dd>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className={cn('gap-1.5 py-0.5 text-xs font-medium', statusConfig.badgeClass)}>
+                <StatusIcon aria-hidden="true" className="size-3" />
+                {t(`portal.requests.status.${ticket.status}`)}
+              </Badge>
+            </div>
           </div>
 
-          <div className="flex items-center gap-1.5">
-            <CalendarDays aria-hidden="true" className="size-3.5" />
-            <dt className="sr-only">{t('portal.requests.opened')}</dt>
-            <dd>{t('portal.requests.openedOn', { date: date(ticket.createdAt) })}</dd>
+          {/* Middle Row: Subject & Action Prompt */}
+          <div className="mt-3 flex items-start justify-between gap-4">
+            <div className="min-w-0 flex-1">
+              <h2 className="text-base font-semibold text-foreground group-hover:text-primary transition-colors sm:text-lg">
+                {ticket.subject}
+              </h2>
+              {needsReply ? (
+                <div className="mt-1.5 flex items-center gap-1.5 text-xs font-medium text-amber-600 dark:text-amber-400">
+                  <span className="relative flex size-2">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
+                    <span className="relative inline-flex size-2 rounded-full bg-amber-500" />
+                  </span>
+                  <span>{t('portal.requests.needsReply')}</span>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted/60 text-muted-foreground transition-transform duration-200 group-hover:bg-primary group-hover:text-primary-foreground group-hover:translate-x-1 rtl:group-hover:-translate-x-1">
+              <ChevronRight aria-hidden="true" className="size-4 rtl:rotate-180" />
+            </div>
           </div>
 
-          <div className="flex items-center gap-1.5">
-            <dt className="sr-only">{t('portal.requests.lastUpdate')}</dt>
-            <dd>{t('portal.requests.updatedOn', { date: date(ticket.updatedAt) })}</dd>
+          {/* Bottom Row: Metadata Dates */}
+          <div className="mt-4 flex flex-wrap items-center gap-4 border-t pt-3 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              <CalendarDays aria-hidden="true" className="size-3.5" />
+              {t('portal.requests.openedOn', { date: date(ticket.createdAt) })}
+            </span>
+            <span>•</span>
+            <span className="flex items-center gap-1.5">
+              <Clock aria-hidden="true" className="size-3.5" />
+              {t('portal.requests.updatedOn', { date: date(ticket.updatedAt) })}
+            </span>
           </div>
-        </dl>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </Link>
   );
 }
 
 /**
- * The customer's own requests — US-84.
+ * The requests list — US-84.
  *
- * **AC4 is unmet and deliberately absent.** A star rating on a resolved request
- * needs somewhere to send the stars, and rating is US-88 — deferred, with no
- * column and no endpoint. Five stars that discard the click would invite feedback
+ * AC4 (inline star rating) is unmet and untested: rating is US-88, deferred.
+ * There are no stars here because a five-star widget that accepted the click
  * and silently throw it away, which is worse than not asking.
  */
 export function PortalRequests(): React.JSX.Element {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const dateLocale = i18n.language.startsWith('ar') ? ar : enUS;
 
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<string>(ANY_STATUS);
-  const [from, setFrom] = useState('');
+  const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date } | undefined>(undefined);
   const [page, setPage] = useState(1);
 
-  /**
-   * Every filter goes to the server — AC2.
-   *
-   * Not a pass over the current page: the scope and the filter are one `where`
-   * clause, and searching in the browser would search only whatever page
-   * happened to be loaded.
-   */
+  const from = dateRange?.from;
+  const to = dateRange?.to;
+
   const query: PortalTicketListQuery = {
     page,
     pageSize: PAGE_SIZE,
     ...(search === '' ? {} : { q: search }),
     ...(status === ANY_STATUS ? {} : { status: status as TicketStatus }),
-    ...(from === '' ? {} : { createdFrom: new Date(from).toISOString() }),
+    ...(from === undefined
+      ? {}
+      : {
+          createdFrom: new Date(
+            from.getFullYear(),
+            from.getMonth(),
+            from.getDate(),
+            0,
+            0,
+            0,
+          ).toISOString(),
+        }),
+    ...(to === undefined
+      ? {}
+      : {
+          createdTo: new Date(
+            to.getFullYear(),
+            to.getMonth(),
+            to.getDate(),
+            23,
+            59,
+            59,
+            999,
+          ).toISOString(),
+        }),
   };
 
   const requests = usePortalTickets(query);
 
-  const filtered = search !== '' || status !== ANY_STATUS || from !== '';
+  const filtered =
+    search !== '' || status !== ANY_STATUS || from !== undefined || to !== undefined;
   const tickets = requests.data?.data ?? [];
   const total = requests.data?.pagination.total ?? 0;
 
   const clear = (): void => {
     setSearch('');
     setStatus(ANY_STATUS);
-    setFrom('');
+    setDateRange(undefined);
     setPage(1);
+  };
+
+  const setPreset = (preset: 'today' | '7days' | '30days' | 'thisMonth') => {
+    const now = new Date();
+    setPage(1);
+    if (preset === 'today') {
+      setDateRange({ from: now, to: now });
+    } else if (preset === '7days') {
+      const past = new Date();
+      past.setDate(now.getDate() - 7);
+      setDateRange({ from: past, to: now });
+    } else if (preset === '30days') {
+      const past = new Date();
+      past.setDate(now.getDate() - 30);
+      setDateRange({ from: past, to: now });
+    } else if (preset === 'thisMonth') {
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      setDateRange({ from: startOfMonth, to: now });
+    }
+  };
+
+  const formattedDateRange = (): string => {
+    if (!from) return t('portal.requests.pickDateRange');
+    if (!to) return format(from, 'd MMM yyyy', { locale: dateLocale });
+    return `${format(from, 'd MMM', { locale: dateLocale })} - ${format(to, 'd MMM yyyy', { locale: dateLocale })}`;
   };
 
   return (
     <section aria-label={t('portal.requests.title')}>
-      {/*
-        AC2 — search, status and date. **Nothing else.** There is no assignee,
-        department, branch or channel control here, and there is no field for one
-        in the query contract either.
-      */}
-      <div className="mb-6 flex flex-wrap items-end gap-3">
-        <div className="min-w-48 flex-1">
-          <Label htmlFor="portal-search" className="mb-1.5">
-            {t('portal.requests.search')}
-          </Label>
-          <div className="relative">
-            <Search
-              aria-hidden="true"
-              className="text-ink-faint absolute inset-y-0 start-0 my-auto ms-3 size-4"
-            />
-            <Input
-              id="portal-search"
-              type="search"
-              className="text-start ps-9"
-              placeholder={t('portal.requests.searchPlaceholder')}
-              value={search}
-              onChange={(event) => {
-                setSearch(event.target.value);
-                setPage(1);
-              }}
-            />
+      {/* Filters Toolbar Card */}
+      <Card className="mb-6 border bg-card/60 shadow-xs backdrop-blur-xs">
+        <CardContent className="p-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-end">
+            {/* Search Input */}
+            <div className="min-w-0 flex-1">
+              <Label htmlFor="portal-search" className="mb-1.5 text-xs font-medium text-muted-foreground">
+                {t('portal.requests.search')}
+              </Label>
+              <div className="relative">
+                <Search
+                  aria-hidden="true"
+                  className="text-muted-foreground absolute inset-y-0 start-0 my-auto ms-3 size-4"
+                />
+                <Input
+                  id="portal-search"
+                  type="search"
+                  className="h-9 text-start ps-9 text-xs"
+                  placeholder={t('portal.requests.searchPlaceholder')}
+                  value={search}
+                  onChange={(event) => {
+                    setSearch(event.target.value);
+                    setPage(1);
+                  }}
+                />
+                {search ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearch('');
+                      setPage(1);
+                    }}
+                    className="text-muted-foreground hover:text-foreground absolute inset-y-0 end-0 my-auto me-2.5 flex size-5 items-center justify-center rounded-full"
+                    aria-label="Clear search"
+                  >
+                    <X aria-hidden="true" className="size-3" />
+                  </button>
+                ) : null}
+              </div>
+            </div>
+
+            {/* Status Select */}
+            <div className="w-full md:w-48">
+              <Label htmlFor="portal-status" className="mb-1.5 text-xs font-medium text-muted-foreground">
+                {t('portal.requests.statusLabel')}
+              </Label>
+              <Select
+                value={status}
+                onValueChange={(value) => {
+                  setStatus(value);
+                  setPage(1);
+                }}
+              >
+                <SelectTrigger id="portal-status" aria-label={t('portal.requests.statusLabel')} className="h-9 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ANY_STATUS} className="text-xs">{t('portal.requests.anyStatus')}</SelectItem>
+                  {STATUS_ORDER.map((value) => (
+                    <SelectItem key={value} value={value} className="text-xs">
+                      {t(`portal.requests.status.${value}`)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Unified Date Range Picker */}
+            <div className="w-full md:w-56">
+              <Label htmlFor="portal-date" className="mb-1.5 text-xs font-medium text-muted-foreground">
+                {t('portal.requests.dateRange')}
+              </Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    id="portal-date"
+                    variant="outline"
+                    className={cn(
+                      'h-9 w-full justify-start px-3 text-start text-xs font-normal',
+                      from === undefined && 'text-muted-foreground',
+                    )}
+                  >
+                    <CalendarIcon className="me-2 size-3.5" />
+                    <span className="truncate">{formattedDateRange()}</span>
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0 shadow-lg rounded-xl border" align="end">
+                  <div className="flex flex-col sm:flex-row divide-y sm:divide-y-0 sm:divide-x rtl:sm:divide-x-reverse">
+                    {/* Presets Sidebar */}
+                    <div className="flex flex-row sm:flex-col gap-1 p-3 min-w-32 bg-muted/20">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 justify-start text-xs font-normal"
+                        onClick={() => setPreset('today')}
+                      >
+                        {t('portal.requests.presets.today')}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 justify-start text-xs font-normal"
+                        onClick={() => setPreset('7days')}
+                      >
+                        {t('portal.requests.presets.last7Days')}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 justify-start text-xs font-normal"
+                        onClick={() => setPreset('30days')}
+                      >
+                        {t('portal.requests.presets.last30Days')}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 justify-start text-xs font-normal"
+                        onClick={() => setPreset('thisMonth')}
+                      >
+                        {t('portal.requests.presets.thisMonth')}
+                      </Button>
+                    </div>
+
+                    {/* Calendar Grid */}
+                    <div className="p-3">
+                      <Calendar
+                        mode="range"
+                        selected={dateRange as any}
+                        onSelect={(range) => {
+                          setDateRange(range as any);
+                          setPage(1);
+                        }}
+                        numberOfMonths={1}
+                      />
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            {/* Clear Filters Button */}
+            {filtered ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={clear}
+                className="h-9 shrink-0 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+              >
+                <X aria-hidden="true" className="size-3.5" />
+                {t('portal.requests.clearFilters')}
+              </Button>
+            ) : null}
           </div>
-        </div>
-
-        <div className="w-44">
-          <Label htmlFor="portal-status" className="mb-1.5">
-            {t('portal.requests.statusLabel')}
-          </Label>
-          <Select
-            value={status}
-            onValueChange={(value) => {
-              setStatus(value);
-              setPage(1);
-            }}
-          >
-            <SelectTrigger id="portal-status" aria-label={t('portal.requests.statusLabel')}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ANY_STATUS}>{t('portal.requests.anyStatus')}</SelectItem>
-              {STATUS_ORDER.map((value) => (
-                <SelectItem key={value} value={value}>
-                  {t(`portal.requests.status.${value}`)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="w-44">
-          <Label htmlFor="portal-from" className="mb-1.5">
-            {t('portal.requests.openedSince')}
-          </Label>
-          <Input
-            id="portal-from"
-            type="date"
-            className="text-start"
-            value={from}
-            onChange={(event) => {
-              setFrom(event.target.value);
-              setPage(1);
-            }}
-          />
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {requests.isPending ? (
         <div className="space-y-3">
@@ -300,31 +486,42 @@ export function PortalRequests(): React.JSX.Element {
             ))}
           </ul>
 
-          {total > PAGE_SIZE ? (
-            <div className="mt-6 flex items-center justify-between gap-3">
-              <p className="text-meta text-ink-muted">
-                {t('portal.requests.showing', { count: tickets.length, total })}
-              </p>
-              <div className="flex gap-2">
+          {total > 0 ? (
+            <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t pt-4">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span>{t('portal.requests.showing', { count: tickets.length, total })}</span>
+                <span>•</span>
+                <span className="font-mono">
+                  {t('common.pageOf', { page, totalPages: Math.max(1, Math.ceil(total / PAGE_SIZE)) })}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
                 <Button
                   variant="outline"
                   size="sm"
-                  disabled={page === 1}
+                  disabled={page <= 1}
                   onClick={() => {
                     setPage((value) => Math.max(1, value - 1));
                   }}
+                  className="gap-1 shadow-2xs h-8 text-xs"
                 >
+                  <ChevronLeft aria-hidden="true" className="size-3.5 rtl:rotate-180" />
                   {t('portal.requests.previous')}
                 </Button>
+                <div className="flex size-8 items-center justify-center rounded-md bg-muted text-xs font-semibold font-mono">
+                  {page}
+                </div>
                 <Button
                   variant="outline"
                   size="sm"
-                  disabled={page * PAGE_SIZE >= total}
+                  disabled={page >= Math.max(1, Math.ceil(total / PAGE_SIZE))}
                   onClick={() => {
                     setPage((value) => value + 1);
                   }}
+                  className="gap-1 shadow-2xs h-8 text-xs"
                 >
                   {t('portal.requests.next')}
+                  <ChevronRight aria-hidden="true" className="size-3.5 rtl:rotate-180" />
                 </Button>
               </div>
             </div>

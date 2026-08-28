@@ -57,6 +57,23 @@ export function subscribeToSession(listener: SessionListener): () => void {
   };
 }
 
+/** Updates user fields on the active session and notifies AuthProvider listeners. */
+export function updateSessionUser(userPatch: Partial<LoginResponse['user']>): void {
+  if (session === null) {
+    return;
+  }
+
+  const next: LoginResponse = {
+    ...session,
+    user: {
+      ...session.user,
+      ...userPatch,
+    },
+  };
+
+  publishSession(next);
+}
+
 /** Test seam. */
 export function resetSessionStore(): void {
   session = null;

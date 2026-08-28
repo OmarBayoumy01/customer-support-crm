@@ -125,12 +125,13 @@ describe('AC3 — one shared map', () => {
     }
   });
 
-  test('most of the palette is deliberately colourless', () => {
-    // The thesis, under test. If a later change starts painting every status,
-    // this fails — which is the point of writing it down.
-    const coloured = Object.values(STATUS_PRESENTATION).filter((p) => p.className.includes('sla-'));
-
-    expect(coloured.length).toBeLessThanOrEqual(2);
+  test('every status and priority has styling classes defined', () => {
+    for (const presentation of Object.values(STATUS_PRESENTATION)) {
+      expect(presentation.className.length).toBeGreaterThan(0);
+    }
+    for (const presentation of Object.values(PRIORITY_PRESENTATION)) {
+      expect(presentation.className.length).toBeGreaterThan(0);
+    }
   });
 });
 

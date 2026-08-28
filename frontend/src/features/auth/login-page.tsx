@@ -2,7 +2,16 @@ import { useCallback, useMemo, useState } from 'react';
 import { useForm, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslation } from 'react-i18next';
-import { AlertCircle, Eye, EyeOff, Headphones, LoaderCircle } from 'lucide-react';
+import {
+  AlertCircle,
+  Eye,
+  EyeOff,
+  Headphones,
+  KeyRound,
+  LoaderCircle,
+  ShieldCheck,
+  User,
+} from 'lucide-react';
 import { LoginRequestSchema, type LoginRequest } from '@crm/shared';
 
 import { LanguageToggle } from '@/components/language-toggle';
@@ -13,6 +22,27 @@ import type { ApiRequestError } from '@/lib/api-client';
 import { cn } from '@/lib/utils';
 import { ServiceStatus } from './service-status';
 import { useLogin } from './use-login';
+
+const DEMO_ACCOUNTS = [
+  {
+    key: 'manager',
+    email: 'manager@crm.local',
+    Icon: ShieldCheck,
+    badgeClass: 'bg-purple-100 text-purple-800 border-purple-200',
+  },
+  {
+    key: 'agent',
+    email: 'agent@crm.local',
+    Icon: Headphones,
+    badgeClass: 'bg-blue-100 text-blue-800 border-blue-200',
+  },
+  {
+    key: 'customer',
+    email: 'customer@crm.local',
+    Icon: User,
+    badgeClass: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+  },
+] as const;
 
 /**
  * Turns a failed request into something a person can read.
@@ -146,6 +176,7 @@ export function LoginPage(): React.JSX.Element {
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors },
   } = useForm<LoginRequest>({
     resolver,
@@ -157,6 +188,14 @@ export function LoginPage(): React.JSX.Element {
       login.mutate(values);
     },
     [login],
+  );
+
+  const fillAccount = useCallback(
+    (email: string) => {
+      setValue('email', email, { shouldValidate: true });
+      setValue('password', 'DevPassw0rd!', { shouldValidate: true });
+    },
+    [setValue],
   );
 
   const isSubmitting = login.isPending;
@@ -292,8 +331,48 @@ export function LoginPage(): React.JSX.Element {
               {isSubmitting ? t('login.submitting') : t('login.submit')}
             </Button>
           </form>
+
+          {/* Quick Demo & Test Accounts */}
+          <div className="mt-8 rounded-lg border border-slate-200 bg-slate-50/75 p-3.5 dark:border-slate-800 dark:bg-slate-900/50">
+            <div className="mb-2.5 flex items-center justify-between">
+              <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                {t('login.demoAccounts.title')}
+              </span>
+              <div className="flex items-center gap-1 text-[11px] text-slate-500">
+                <KeyRound aria-hidden="true" className="size-3 text-slate-400" />
+                <span>DevPassw0rd!</span>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              {DEMO_ACCOUNTS.map(({ key, email, Icon, badgeClass }) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => fillAccount(email)}
+                  className="flex w-full items-center justify-between rounded-md border border-slate-200/80 bg-white px-2.5 py-1.5 text-start transition-colors hover:border-indigo-300 hover:bg-indigo-50/50 dark:border-slate-700/60 dark:bg-slate-800/80 dark:hover:border-indigo-600 dark:hover:bg-indigo-950/30"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className={cn('rounded p-1 border text-xs', badgeClass)}>
+                      <Icon aria-hidden="true" className="size-3.5" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-semibold text-slate-900 dark:text-slate-100">
+                        {t(`login.demoAccounts.${key}.role`)}
+                      </div>
+                      <div className="text-[11px] text-slate-500 dark:text-slate-400">{email}</div>
+                    </div>
+                  </div>
+                  <span className="text-[11px] font-medium text-indigo-600 hover:underline dark:text-indigo-400">
+                    {t('common.create') === 'Create' ? 'Fill' : 'تعبئة'}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       </main>
     </div>
   );
 }
+

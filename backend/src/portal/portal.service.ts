@@ -8,6 +8,8 @@ import {
   type PortalEvent,
   type PortalEventKind,
   type PortalReply,
+  type PortalProfile,
+  type UpdatePortalProfile,
   type PortalTicketListQuery,
   type SubmitPortalTicket,
 } from '@crm/shared';
@@ -589,4 +591,103 @@ export class PortalService {
 
     return this.ticket(actor.customerId, ticketId, locale);
   }
+
+  /**
+   * The customer profile — US-87.
+   */
+  async profile(customerId: string): Promise<PortalProfile> {
+    const customer = await this.prisma.notDeleted.customer.findFirst({
+      where: { id: customerId },
+      include: { user: { select: { email: true, firstName: true, lastName: true, phone: true, locale: true } } },
+    });
+
+    if (customer === null) {
+      throw ApiException.notFound('Customer profile');
+    }
+
+    return {
+      id: customer.id,
+      email: customer.user?.email ?? customer.email ?? '',
+      firstName: customer.firstName,
+      lastName: customer.lastName,
+      phone: customer.phone ?? null,
+      companyName: customer.companyName ?? null,
+      preferredLocale: customer.preferredLocale,
+      preferredChannel: customer.preferredChannel ?? null,
+    };
+  }
+
+  /**
+   * Updates customer profile details in Customer and linked User records.
+   */
+  async updateProfile(
+    actor: { customerId: string; userId: string },
+    input: UpdatePortalProfile,
+  ): Promise<PortalProfile> {
+    const customer = await this.prisma.notDeleted.customer.findFirst({
+      where: { id: actor.customerId },
+      select: { id: true, userId: true },
+    });
+
+    if (customer === null) {
+      throw ApiException.notFound('Customer profile');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.customer.update({
+        where: { id: actor.customerId },
+        data: {
+          ...(input.firstName !== undefined ? { firstName: input.firstName } : {}),
+          ...(input.lastName !== undefined ? { lastName: input.lastName } : {}),
+          ...(input.phone !== undefined ? { phone: input.phone } : {}),
+          ...(input.companyName !== undefined ? { companyName: input.companyName } : {}),
+          ...(input.preferredLocale !== undefined ? { preferredLocale: input.preferredLocale } : {}),
+          ...(input.preferredChannel !== undefined ? { preferredChannel: input.preferredChannel } : {}),
+        },
+      });
+
+      if (customer.userId) {
+        await tx.user.update({
+          where: { id: customer.userId },
+          data: {
+            ...(input.firstName !== undefined ? { firstName: input.firstName } : {}),
+            ...(input.lastName !== undefined ? { lastName: input.lastName } : {}),
+            ...(input.phone !== undefined ? { phone: input.phone } : {}),
+            ...(input.preferredLocale !== undefined ? { locale: input.preferredLocale } : {}),
+          },
+        });
+      }
+    });
+
+    this.logger.log(`Updated profile for customer ${actor.customerId}`);
+
+    return this.profile(actor.customerId);
+  }
+
+  /**
+   * Delete a request filed by the customer.
+   */
+  async delete(customerId: string, ticketId: string): Promise<void> {
+    const ticket = await this.prisma.notDeleted.ticket.findFirst({
+      where: { id: ticketId, customerId },
+      select: { id: true, status: true },
+    });
+
+    if (ticket === null) {
+      throw ApiException.notFound('That request');
+    }
+
+    if (ticket.status === 'RESOLVED') {
+      throw ApiException.unprocessable('Resolved requests cannot be deleted.');
+    }
+
+    await this.prisma.ticket.update({
+      where: { id: ticketId },
+      data: { deletedAt: new Date() },
+    });
+
+    this.logger.log(`Customer ${customerId} deleted request ${ticketId}`);
+  }
 }
+
+

@@ -974,11 +974,38 @@ export class TicketsService {
   async create(input: CreateTicket, actor: TicketActor): Promise<Ticket> {
     const customer = await this.prisma.notDeleted.customer.findFirst({
       where: { id: input.customerId },
-      select: { id: true },
+      select: { id: true, departmentId: true, branchId: true },
     });
 
     if (customer === null) {
       throw ApiException.unprocessable('That customer does not exist.');
+    }
+
+    let departmentId = input.departmentId ?? null;
+    let branchId = input.branchId ?? null;
+    let priority = input.priority;
+
+    if (input.categoryId) {
+      const category = await this.prisma.notDeleted.category.findUnique({
+        where: { id: input.categoryId },
+        select: { departmentId: true, defaultPriority: true },
+      });
+
+      if (category) {
+        if (!departmentId && category.departmentId) {
+          departmentId = category.departmentId;
+        }
+        if (!priority && category.defaultPriority) {
+          priority = category.defaultPriority;
+        }
+      }
+    }
+
+    if (!departmentId && customer.departmentId) {
+      departmentId = customer.departmentId;
+    }
+    if (!branchId && customer.branchId) {
+      branchId = customer.branchId;
     }
 
     const row = await this.prisma.ticket.create({
@@ -987,9 +1014,9 @@ export class TicketsService {
         subject: input.subject,
         description: input.description ?? null,
         categoryId: input.categoryId ?? null,
-        priority: input.priority ?? 'MEDIUM',
-        departmentId: input.departmentId ?? null,
-        branchId: input.branchId ?? null,
+        priority: priority ?? 'MEDIUM',
+        departmentId,
+        branchId,
         channel: input.channel,
         tags: input.tags ?? [],
       },
@@ -1611,4 +1638,23 @@ export class TicketsService {
       return;
     }
   }
+
+  /**
+   * Soft delete a ticket.
+   */
+  async delete(id: string, actor: TicketActor): Promise<void> {
+    // Check if ticket exists in caller's scope
+    const ticket = await this.detail(id, actor);
+
+    if (ticket.status === 'RESOLVED') {
+      throw ApiException.unprocessable('Resolved tickets cannot be deleted.');
+    }
+
+    await this.prisma.ticket.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
+  }
 }
+
+

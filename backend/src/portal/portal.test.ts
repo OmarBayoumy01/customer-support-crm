@@ -16,7 +16,7 @@ import type { AddressInfo } from 'node:net';
 
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import type { PortalTicket, PortalTicketDetail } from '@crm/shared';
+import type { PortalProfile, PortalTicket, PortalTicketDetail } from '@crm/shared';
 
 import { AppModule } from '../app.module.js';
 import { PasswordService, TokenService } from '../auth/index.js';
@@ -462,4 +462,67 @@ test('AC5 — the IP counter is independent of the account counter', async () =>
   assert.equal(await redis.client.get(`portal:rate:account:other-${run}`), '1');
 
   await redis.client.del(`portal:rate:ip:${ip}`, `portal:rate:account:other-${run}`);
+});
+
+test('a customer can read their own profile', async () => {
+  const { status, body } = await call<PortalProfile>('/portal/profile', { token: portalToken });
+
+  assert.equal(status, 200);
+  assert.equal(body.data?.id, customerId);
+  assert.equal(body.data?.firstName, 'Nadia');
+  assert.equal(body.data?.lastName, `Saeed-${run}`);
+  assert.equal(body.data?.email, `portal-customer-${run}@example.com`);
+});
+
+test('a customer can update their profile information and sync with user record', async () => {
+  const updateRes = await fetch(`${baseUrl}/portal/profile`, {
+    method: 'PATCH',
+    headers: {
+      'content-type': 'application/json',
+      authorization: `Bearer ${portalToken}`,
+    },
+    body: JSON.stringify({
+      firstName: 'NadiaUpdated',
+      lastName: 'SaeedUpdated',
+      phone: '+966500000000',
+      companyName: 'Acme Corp',
+      preferredLocale: 'AR',
+      preferredChannel: 'WHATSAPP',
+    }),
+  });
+
+  assert.equal(updateRes.status, 200);
+  const updated = (await updateRes.json()) as Envelope<PortalProfile>;
+  assert.equal(updated.data?.firstName, 'NadiaUpdated');
+  assert.equal(updated.data?.lastName, 'SaeedUpdated');
+  assert.equal(updated.data?.phone, '+966500000000');
+  assert.equal(updated.data?.companyName, 'Acme Corp');
+  assert.equal(updated.data?.preferredLocale, 'AR');
+  assert.equal(updated.data?.preferredChannel, 'WHATSAPP');
+
+  // Verify the customer and user rows in the database
+  const customer = await prisma.customer.findUniqueOrThrow({ where: { id: customerId } });
+  assert.equal(customer.firstName, 'NadiaUpdated');
+  assert.equal(customer.phone, '+966500000000');
+  assert.equal(customer.preferredLocale, 'AR');
+
+  const user = await prisma.user.findUniqueOrThrow({ where: { id: customer.userId! } });
+  assert.equal(user.firstName, 'NadiaUpdated');
+  assert.equal(user.phone, '+966500000000');
+  assert.equal(user.locale, 'AR');
+});
+
+test('a staff token cannot access or update the customer profile', async () => {
+  const getRes = await call<PortalProfile>('/portal/profile', { token: staffToken });
+  assert.equal(getRes.status, 401);
+
+  const patchRes = await fetch(`${baseUrl}/portal/profile`, {
+    method: 'PATCH',
+    headers: {
+      'content-type': 'application/json',
+      authorization: `Bearer ${staffToken}`,
+    },
+    body: JSON.stringify({ firstName: 'Hacker' }),
+  });
+  assert.equal(patchRes.status, 401);
 });

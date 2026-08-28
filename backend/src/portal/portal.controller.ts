@@ -1,9 +1,11 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   Param,
+  Patch,
   Post,
   Query,
   Req,
@@ -14,12 +16,14 @@ import type { Request } from 'express';
 import {
   ApiErrorSchema,
   PortalCategorySchema,
+  PortalProfileSchema,
   PortalTicketDetailSchema,
   PortalTicketSchema,
   buildPaginationMeta,
   toSkipTake,
   type ApiPaginated,
   type PortalCategory,
+  type PortalProfile,
   type PortalTicket,
   type PortalTicketDetail,
 } from '@crm/shared';
@@ -40,6 +44,7 @@ import {
   PortalTicketListQueryDto,
   PortalReplyDto,
   SubmitPortalTicketDto,
+  UpdatePortalProfileDto,
 } from './dto/portal.dto.js';
 
 /**
@@ -260,5 +265,53 @@ export class PortalController {
     const actor = await this.scopeFor(user, request);
 
     return this.portal.reply(actor, id, body);
+  }
+
+  @Get('profile')
+  @ApiOperation({
+    summary: 'Get the signed-in customer profile',
+    description: 'Returns profile information including name, email, phone, company, and preferences.',
+  })
+  @ApiZodResponse(200, PortalProfileSchema, 'The customer profile')
+  async profile(
+    @CurrentUser() user: CurrentUserPayload | undefined,
+    @Req() request: Request,
+  ): Promise<PortalProfile> {
+    const { customerId } = await this.scopeFor(user, request);
+
+    return this.portal.profile(customerId);
+  }
+
+  @Patch('profile')
+  @ApiOperation({
+    summary: 'Update the signed-in customer profile',
+    description: 'Updates editable profile fields (name, phone, company, contact preference, language).',
+  })
+  @ApiZodBody(UpdatePortalProfileDto)
+  @ApiZodResponse(200, PortalProfileSchema, 'The updated profile')
+  @ApiResponse({ status: 422, schema: zodToOpenApi(ApiErrorSchema) })
+  async updateProfile(
+    @Body() body: UpdatePortalProfileDto,
+    @CurrentUser() user: CurrentUserPayload | undefined,
+    @Req() request: Request,
+  ): Promise<PortalProfile> {
+    const actor = await this.scopeFor(user, request);
+
+    return this.portal.updateProfile(actor, body);
+  }
+
+  @Delete('tickets/:id')
+  @HttpCode(204)
+  @ApiOperation({ summary: 'Delete a customer request' })
+  @ApiResponse({ status: 204, description: 'Deleted' })
+  @ApiResponse({ status: 404, schema: zodToOpenApi(ApiErrorSchema) })
+  async deleteTicket(
+    @Param('id') id: string,
+    @CurrentUser() user: CurrentUserPayload | undefined,
+    @Req() request: Request,
+  ): Promise<void> {
+    const { customerId } = await this.scopeFor(user, request);
+
+    await this.portal.delete(customerId, id);
   }
 }

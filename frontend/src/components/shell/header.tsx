@@ -59,13 +59,19 @@ function Breadcrumb(): React.JSX.Element {
   );
 }
 
-/** The Create menu — AC4. Gated, so it never offers an action that will fail. */
+/** The Create menu — AC4. Gated, so it never offers an action that will fail or has no meaning for agents. */
 function CreateMenu(): React.JSX.Element | null {
   const { t } = useTranslation();
+  const { permissions } = useAuth();
+  const isAgentOnly =
+    permissions?.roles.includes('agent') &&
+    !permissions?.roles.includes('administrator') &&
+    !permissions?.roles.includes('manager');
+
   const canCreateTicket = usePermission('ticket:create');
   const canCreateCustomer = usePermission('customer:create');
 
-  if (!canCreateTicket && !canCreateCustomer) {
+  if (isAgentOnly || (!canCreateTicket && !canCreateCustomer)) {
     return null;
   }
 
@@ -162,7 +168,6 @@ export function Header(): React.JSX.Element {
         <Search aria-hidden="true" className="size-4" />
         <span className="truncate">{t('nav.searchPlaceholder')}</span>
         <kbd className="text-meta border-line text-ink-faint ms-auto rounded border px-1">
-          {/* Displayed, not detected — a keyboard hint that lies is worse than none. */}
           Ctrl K
         </kbd>
       </Button>
@@ -180,7 +185,7 @@ export function Header(): React.JSX.Element {
           <Search aria-hidden="true" className="size-4" />
         </Button>
 
-        <CreateMenu />
+        {/* <CreateMenu /> */}
         <NotificationBell unread={0} />
         <LanguageToggle />
 
@@ -206,13 +211,6 @@ export function Header(): React.JSX.Element {
               }}
             >
               {t('common.signOut')}
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onSelect={() => {
-                logout.mutate({ everywhere: true });
-              }}
-            >
-              {t('common.signOutEverywhere')}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

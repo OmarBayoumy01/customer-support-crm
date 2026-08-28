@@ -2,6 +2,7 @@ import { AlertTriangle, ArrowUpCircle, CheckCircle2, Inbox, UserRound, UserX } f
 import { useTranslation } from 'react-i18next';
 import { TICKET_VIEWS, type TicketCounts, type TicketView } from '@crm/shared';
 
+import { useAuth } from '@/features/auth/auth-context';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
@@ -43,6 +44,16 @@ export function QueueTabs({
   className,
 }: QueueTabsProps): React.JSX.Element {
   const { t } = useTranslation();
+  const { permissions } = useAuth();
+
+  const isAgentOnly =
+    permissions?.roles.includes('agent') &&
+    !permissions?.roles.includes('administrator') &&
+    !permissions?.roles.includes('manager');
+
+  const visibleViews = TICKET_VIEWS.filter(
+    (v) => v !== 'unassigned' && (!isAgentOnly || v !== 'all'),
+  );
 
   return (
     <Tabs
@@ -53,7 +64,7 @@ export function QueueTabs({
       className={className}
     >
       <TabsList aria-label={t('ticket.queue.views')} className="h-auto w-full justify-start p-1">
-        {TICKET_VIEWS.map((candidate) => {
+        {visibleViews.map((candidate) => {
           const Icon = VIEW_ICON[candidate];
           const count = counts?.[candidate];
           const active = candidate === view;

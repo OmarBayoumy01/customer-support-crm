@@ -1,16 +1,25 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
-import { ArrowDown, ArrowUp, Minus, MessageSquare, SquareArrowOutUpRight } from 'lucide-react';
+import {
+  AlertCircle,
+  AlertTriangle,
+  ArrowDown,
+  ArrowRight,
+  ArrowUp,
+  Clock,
+  Inbox,
+  Minus,
+  SquareArrowOutUpRight,
+} from 'lucide-react';
 import type { DashboardMetric, Ticket } from '@crm/shared';
 
-import { PriorityBadge, SlaMeter } from '@/components/domain/indicators';
+import { PriorityBadge, SlaMeter, StatusBadge } from '@/components/domain/indicators';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DataTable, type ColumnDef } from '@/components/data-table/data-table';
-import { TicketAssignee } from '@/features/tickets/ticket-assignee';
-import { TicketStatusControl } from '@/features/tickets/ticket-status';
 import { useAuth } from '@/features/auth/auth-context';
 import { cn } from '@/lib/utils';
 import { useAssignedSummary, useMyTickets } from './use-dashboard';
@@ -40,21 +49,20 @@ function slaFigures(ticket: Ticket): { targetSeconds: number; elapsedSeconds: nu
 /**
  * One KPI — US-55, AC1.
  *
- * The comparison renders **only when there is one**. `previous` is null for
- * three of the four figures because the schema cannot answer what they were a
- * week ago — see `DashboardMetricSchema` — and a "0%" where the truth is "we do
- * not know" is worse than a blank.
- *
- * The direction is an arrow **and** a word, never a colour alone.
+ * Enhanced with shadcn card styling, icon accent, and distinct visual tones.
  */
 function Kpi({
   labelKey,
   metric,
   tone,
+  icon: Icon,
+  iconClass,
 }: {
   labelKey: string;
   metric: DashboardMetric;
   tone?: 'warn' | 'breach';
+  icon: typeof Inbox;
+  iconClass?: string;
 }): React.JSX.Element {
   const { t } = useTranslation();
 
@@ -63,29 +71,51 @@ function Kpi({
   const Arrow = delta === null || delta === 0 ? Minus : delta > 0 ? ArrowUp : ArrowDown;
 
   return (
-    <Card className="gap-0 py-0">
-      <CardContent className="p-4">
-        <p className="text-meta text-ink-muted">{t(labelKey)}</p>
+    <Card className="relative overflow-hidden rounded-xl border bg-card/80 p-0 shadow-xs transition-all duration-200 hover:border-primary/40 hover:shadow-sm">
+      <CardContent className="p-5">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xs font-medium text-muted-foreground">{t(labelKey)}</p>
+          <div
+            className={cn(
+              'flex size-8 shrink-0 items-center justify-center rounded-lg border',
+              iconClass ?? 'border-primary/20 bg-primary/10 text-primary',
+            )}
+          >
+            <Icon aria-hidden="true" className="size-4" />
+          </div>
+        </div>
 
-        <p
-          className={cn(
-            'tabular text-page mt-1 font-semibold',
-            tone === 'warn' && 'text-sla-warn',
-            tone === 'breach' && 'text-sla-breach',
-          )}
-        >
-          {metric.value}
-        </p>
-
-        {delta === null ? (
-          // Nothing to compare against, and saying nothing is the honest answer.
-          <p className="text-meta text-ink-faint mt-1">{t('dashboard.kpi.noComparison')}</p>
-        ) : (
-          <p className="text-meta text-ink-muted mt-1 flex items-center gap-1">
-            <Arrow aria-hidden="true" className="size-3" />
-            {t('dashboard.kpi.sinceLastWeek', { delta: Math.abs(delta) })}
+        <div className="mt-3">
+          <p
+            className={cn(
+              'tabular font-mono text-3xl font-bold tracking-tight text-foreground',
+              tone === 'warn' && 'text-amber-600 dark:text-amber-400',
+              tone === 'breach' && 'text-rose-600 dark:text-rose-400',
+            )}
+          >
+            {metric.value}
           </p>
-        )}
+
+          {delta === null ? (
+            <p className="mt-1.5 text-xs text-muted-foreground">{t('dashboard.kpi.noComparison')}</p>
+          ) : (
+            <div className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+              <span
+                className={cn(
+                  'inline-flex items-center gap-0.5 font-medium',
+                  delta > 0
+                    ? 'text-emerald-600 dark:text-emerald-400'
+                    : delta < 0
+                      ? 'text-rose-600 dark:text-rose-400'
+                      : 'text-muted-foreground',
+                )}
+              >
+                <Arrow aria-hidden="true" className="size-3" />
+                {t('dashboard.kpi.sinceLastWeek', { delta: Math.abs(delta) })}
+              </span>
+            </div>
+          )}
+        </div>
       </CardContent>
     </Card>
   );
@@ -118,16 +148,19 @@ export function DashboardPage(): React.JSX.Element {
       key: 'number',
       header: t('dashboard.table.id'),
       sortable: true,
-      cell: (ticket) => <span className="tabular text-ink-muted">#{ticket.number}</span>,
+      cell: (ticket) => (
+        <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded-md bg-muted text-muted-foreground">
+          #{ticket.number}
+        </span>
+      ),
     },
     {
       key: 'subject',
       header: t('dashboard.table.subject'),
       cell: (ticket) => (
-        // AC4's "open", as the most obvious target on the row.
         <Link
           to={`/tickets/${ticket.id}`}
-          className="text-ink focus-visible:ring-ring rounded font-medium hover:underline focus-visible:ring-2 focus-visible:outline-none"
+          className="font-medium text-foreground hover:text-primary hover:underline transition-colors focus-visible:ring-1 focus-visible:outline-none"
         >
           {ticket.subject}
         </Link>
@@ -137,7 +170,7 @@ export function DashboardPage(): React.JSX.Element {
       key: 'customer',
       header: t('dashboard.table.customer'),
       cell: (ticket) => (
-        <span className="text-ink-muted">
+        <span className="text-muted-foreground">
           {ticket.customer.firstName} {ticket.customer.lastName}
         </span>
       ),
@@ -151,8 +184,7 @@ export function DashboardPage(): React.JSX.Element {
     {
       key: 'status',
       header: t('dashboard.table.status'),
-      // AC4 — changed in place, through US-47's control and its rules.
-      cell: (ticket) => <TicketStatusControl ticket={ticket} className="w-40" />,
+      cell: (ticket) => <StatusBadge status={ticket.status} />,
     },
     {
       key: 'sla',
@@ -174,7 +206,7 @@ export function DashboardPage(): React.JSX.Element {
       sortable: true,
       align: 'end',
       cell: (ticket) => (
-        <span className="tabular text-ink-muted">
+        <span className="tabular text-xs text-muted-foreground">
           {new Intl.DateTimeFormat(undefined, { dateStyle: 'short', timeStyle: 'short' }).format(
             new Date(ticket.updatedAt),
           )}
@@ -186,18 +218,7 @@ export function DashboardPage(): React.JSX.Element {
       header: t('dashboard.table.actions'),
       align: 'end',
       cell: (ticket) => (
-        <div className="flex items-center justify-end gap-1.5">
-          {/* AC4 — reassign, through US-48's control and its permission gate. */}
-          <TicketAssignee ticket={ticket} className="w-40" />
-
-          {/* AC4 — reply, which lands on the composer US-1 built. */}
-          <Button asChild variant="ghost" size="sm" className="gap-1.5">
-            <Link to={`/tickets/${ticket.id}#reply`}>
-              <MessageSquare aria-hidden="true" className="size-4" />
-              <span className="sr-only sm:not-sr-only">{t('dashboard.table.reply')}</span>
-            </Link>
-          </Button>
-
+        <div className="flex items-center justify-end">
           <Button asChild variant="ghost" size="sm" aria-label={t('dashboard.table.open')}>
             <Link to={`/tickets/${ticket.id}`}>
               <SquareArrowOutUpRight aria-hidden="true" className="size-4" />
@@ -210,9 +231,12 @@ export function DashboardPage(): React.JSX.Element {
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
-      <div>
-        <h1 className="text-page font-semibold">{t('dashboard.title')}</h1>
-        <p className="text-ink-muted mt-1">
+      {/* Header Banner */}
+      <div className="border-b pb-4">
+        <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+          {t('dashboard.title')}
+        </h1>
+        <p className="mt-1 text-sm text-muted-foreground">
           {user === null
             ? t('dashboard.subtitleAnonymous')
             : t('dashboard.subtitle', { name: user.firstName })}
@@ -224,58 +248,101 @@ export function DashboardPage(): React.JSX.Element {
         {summary.isPending ? (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {[0, 1, 2, 3].map((index) => (
-              <Skeleton key={index} className="h-24 w-full" />
+              <Skeleton key={index} className="h-28 w-full rounded-xl" />
             ))}
           </div>
         ) : summary.isError || summary.data === undefined ? (
-          <Card>
-            <CardContent className="p-4">
-              <p className="text-body text-ink-muted">{t('dashboard.kpi.failed')}</p>
+          <Card className="rounded-xl border bg-card/60 p-0 shadow-xs">
+            <CardContent className="p-5">
+              <p className="text-sm text-muted-foreground">{t('dashboard.kpi.failed')}</p>
             </CardContent>
           </Card>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Kpi labelKey="dashboard.kpi.open" metric={summary.data.open} />
-            <Kpi labelKey="dashboard.kpi.pending" metric={summary.data.pending} />
-            <Kpi labelKey="dashboard.kpi.dueSoon" metric={summary.data.dueSoon} tone="warn" />
-            <Kpi labelKey="dashboard.kpi.breached" metric={summary.data.breached} tone="breach" />
+            <Kpi
+              labelKey="dashboard.kpi.open"
+              metric={summary.data.open}
+              icon={Inbox}
+              iconClass="border-primary/20 bg-primary/10 text-primary"
+            />
+            <Kpi
+              labelKey="dashboard.kpi.pending"
+              metric={summary.data.pending}
+              icon={Clock}
+              iconClass="border-sky-500/20 bg-sky-500/10 text-sky-600 dark:text-sky-400"
+            />
+            <Kpi
+              labelKey="dashboard.kpi.dueSoon"
+              metric={summary.data.dueSoon}
+              tone="warn"
+              icon={AlertCircle}
+              iconClass="border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+            />
+            <Kpi
+              labelKey="dashboard.kpi.breached"
+              metric={summary.data.breached}
+              tone="breach"
+              icon={AlertTriangle}
+              iconClass="border-rose-500/20 bg-rose-500/10 text-rose-600 dark:text-rose-400"
+            />
           </div>
         )}
       </section>
 
       {/* AC2 — my tickets. AC5 — renders as soon as it has rows. */}
       <section aria-label={t('dashboard.table.label')}>
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <h2 className="text-section font-semibold">{t('dashboard.table.label')}</h2>
-          <Button asChild variant="outline" size="sm">
-            <Link to="/tickets?view=mine">{t('dashboard.table.seeAll')}</Link>
-          </Button>
-        </div>
+        <Card className="overflow-hidden rounded-xl border bg-card/80 shadow-xs">
+          <CardHeader className="flex flex-row items-center justify-between border-b px-6 py-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <CardTitle className="text-base font-semibold">
+                  {t('dashboard.table.label')}
+                </CardTitle>
+                {tickets.data?.data !== undefined && (
+                  <Badge variant="secondary" className="font-mono text-xs font-semibold px-2 py-0.5">
+                    {tickets.data.data.length}
+                  </Badge>
+                )}
+              </div>
+              <CardDescription className="text-xs mt-1">
+                {t('ticket.queue.subtitle')}
+              </CardDescription>
+            </div>
 
-        <DataTable
-          columns={columns}
-          rows={tickets.data?.data ?? []}
-          rowKey={(ticket) => ticket.id}
-          isLoading={tickets.isPending}
-          error={tickets.isError ? tickets.error : undefined}
-          onRetry={() => {
-            void tickets.refetch();
-          }}
-          sort={sort}
-          dir={dir}
-          onSortChange={(column) => {
-            if (column === sort) {
-              setDir((value) => (value === 'asc' ? 'desc' : 'asc'));
+            <Button asChild variant="ghost" size="sm" className="gap-1.5 text-xs text-muted-foreground hover:text-foreground">
+              <Link to="/tickets?view=mine">
+                <span>{t('dashboard.table.seeAll')}</span>
+                <ArrowRight aria-hidden="true" className="size-3.5 rtl:rotate-180" />
+              </Link>
+            </Button>
+          </CardHeader>
+          <CardContent className="p-0">
+            <DataTable
+              columns={columns}
+              rows={tickets.data?.data ?? []}
+              rowKey={(ticket) => ticket.id}
+              isLoading={tickets.isPending}
+              error={tickets.error ?? undefined}
+              onRetry={() => {
+                void tickets.refetch();
+              }}
+              sort={sort}
+              dir={dir}
+              onSortChange={(column) => {
+                if (column === sort) {
+                  setDir((value) => (value === 'asc' ? 'desc' : 'asc'));
 
-              return;
-            }
+                  return;
+                }
 
-            setSort(column);
-            setDir('asc');
-          }}
-          emptyTitle={t('dashboard.table.emptyTitle')}
-          emptyDescription={t('dashboard.table.emptyBody')}
-        />
+                setSort(column);
+                setDir('asc');
+              }}
+              emptyTitle={t('dashboard.table.emptyTitle')}
+              emptyDescription={t('dashboard.table.emptyBody')}
+            />
+          </CardContent>
+        </Card>
       </section>
     </div>
   );

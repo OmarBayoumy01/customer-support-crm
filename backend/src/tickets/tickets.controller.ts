@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorSchema,
@@ -452,5 +452,18 @@ export class TicketsController {
     @CurrentUser() user: CurrentUserPayload | undefined,
   ): Promise<Ticket> {
     return this.tickets.changeStatus(id, body.status, await this.actorFrom(user));
+  }
+
+  @Delete(':id')
+  @RequirePermission('ticket:delete')
+  @HttpCode(204)
+  @ApiOperation({ summary: 'Delete a ticket' })
+  @ApiResponse({ status: 204, description: 'Deleted' })
+  @ApiResponse({ status: 404, schema: zodToOpenApi(ApiErrorSchema) })
+  async delete(
+    @Param('id') id: string,
+    @CurrentUser() user: CurrentUserPayload | undefined,
+  ): Promise<void> {
+    await this.tickets.delete(id, await this.actorFrom(user));
   }
 }

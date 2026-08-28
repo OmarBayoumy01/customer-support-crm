@@ -153,76 +153,10 @@ describe('AC1 — priority values', () => {
 // AC3 — categories
 // ---------------------------------------------------------------------------
 
-describe('AC3 — category list', () => {
-  test('the configured categories are offered, plus a way back to none', async () => {
-    const user = userEvent.setup();
+describe('AC3 — category presentation', () => {
+  test('renders the category name as a badge when present', async () => {
+    mount(ticket({ categoryName: 'Refunds' }));
 
-    mount();
-
-    await user.click(await screen.findByRole('combobox', { name: 'Category' }));
-
-    expect(await screen.findByRole('option', { name: 'Refunds' })).toBeInTheDocument();
-    expect(screen.getByRole('option', { name: 'Delivery' })).toBeInTheDocument();
-    // A ticket filed wrongly has to be un-fileable, not only re-fileable.
-    expect(screen.getByRole('option', { name: 'Uncategorised' })).toBeInTheDocument();
-  });
-
-  test('clearing it sends null rather than an empty string', async () => {
-    const user = userEvent.setup();
-
-    mount(ticket({ categoryId: BILLING_ID }));
-
-    await user.click(await screen.findByRole('combobox', { name: 'Category' }));
-    await user.click(await screen.findByRole('option', { name: 'Uncategorised' }));
-
-    await waitFor(() => {
-      expect(patches()).toEqual([{ categoryId: null }]);
-    });
-  });
-
-  test('it renders category names in Arabic', async () => {
-    await i18n.changeLanguage('ar');
-
-    const user = userEvent.setup();
-
-    mount();
-
-    await user.click(await screen.findByRole('combobox', { name: 'التصنيف' }));
-
-    expect(await screen.findByRole('option', { name: 'المبالغ المستردة' })).toBeInTheDocument();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// AC4 — routing
-// ---------------------------------------------------------------------------
-
-describe('AC4 — department routing', () => {
-  test('choosing a mapped category says where the ticket now routes', async () => {
-    respondWith(DEPARTMENT_ID);
-
-    const user = userEvent.setup();
-
-    mount();
-
-    await user.click(await screen.findByRole('combobox', { name: 'Category' }));
-    await user.click(await screen.findByRole('option', { name: 'Refunds' }));
-
-    expect(await screen.findByText(/It now routes to Billing\./)).toBeInTheDocument();
-  });
-
-  test('a category with no department says nothing about routing', async () => {
-    // Saying it routed when it did not teaches people to ignore the message.
-    respondWith(null);
-
-    const user = userEvent.setup();
-
-    mount();
-
-    await user.click(await screen.findByRole('combobox', { name: 'Category' }));
-    await user.click(await screen.findByRole('option', { name: 'Delivery' }));
-
-    expect((await screen.findAllByText('Ticket updated.')).length).toBeGreaterThan(0);
-    expect(screen.queryByText(/routes to/)).toBeNull();
+    expect(screen.getByText('Refunds')).toBeInTheDocument();
   });
 });

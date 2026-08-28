@@ -8,7 +8,6 @@
  * asserted in `backend/src/tickets/dashboard.test.ts`.
  */
 import { render, screen, waitFor, within } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import {
   AxiosError,
@@ -335,7 +334,7 @@ describe('AC3 — urgency-first sorting', () => {
 // ---------------------------------------------------------------------------
 
 describe('AC4 — row actions', () => {
-  test('open, reply, change status and reassign are all on the row', async () => {
+  test('open action is on the row with a status indicator', async () => {
     mount();
 
     await screen.findByText('Refund has not arrived');
@@ -346,39 +345,8 @@ describe('AC4 — row actions', () => {
       `/tickets/${TICKET_ID}`,
     );
 
-    // Reply — lands on the composer US-1 built.
-    expect(screen.getByRole('link', { name: /Reply/ })).toHaveAttribute(
-      'href',
-      `/tickets/${TICKET_ID}#reply`,
-    );
-
-    // Status — US-47's control, in the row.
-    expect(screen.getByRole('combobox', { name: 'Status' })).toBeInTheDocument();
-
-    // Reassign — US-48's control. This agent lacks `ticket:assign`, so it renders
-    // its own read-only branch, which is that story's AC4 rather than a gap here.
-    expect(screen.getByText('Aisha Haddad')).toBeInTheDocument();
-  });
-
-  test('changing the status from the row patches that ticket', async () => {
-    const user = userEvent.setup();
-
-    mount();
-
-    await screen.findByText('Refund has not arrived');
-
-    await user.click(screen.getByRole('combobox', { name: 'Status' }));
-    await user.click(await screen.findByRole('option', { name: /Waiting for customer/ }));
-
-    await waitFor(() => {
-      expect(
-        sent.some(
-          (request) =>
-            request.method?.toLowerCase() === 'patch' &&
-            (request.url ?? '') === `/tickets/${TICKET_ID}/status`,
-        ),
-      ).toBe(true);
-    });
+    // Status is displayed as a badge.
+    expect(screen.getByText('Waiting for agent')).toBeInTheDocument();
   });
 
   test('there is no snooze control, because there is nowhere to store one', async () => {

@@ -8,11 +8,13 @@ import {
 import type {
   PaginationMeta,
   PortalCategory,
+  PortalProfile,
   PortalReply,
   PortalTicket,
   PortalTicketDetail,
   PortalTicketListQuery,
   SubmitPortalTicket,
+  UpdatePortalProfile,
 } from '@crm/shared';
 
 import { apiGet, http, type ApiRequestError } from '@/lib/api-client';
@@ -135,3 +137,72 @@ export function usePortalReply(
     retry: false,
   });
 }
+
+/** The key the profile subscribes to. */
+export const PORTAL_PROFILE_KEY = ['portal', 'profile'] as const;
+
+/** The signed-in customer's own profile — US-87. */
+export function usePortalProfile(): UseQueryResult<PortalProfile> {
+  return useQuery({
+    queryKey: PORTAL_PROFILE_KEY,
+    queryFn: async () => apiGet<PortalProfile>('/portal/profile'),
+    staleTime: 60_000,
+  });
+}
+
+import { updateSessionUser } from '@/lib/session-store';
+
+/** Update profile details — US-87. */
+export function useUpdatePortalProfile(): UseMutationResult<
+  PortalProfile,
+  ApiRequestError,
+  UpdatePortalProfile
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation<PortalProfile, ApiRequestError, UpdatePortalProfile>({
+    mutationFn: async (input) => {
+      const response = await http.patch<{ data: PortalProfile }>('/portal/profile', input);
+      return response.data.data;
+    },
+    onSuccess: (updated) => {
+      queryClient.setQueryData(PORTAL_PROFILE_KEY, updated);
+      updateSessionUser({
+        firstName: updated.firstName,
+        lastName: updated.lastName,
+        locale: updated.preferredLocale,
+      });
+    },
+    retry: false,
+  });
+}
+
+import { useNavigate } from 'react-router';
+import { toastError, toastSuccess } from '@/lib/toast';
+import { useTranslation } from 'react-i18next';
+
+/** Delete a request from the portal with toast and redirect. */
+export function useDeletePortalTicket(id: string, ticketNumber?: number) {
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const { t } = useTranslation();
+
+  return useMutation({
+    mutationFn: async () => {
+      await http.delete(`/portal/tickets/${id}`);
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: PORTAL_TICKETS_KEY });
+      toastSuccess(
+        ticketNumber !== undefined
+          ? t('ticket.delete.success', { number: ticketNumber })
+          : t('ticket.delete.success', { number: '' }),
+      );
+      navigate('/portal');
+    },
+    onError: (error) => {
+      toastError(error);
+    },
+  });
+}
+

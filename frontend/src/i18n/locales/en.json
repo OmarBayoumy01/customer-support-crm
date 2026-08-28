@@ -98,6 +98,16 @@
       "sms": "SMS",
       "web": "Web"
     },
+    "delete": {
+      "button": "Delete ticket",
+      "title": "Delete ticket #{{number}}",
+      "description": "This action cannot be undone. This will permanently delete the ticket and all its messages from the workspace.",
+      "prompt": "To confirm deletion, type DELETE in the box below:",
+      "placeholder": "Type DELETE to confirm",
+      "confirmButton": "Delete permanently",
+      "deleting": "Deleting…",
+      "success": "Ticket #{{number}} has been deleted."
+    },
     "queue": {
       "title": "Tickets",
       "subtitle": "What needs attention next.",
@@ -219,7 +229,8 @@
       "switchToNoteTitle": "Turn this reply into an internal note?",
       "switchToNoteBody": "What you have written will be kept. As a note the customer will never see it, and it will not be sent to them.",
       "switchToReplyTitle": "Turn this note into a reply?",
-      "switchToReplyBody": "What you have written will be kept — and sending it will deliver it to the customer."
+      "switchToReplyBody": "What you have written will be kept — and sending it will deliver it to the customer.",
+      "resolvedNotice": "This ticket is resolved and closed for replies."
     },
     "classification": {
       "uncategorised": "Uncategorised",
@@ -239,6 +250,7 @@
       "current": "Current",
       "notAllowed": "Not available from here",
       "noPermission": "Needs permission",
+      "resolve": "Resolve ticket",
       "confirmResolve": {
         "title": "Resolve without replying?",
         "description": "Nobody has replied to the customer on this ticket. Resolving now closes it without them hearing anything back.",
@@ -318,7 +330,27 @@
     },
     "showPassword": "Show password",
     "hidePassword": "Hide password",
-    "capsLock": "Caps Lock is on"
+    "capsLock": "Caps Lock is on",
+    "demoAccounts": {
+      "title": "Quick Test Accounts",
+      "subtitle": "Click any account to auto-fill credentials",
+      "passwordHint": "Password:",
+      "manager": {
+        "role": "Manager",
+        "name": "Marcus Webb",
+        "description": "Team queue & SLA supervision"
+      },
+      "agent": {
+        "role": "Support Agent",
+        "name": "Aisha Haddad",
+        "description": "Assigned queue & ticket resolution"
+      },
+      "customer": {
+        "role": "Portal Customer",
+        "name": "Omar Nasser",
+        "description": "Customer portal & new requests"
+      }
+    }
   },
   "dashboard": {
     "title": "My workload",
@@ -388,6 +420,37 @@
       "subtitle": "Everything you have asked us, and where it stands.",
       "newRequest": "New request"
     },
+    "profile": {
+      "button": "My profile",
+      "title": "My profile",
+      "description": "Manage your personal contact details and preferences.",
+      "firstName": "First name",
+      "lastName": "Last name",
+      "email": "Email address",
+      "emailNotice": "Email cannot be changed directly.",
+      "phone": "Phone number",
+      "phonePlaceholder": "+1 555-0100",
+      "companyName": "Company name",
+      "companyPlaceholder": "Acme Inc.",
+      "preferredChannel": "Preferred contact method",
+      "preferredLocale": "Preferred language",
+      "channelOptions": {
+        "email": "Email",
+        "whatsapp": "WhatsApp",
+        "chat": "Live chat",
+        "sms": "SMS",
+        "web": "Web portal"
+      },
+      "localeOptions": {
+        "en": "English",
+        "ar": "العربية"
+      },
+      "save": "Save changes",
+      "saving": "Saving…",
+      "cancel": "Cancel",
+      "success": "Your profile has been updated.",
+      "error": "Failed to update profile. Please try again."
+    },
     "submit": {
       "title": "Ask us for help",
       "subtitle": "Tell us what is happening and we will pick it up.",
@@ -441,7 +504,17 @@
       "searchPlaceholder": "Subject or request number",
       "statusLabel": "Status",
       "anyStatus": "Any status",
-      "openedSince": "Opened since",
+      "openedSince": "From date",
+      "createdFrom": "From date",
+      "createdTo": "To date",
+      "dateRange": "Date range",
+      "pickDateRange": "Filter by date",
+      "presets": {
+        "today": "Today",
+        "last7Days": "Last 7 days",
+        "last30Days": "Last 30 days",
+        "thisMonth": "This month"
+      },
       "empty": "You have not asked us anything yet.",
       "emptyHint": "When you do, it will appear here so you can follow it.",
       "noMatches": "Nothing matches those filters.",

@@ -8,9 +8,7 @@ import { TicketTimeline } from '@/components/domain/ticket-timeline';
 import { ErrorState } from '@/components/states/error-state';
 import { DetailSkeleton } from '@/components/states/skeletons';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
+import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { CustomerContextPanel } from './customer-context-panel';
 import { TicketComposer } from './ticket-composer';
@@ -81,83 +79,77 @@ export function TicketDetailPage(): React.JSX.Element {
   ];
 
   return (
-    <div className="space-y-4">
+    <div className="mx-auto max-w-7xl space-y-5">
       <TicketHeader ticket={ticket} />
 
       <div
         className={cn(
-          'grid gap-4',
-          // The context column is a fixed, readable width; the conversation
-          // takes whatever is left, which is what AC5's "expands to use the
-          // space" means in practice.
-          collapsed ? 'lg:grid-cols-1' : 'lg:grid-cols-[minmax(0,1fr)_20rem]',
+          'grid gap-5 items-start',
+          collapsed ? 'grid-cols-[1fr_auto]' : 'grid-cols-[minmax(0,1fr)_22rem]',
         )}
       >
-        {/*
-          The conversation and its composer dock. `flex` with the thread
-          scrolling means the composer stays at the foot of the column rather
-          than at the foot of the page, which is AC3's actual requirement.
-        */}
-        {/*
-          `role` rather than a <section> element: shadcn's Card is a div and has
-          no `asChild`, and a labelled region is the same landmark to a screen
-          reader either way.
-        */}
+        {/* The conversation and its composer dock */}
         <Card
           role="region"
           aria-label={t('ticket.detail.conversation.title')}
-          className="min-h-[32rem] gap-0 overflow-hidden py-0 lg:max-h-[calc(100vh-20rem)]"
+          className="flex flex-col h-[calc(100vh-14rem)] min-h-[32rem] gap-0 overflow-hidden rounded-xl border bg-card/80 p-0 shadow-xs"
         >
-          <ScrollArea className="flex-1">
-            <div className="p-4">
-              <TicketConversation
-                messages={thread}
-                description={ticket.description}
-                createdAt={ticket.createdAt}
-                customerName={`${ticket.customer.firstName} ${ticket.customer.lastName}`}
-                messageCount={ticket.messageCount}
-                onLoadEarlier={() => {
-                  void earlier.fetchNextPage();
-                }}
-                isLoadingEarlier={earlier.isFetching}
-              />
-            </div>
-          </ScrollArea>
+          <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6">
+            <TicketConversation
+              messages={thread}
+              description={ticket.description}
+              createdAt={ticket.createdAt}
+              customerName={`${ticket.customer.firstName} ${ticket.customer.lastName}`}
+              messageCount={ticket.messageCount}
+              onLoadEarlier={() => {
+                void earlier.fetchNextPage();
+              }}
+              isLoadingEarlier={earlier.isFetching}
+            />
+          </div>
 
-          {/*
-            The dock. Empty until US-1, which owns replying and adding an
-            internal note. It is a real region rather than nothing, because AC3
-            is about where the composer sits and a layout that only becomes
-            correct three stories later is a layout nobody has seen.
-          */}
-          {/* US-1 fills the dock US-45 reserved. */}
-          <TicketComposer ticketId={ticket.id} />
+          {/* Composer Dock */}
+          <div className="shrink-0">
+            <TicketComposer ticketId={ticket.id} isResolved={ticket.status === 'RESOLVED'} />
+          </div>
         </Card>
 
-        {!collapsed && (
+        {collapsed ? (
+          <button
+            type="button"
+            onClick={() => setCollapsed(false)}
+            aria-label={t('ticket.detail.context.expand')}
+            className="flex flex-col items-center justify-start gap-4 rounded-xl border bg-card/80 py-4 px-2 hover:bg-muted/40 transition-colors h-[calc(100vh-14rem)] min-h-[32rem] shadow-xs group cursor-pointer"
+          >
+            <div className="flex size-7 items-center justify-center rounded-md border border-border/80 bg-background text-muted-foreground group-hover:text-foreground group-hover:border-primary/40 shadow-2xs">
+              <PanelRightOpen aria-hidden="true" className="size-4 rtl:rotate-180" />
+            </div>
+            <span className="[writing-mode:vertical-rl] rotate-180 text-xs font-semibold uppercase tracking-wider text-muted-foreground group-hover:text-foreground">
+              {t('ticket.detail.context.title')}
+            </span>
+          </button>
+        ) : (
           <Card
             role="complementary"
             aria-label={t('ticket.detail.context.title')}
-            className="h-fit gap-0 overflow-hidden py-0"
+            className="h-fit gap-0 overflow-hidden rounded-xl border bg-card/80 p-0 shadow-xs"
           >
-            <CardHeader className="flex-row items-center justify-between gap-2 px-4 py-2">
-              <CardTitle className="text-meta text-ink">
+            <div className="flex items-center justify-between border-b px-5 py-3.5">
+              <h2 className="text-sm font-semibold text-foreground">
                 {t('ticket.detail.context.title')}
-              </CardTitle>
+              </h2>
               <Button
                 variant="ghost"
                 size="icon"
-                className="size-7"
+                className="size-7 text-muted-foreground hover:text-foreground -me-1"
                 onClick={() => {
                   setCollapsed(true);
                 }}
                 aria-label={t('ticket.detail.context.collapse')}
               >
-                <PanelRightClose aria-hidden="true" className="rtl:rotate-180" />
+                <PanelRightClose aria-hidden="true" className="size-4 rtl:rotate-180" />
               </Button>
-            </CardHeader>
-
-            <Separator />
+            </div>
 
             <CardContent className="p-0">
               <CustomerContextPanel
@@ -166,8 +158,8 @@ export function TicketDetailPage(): React.JSX.Element {
                 recentTickets={recent.data}
               />
 
-              <section className="p-4">
-                <h3 className="text-meta text-ink-muted mb-2 font-medium tracking-wide uppercase">
+              <section className="p-5 border-t">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
                   {t('ticket.history.title')}
                 </h3>
                 <TicketTimeline entries={ticket.history} />
@@ -176,19 +168,6 @@ export function TicketDetailPage(): React.JSX.Element {
           </Card>
         )}
       </div>
-
-      {collapsed && (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => {
-            setCollapsed(false);
-          }}
-        >
-          <PanelRightOpen aria-hidden="true" className="size-4 rtl:rotate-180" />
-          {t('ticket.detail.context.expand')}
-        </Button>
-      )}
     </div>
   );
 }

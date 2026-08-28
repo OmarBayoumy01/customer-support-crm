@@ -3,6 +3,7 @@ import {
   PortalReplySchema,
   PortalTicketListQuerySchema,
   SubmitPortalTicketSchema,
+  UpdatePortalProfileSchema,
 } from '@crm/shared';
 
 import { createZodDto } from '../../common/index.js';
@@ -18,3 +19,6 @@ export class SubmitPortalTicketDto extends createZodDto(SubmitPortalTicketSchema
 
 /** A customer reply — US-85. No isInternal, deliberately: see the schema. */
 export class PortalReplyDto extends createZodDto(PortalReplySchema) {}
+
+/** Customer profile updates — US-87. */
+export class UpdatePortalProfileDto extends createZodDto(UpdatePortalProfileSchema) {}

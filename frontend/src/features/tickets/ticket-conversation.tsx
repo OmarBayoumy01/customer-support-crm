@@ -64,13 +64,20 @@ function AttachmentChip({ attachment }: { attachment: TicketAttachment }): React
   );
 }
 
+/** Two letters, from whatever the name gives us. */
+function initialsOf(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  const first = parts[0] ?? '';
+  if (parts.length === 1) return first.slice(0, 2).toUpperCase();
+  const second = parts[1] ?? '';
+  return ((first[0] ?? '') + (second[0] ?? '')).toUpperCase() || '?';
+}
+
 /**
  * Who wrote it.
  *
- * Initials rather than a silhouette: the platform has no avatar uploads, and a
- * generic icon repeated down a thread distinguishes nobody. The customer and
- * the agent are also tinted differently, which is one more encoding on top of
- * the side the bubble sits on.
+ * High contrast initials for customer and agent avatars.
  */
 function Author({
   name,
@@ -79,21 +86,24 @@ function Author({
   name: string;
   fromCustomer: boolean;
 }): React.JSX.Element {
+  const initials = initialsOf(name);
+
   return (
-    <Avatar className="size-7 shrink-0">
+    <Avatar className={cn(
+      'size-7 shrink-0 select-none border',
+      fromCustomer
+        ? 'border-border/80 bg-muted text-foreground'
+        : 'border-primary/30 bg-primary text-primary-foreground shadow-2xs',
+    )}>
       <AvatarFallback
         className={cn(
-          'text-[0.625rem] font-medium',
-          fromCustomer ? 'bg-secondary text-ink-muted' : 'bg-brand-soft text-accent',
+          'text-[0.6875rem] font-bold',
+          fromCustomer
+            ? 'bg-muted text-foreground'
+            : 'bg-primary text-primary-foreground',
         )}
       >
-        {name
-          .split(' ')
-          .filter(Boolean)
-          .slice(0, 2)
-          .map((part) => part.charAt(0))
-          .join('')
-          .toUpperCase() || '?'}
+        {initials}
       </AvatarFallback>
     </Avatar>
   );
@@ -201,11 +211,13 @@ export function TicketConversation({
 
       {description !== null && description !== '' && (
         <li className="flex flex-col items-start">
-          <div className="border-line bg-card max-w-[85%] rounded-md rounded-ss-none border p-3">
-            <p className="text-meta text-ink-muted mb-1">
-              {customerName} · <time dateTime={createdAt}>{time(createdAt)}</time>
+          <div className="border border-border/70 bg-card max-w-[85%] rounded-2xl rounded-ss-xs p-4 shadow-2xs">
+            <p className="text-xs text-muted-foreground mb-1.5 flex items-center gap-1.5">
+              <span className="font-semibold text-foreground">{customerName}</span>
+              <span>·</span>
+              <time dateTime={createdAt}>{time(createdAt)}</time>
             </p>
-            <p className="text-body text-ink whitespace-pre-line">{description}</p>
+            <p className="text-sm text-foreground whitespace-pre-line leading-relaxed">{description}</p>
           </div>
         </li>
       )}
@@ -214,8 +226,8 @@ export function TicketConversation({
         // AC6 — a status change is context, not correspondence.
         if (message.senderType === 'SYSTEM') {
           return (
-            <li key={message.id} className="flex justify-center">
-              <p className="text-meta text-ink-faint bg-secondary rounded-full px-3 py-1 text-center">
+            <li key={message.id} className="flex justify-center my-2">
+              <p className="text-xs text-muted-foreground bg-muted/80 border px-3.5 py-1 rounded-full text-center shadow-2xs">
                 {message.body} · <time dateTime={message.createdAt}>{time(message.createdAt)}</time>
               </p>
             </li>
@@ -227,31 +239,26 @@ export function TicketConversation({
         // AC2 — an internal note breaks the bubble geometry on purpose.
         if (message.isInternal) {
           return (
-            <li key={message.id}>
-              {/*
-                US-1, AC4 — full width, amber ground, and a coloured rule on the
-                inline start. `border-s` rather than `border-l`, so the rule is
-                on the edge the reading starts from in Arabic too.
-              */}
-              <div className="border-sla-warn/40 bg-sla-warn-soft border-s-sla-warn rounded-md border border-s-4 border-dashed p-3">
-                <p className="text-meta mb-1 flex flex-wrap items-center gap-x-2">
-                  <span className="text-sla-warn inline-flex items-center gap-1 font-medium">
-                    <Lock aria-hidden="true" className="size-3" />
+            <li key={message.id} className="my-2">
+              <div className="rounded-xl border border-dashed border-sla-warn/40 bg-sla-warn-soft border-s-4 border-s-sla-warn p-4 shadow-2xs">
+                <p className="text-xs mb-1.5 flex flex-wrap items-center gap-x-2">
+                  <span className="text-amber-700 dark:text-amber-300 inline-flex items-center gap-1 font-semibold">
+                    <Lock aria-hidden="true" className="size-3.5" />
                     {t('ticket.detail.conversation.notVisibleToCustomer')}
                   </span>
-                  <span aria-hidden="true" className="text-ink-faint">
+                  <span aria-hidden="true" className="text-muted-foreground/60">
                     ·
                   </span>
-                  <span className="text-ink-muted">
+                  <span className="text-muted-foreground font-medium">
                     {message.authorName ?? t('ticket.detail.conversation.unknownAuthor')}
                   </span>
-                  <time className="text-ink-muted" dateTime={message.createdAt}>
+                  <time className="text-muted-foreground" dateTime={message.createdAt}>
                     {time(message.createdAt)}
                   </time>
                 </p>
-                <p className="text-body text-ink whitespace-pre-line">{message.body}</p>
+                <p className="text-sm text-foreground whitespace-pre-line leading-relaxed">{message.body}</p>
                 {message.attachments.length > 0 && (
-                  <ul className="mt-2 flex flex-wrap gap-1.5">
+                  <ul className="mt-2.5 flex flex-wrap gap-1.5">
                     {message.attachments.map((attachment) => (
                       <li key={attachment.id} className="min-w-0">
                         <AttachmentChip attachment={attachment} />
@@ -270,7 +277,7 @@ export function TicketConversation({
           <li
             key={message.id}
             className={cn(
-              'flex items-start gap-2',
+              'flex items-start gap-2.5 my-2',
               fromCustomer ? 'justify-start' : 'flex-row-reverse justify-start',
             )}
           >
@@ -278,14 +285,14 @@ export function TicketConversation({
 
             <div
               className={cn(
-                'max-w-[85%] min-w-0 rounded-md border p-3',
+                'max-w-[85%] min-w-0 rounded-2xl border p-4 shadow-2xs',
                 fromCustomer
-                  ? 'border-line bg-card rounded-ss-none'
-                  : 'border-accent/20 bg-brand-soft rounded-se-none',
+                  ? 'border-border/70 bg-card rounded-ss-xs'
+                  : 'border-primary/25 bg-primary/10 rounded-se-xs',
               )}
             >
-              <p className="text-meta text-ink-muted mb-1 flex flex-wrap items-center gap-x-2">
-                <span className="text-ink font-medium">{author}</span>
+              <p className="text-xs text-muted-foreground mb-1.5 flex flex-wrap items-center gap-x-2">
+                <span className="font-semibold text-foreground">{author}</span>
                 <span aria-hidden="true">·</span>
                 <time dateTime={message.createdAt}>{time(message.createdAt)}</time>
                 {message.channel !== null && (
@@ -295,9 +302,9 @@ export function TicketConversation({
                   </>
                 )}
               </p>
-              <p className="text-body text-ink whitespace-pre-line">{message.body}</p>
+              <p className="text-sm text-foreground whitespace-pre-line leading-relaxed">{message.body}</p>
               {message.attachments.length > 0 && (
-                <ul className="mt-2 flex flex-wrap gap-1.5">
+                <ul className="mt-2.5 flex flex-wrap gap-1.5">
                   {message.attachments.map((attachment) => (
                     <li key={attachment.id} className="min-w-0">
                       <AttachmentChip attachment={attachment} />

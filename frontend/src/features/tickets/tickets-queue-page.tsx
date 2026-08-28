@@ -16,6 +16,7 @@ import {
   type TicketStatus,
 } from '@/lib/design-tokens';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/features/auth/auth-context';
 import { FilterChips, type FilterChip } from './filter-chips';
 import { QueueTabs } from './queue-tabs';
 import { useTicketCounts, useTicketList } from './use-tickets';
@@ -73,20 +74,31 @@ export function TicketsQueuePage(): React.JSX.Element {
   const [params] = useSearchParams();
   const table = useTableQueryState(FILTER_KEYS);
   const [selected, setSelected] = useState(new Set<string>());
+  const { permissions } = useAuth();
+
+  const isAgentOnly =
+    permissions?.roles.includes('agent') &&
+    !permissions?.roles.includes('administrator') &&
+    !permissions?.roles.includes('manager');
+
+  const defaultView: TicketView = isAgentOnly ? 'mine' : 'all';
 
   const rawView = table.filters['view'];
   const view: TicketView = TICKET_VIEWS.includes(rawView as TicketView)
     ? (rawView as TicketView)
-    : 'all';
+    : defaultView;
 
   // Sent to the API verbatim. `view` travels with the rest because the server
   // owns what each tab means — see `TicketsService.viewWhere`.
   const search = useMemo(() => {
     const next = new URLSearchParams(params);
     next.set('pageSize', '25');
+    if (!next.has('view') && isAgentOnly) {
+      next.set('view', 'mine');
+    }
 
     return `?${next.toString()}`;
-  }, [params]);
+  }, [params, isAgentOnly]);
 
   const list = useTicketList(search);
   const counts = useTicketCounts();

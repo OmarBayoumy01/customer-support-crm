@@ -179,7 +179,7 @@ describe('AC2 — simple filters', () => {
 
     expect(screen.getByLabelText('Search')).toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: 'Status' })).toBeInTheDocument();
-    expect(screen.getByLabelText('Opened since')).toBeInTheDocument();
+    expect(screen.getByLabelText('Date range')).toBeInTheDocument();
   });
 
   test('and offers nothing else — no assignee, department, branch or channel', async () => {
@@ -301,7 +301,7 @@ describe('AC5 — empty state', () => {
     // support is the failure this distinction avoids.
     expect(await screen.findByText('Nothing matches those filters.')).toBeInTheDocument();
     expect(screen.queryByText('You have not asked us anything yet.')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Clear filters' })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Clear filters' })[0]).toBeInTheDocument();
   });
 });
 

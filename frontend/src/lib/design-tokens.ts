@@ -63,51 +63,48 @@ export const STATUS_PRESENTATION: Record<TicketStatus, Presentation> = {
   NEW: {
     labelKey: 'ticket.status.new',
     icon: Circle,
-    className: 'text-ink bg-secondary border-line',
+    className: 'text-purple-700 dark:text-purple-400 bg-purple-500/10 border-purple-500/30',
   },
   WAITING_FOR_AGENT: {
     labelKey: 'ticket.status.waitingForAgent',
     icon: CircleDot,
-    className: 'text-ink bg-secondary border-line',
+    className: 'text-sky-700 dark:text-sky-400 bg-sky-500/10 border-sky-500/30',
   },
   WAITING_FOR_CUSTOMER: {
     labelKey: 'ticket.status.waitingForCustomer',
     icon: PauseCircle,
-    className: 'text-ink-muted bg-secondary border-line',
+    className: 'text-amber-700 dark:text-amber-400 bg-amber-500/10 border-amber-500/30',
   },
   RESOLVED: {
     labelKey: 'ticket.status.resolved',
     icon: CheckCircle2,
-    className: 'text-sla-ok bg-sla-ok-soft border-sla-ok/25',
+    className: 'text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/30',
   },
 };
 
 /**
- * Priority **is** on the ramp, because it is a statement about urgency.
- *
- * Low is deliberately colourless. Three of the four priorities being grey is
- * the point — if everything is coloured, nothing is.
+ * Priority urgency colors.
  */
 export const PRIORITY_PRESENTATION: Record<TicketPriority, Presentation> = {
   LOW: {
     labelKey: 'ticket.priority.low',
     icon: Minus,
-    className: 'text-ink-muted bg-transparent border-line',
+    className: 'text-slate-600 dark:text-slate-400 bg-slate-500/10 border-slate-500/30',
   },
   MEDIUM: {
     labelKey: 'ticket.priority.medium',
     icon: Circle,
-    className: 'text-ink bg-secondary border-line',
+    className: 'text-blue-700 dark:text-blue-400 bg-blue-500/10 border-blue-500/30',
   },
   HIGH: {
     labelKey: 'ticket.priority.high',
     icon: AlertTriangle,
-    className: 'text-sla-warn bg-sla-warn-soft border-sla-warn/25',
+    className: 'text-amber-700 dark:text-amber-400 bg-amber-500/10 border-amber-500/30',
   },
   URGENT: {
     labelKey: 'ticket.priority.urgent',
     icon: Flame,
-    className: 'text-sla-breach bg-sla-breach-soft border-sla-breach/25',
+    className: 'text-rose-700 dark:text-rose-400 bg-rose-500/10 border-rose-500/30',
   },
 };
 

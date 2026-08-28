@@ -1,10 +1,13 @@
 import {
   useInfiniteQuery,
+  useMutation,
   useQuery,
+  useQueryClient,
   type InfiniteData,
   type UseInfiniteQueryResult,
   type UseQueryResult,
 } from '@tanstack/react-query';
+import { useNavigate } from 'react-router';
 import type { Customer, PaginationMeta, Ticket, TicketDetail, TicketMessage } from '@crm/shared';
 
 import { apiGet, http } from '@/lib/api-client';
@@ -98,5 +101,35 @@ export function useCustomerTickets(
     },
     enabled: customerId !== undefined,
     staleTime: 30_000,
+  });
+}
+
+import { toastError, toastSuccess } from '@/lib/toast';
+import { useTranslation } from 'react-i18next';
+
+/**
+ * Delete a ticket — soft delete with toast and redirect to queue.
+ */
+export function useDeleteTicket(id: string, ticketNumber?: number) {
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const { t } = useTranslation();
+
+  return useMutation({
+    mutationFn: async () => {
+      await http.delete(`/tickets/${id}`);
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['tickets'] });
+      toastSuccess(
+        ticketNumber !== undefined
+          ? t('ticket.delete.success', { number: ticketNumber })
+          : t('ticket.delete.success', { number: '' }),
+      );
+      navigate('/tickets');
+    },
+    onError: (error) => {
+      toastError(error);
+    },
   });
 }

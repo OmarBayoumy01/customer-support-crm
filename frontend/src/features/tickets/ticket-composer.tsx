@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Lock, Reply, Send } from 'lucide-react';
+import { CheckCircle2, Lock, Reply, Send } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { CreateTicketMessage, TicketMessage } from '@crm/shared';
@@ -17,31 +17,14 @@ type Mode = 'reply' | 'note';
 
 export interface TicketComposerProps {
   ticketId: string;
+  isResolved?: boolean | undefined;
   className?: string | undefined;
 }
 
 /**
  * Reply, or write a note — US-1.
- *
- * **The risk this story exists to mitigate is an agent sending private context
- * to a customer**, which the story itself calls a trust and confidentiality
- * issue rather than a cosmetic one. Everything below follows from that:
- *
- * - Reply is the default (AC1), because the safe-by-accident case should be the
- *   customer-facing one an agent is expecting.
- * - Note mode changes the **whole** composer, not a checkbox somewhere (AC2).
- *   A single toggle you can miss is exactly how the accident happens.
- * - Switching with text already typed asks first (AC3). The text survives
- *   either way; what the dialog buys is a moment's attention at the one point
- *   where a note could become a reply.
- * - The button changes its verb (AC6), so the last thing an agent reads before
- *   committing says which of the two they are doing.
- *
- * The mode is deliberately **not** in the URL. Everything else on this screen
- * is shareable state; a half-written note is not, and a link that opens
- * somebody else's composer in note mode is a way to get this wrong.
  */
-export function TicketComposer({ ticketId, className }: TicketComposerProps): React.JSX.Element {
+export function TicketComposer({ ticketId, isResolved, className }: TicketComposerProps): React.JSX.Element {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
 
@@ -65,9 +48,6 @@ export function TicketComposer({ ticketId, className }: TicketComposerProps): Re
       );
     },
     onError: (error: unknown) => {
-      // The draft is deliberately left in the box: losing what somebody just
-      // wrote because the network blinked is the worst possible response to a
-      // failure that retrying would fix.
       toastError(error, {
         onRetry: () => {
           submit();
@@ -77,7 +57,7 @@ export function TicketComposer({ ticketId, className }: TicketComposerProps): Re
   });
 
   function submit(): void {
-    if (body.trim() === '') {
+    if (isResolved || body.trim() === '') {
       return;
     }
 
@@ -86,7 +66,7 @@ export function TicketComposer({ ticketId, className }: TicketComposerProps): Re
 
   /** AC3 — warn before the mode changes, but never lose the draft. */
   function requestMode(next: Mode): void {
-    if (next === mode) {
+    if (isResolved || next === mode) {
       return;
     }
 
@@ -98,12 +78,24 @@ export function TicketComposer({ ticketId, className }: TicketComposerProps): Re
     setPendingMode(next);
   }
 
+  if (isResolved) {
+    return (
+      <div className={cn('border-t p-4 bg-muted/30', className)}>
+        <div className="flex items-center justify-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-xs font-medium text-emerald-800 dark:text-emerald-300 shadow-2xs">
+          <CheckCircle2 aria-hidden="true" className="size-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+          <span>{t('ticket.composer.resolvedNotice')}</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       className={cn(
-        'space-y-2 border-t p-4 transition-colors',
-        // AC2 — the whole composer, not a corner of it.
-        isNote ? 'border-sla-warn/30 bg-sla-warn-soft' : 'bg-secondary/30',
+        'space-y-2 border-t p-5 transition-colors',
+        isNote
+          ? 'border-sla-warn/40 bg-sla-warn-soft'
+          : 'border-border/60 bg-muted/20',
         className,
       )}
     >
@@ -114,12 +106,12 @@ export function TicketComposer({ ticketId, className }: TicketComposerProps): Re
             requestMode(next as Mode);
           }}
         >
-          <TabsList>
-            <TabsTrigger value="reply" className="gap-1.5">
+          <TabsList className="bg-muted/60 p-1">
+            <TabsTrigger value="reply" className="gap-1.5 text-xs">
               <Reply aria-hidden="true" className="size-3.5" />
               {t('ticket.composer.reply')}
             </TabsTrigger>
-            <TabsTrigger value="note" className="gap-1.5">
+            <TabsTrigger value="note" className="gap-1.5 text-xs">
               <Lock aria-hidden="true" className="size-3.5" />
               {t('ticket.composer.note')}
             </TabsTrigger>
@@ -127,13 +119,8 @@ export function TicketComposer({ ticketId, className }: TicketComposerProps): Re
         </Tabs>
       </div>
 
-      {/*
-        AC2 — the label sits above the text area, in words, with the icon. Not a
-        tooltip and not a placeholder: it has to be readable at the moment the
-        agent is typing, which is when it matters.
-      */}
       {isNote && (
-        <p className="text-meta text-sla-warn flex items-center gap-1.5 font-medium">
+        <p className="text-xs text-amber-700 dark:text-amber-300 flex items-center gap-1.5 font-medium">
           <Lock aria-hidden="true" className="size-3.5" />
           {t('ticket.composer.noteWarning')}
         </p>
@@ -149,26 +136,31 @@ export function TicketComposer({ ticketId, className }: TicketComposerProps): Re
         placeholder={
           isNote ? t('ticket.composer.notePlaceholder') : t('ticket.composer.replyPlaceholder')
         }
-        className={cn('bg-card resize-y', isNote && 'border-sla-warn/40')}
+        className={cn(
+          'bg-card resize-y min-h-[5rem] rounded-xl border-border/80 shadow-2xs focus-visible:ring-1',
+          isNote && 'border-amber-500/40 focus-visible:border-amber-500',
+        )}
       />
 
-      <div className="flex items-center justify-end gap-2">
-        {/*
-          AC6 — the verb changes with the mode, and "send and resolve" is not
-          offered on a note. Resolving a ticket by writing a private note would
-          leave the customer with silence and a closed ticket.
-        */}
-        <Button onClick={submit} disabled={body.trim() === '' || send.isPending}>
+      <div className="flex items-center justify-end gap-2 pt-1">
+        <Button
+          onClick={submit}
+          disabled={body.trim() === '' || send.isPending}
+          className={cn(
+            'gap-1.5 shadow-2xs',
+            isNote && 'bg-amber-600 hover:bg-amber-700 text-white',
+          )}
+        >
           {send.isPending ? (
             t('common.working')
           ) : isNote ? (
             <>
-              <Lock aria-hidden="true" />
+              <Lock aria-hidden="true" className="size-3.5" />
               {t('ticket.composer.addNote')}
             </>
           ) : (
             <>
-              <Send aria-hidden="true" />
+              <Send aria-hidden="true" className="size-3.5" />
               {t('ticket.composer.send')}
             </>
           )}

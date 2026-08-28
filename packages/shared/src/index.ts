@@ -134,6 +134,8 @@ export {
   PortalEventSchema,
   PortalEventKindSchema,
   PortalReplySchema,
+  PortalProfileSchema,
+  UpdatePortalProfileSchema,
   PORTAL_EVENT_KINDS,
   PORTAL_URGENCY,
   URGENCY_PRIORITY,
@@ -148,6 +150,8 @@ export {
   type PortalEvent,
   type PortalEventKind,
   type PortalReply,
+  type PortalProfile,
+  type UpdatePortalProfile,
 } from './dto/portal.js';
 
 export {

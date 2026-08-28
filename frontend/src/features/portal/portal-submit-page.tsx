@@ -20,6 +20,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { LanguageToggle } from '@/components/language-toggle';
 import { useAuth } from '@/features/auth/auth-context';
 import { usePortalCategories, usePortalSubmit } from './use-portal';
+import { PortalProfileDialog } from './portal-profile-dialog';
 
 /** `null` cannot travel in a `<Select>` value, so absence gets a name. */
 const NO_CATEGORY = '__none__';
@@ -136,18 +137,30 @@ export function PortalSubmitPage(): React.JSX.Element {
   const categoryId = watch('categoryId');
 
   return (
-    <div className="bg-canvas min-h-screen">
-      <header className="border-line bg-card border-b">
-        <div className="mx-auto flex max-w-2xl items-center justify-between gap-3 px-6 py-4">
+    <div className="bg-background min-h-screen text-foreground">
+      <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur-md">
+        <div className="mx-auto flex max-w-4xl items-center justify-between gap-3 px-6 py-3.5">
           <Link to="/portal" className="flex items-center gap-2.5">
-            <LifeBuoy aria-hidden="true" className="text-ink size-5" />
-            <span className="text-section font-semibold">{t('portal.home.brand')}</span>
+            <div className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-xs">
+              <LifeBuoy aria-hidden="true" className="size-5" />
+            </div>
+            <div>
+              <span className="text-sm font-bold tracking-tight text-foreground">
+                {t('portal.home.brand')}
+              </span>
+              <span className="ms-2 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground uppercase">
+                Portal
+              </span>
+            </div>
           </Link>
-          <LanguageToggle />
+          <div className="flex items-center gap-2">
+            <PortalProfileDialog />
+            <LanguageToggle />
+          </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-2xl px-6 py-10">
+      <main className="mx-auto max-w-4xl px-6 py-10">
         <h1 className="text-page font-semibold">{t('portal.submit.title')}</h1>
         <p className="text-ink-muted mt-1">{t('portal.submit.subtitle')}</p>
 

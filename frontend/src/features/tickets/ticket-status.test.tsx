@@ -63,8 +63,6 @@ const FULL = sessionWith({
   'ticket:close': ['ALL'],
   'ticket:escalate': ['ALL'],
 });
-/** Can update, cannot resolve or close — the grant the catalogue separates. */
-const NO_CLOSE = sessionWith({ 'ticket:view': ['ALL'], 'ticket:update': ['ALL'] });
 
 function mount(session: LoginResponse, current: TicketDetail = ticket()): void {
   publishSession(session);
@@ -106,69 +104,19 @@ afterEach(() => {
   }
 });
 
-describe('AC1 — the status set', () => {
-  test('all four are offered, by name', async () => {
-    const user = userEvent.setup();
-
-    mount(FULL);
-
-    await user.click(screen.getByRole('combobox', { name: 'Status' }));
-
-    for (const label of ['New', 'Waiting for agent', 'Waiting for customer', 'Resolved']) {
-      // AC6 — the label comes from STATUS_PRESENTATION, the same source the
-      // badge in the queue reads.
-      expect(await screen.findByRole('option', { name: new RegExp(label) })).toBeInTheDocument();
-    }
-  });
-});
-
-describe('AC2 — valid transitions', () => {
-  test('a legal move patches the status endpoint', async () => {
-    const user = userEvent.setup();
-
-    mount(FULL);
-
-    await user.click(screen.getByRole('combobox', { name: 'Status' }));
-    await user.click(await screen.findByRole('option', { name: /Waiting for customer/ }));
-
-    await waitFor(() => {
-      expect(patches()).toEqual([{ status: 'WAITING_FOR_CUSTOMER' }]);
-    });
-  });
-
-  test('a move the state machine forbids is disabled, with the reason in words', async () => {
-    const user = userEvent.setup();
-
+describe('AC1 — the status badge and resolve button', () => {
+  test('renders the current status badge and resolve button when unresolved', async () => {
     mount(FULL, ticket({ status: 'WAITING_FOR_AGENT' }));
 
-    await user.click(screen.getByRole('combobox', { name: 'Status' }));
-
-    // NEW is never a target from WAITING_FOR_AGENT.
-    const newStatus = await screen.findByRole('option', { name: /^New/ });
-
-    expect(newStatus).toHaveAttribute('aria-disabled', 'true');
-    expect(newStatus).toHaveTextContent('Not available from here');
-
-    await user.click(newStatus);
-
-    await waitFor(() => {
-      expect(patches()).toEqual([]);
-    });
+    expect(screen.getByText('Waiting for agent')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Resolve ticket/ })).toBeInTheDocument();
   });
 
-  test('a move the caller lacks the permission for is disabled', async () => {
-    const user = userEvent.setup();
+  test('disables the resolve button when already resolved', async () => {
+    mount(FULL, ticket({ status: 'RESOLVED' }));
 
-    mount(NO_CLOSE);
-
-    await user.click(screen.getByRole('combobox', { name: 'Status' }));
-
-    const resolved = await screen.findByRole('option', { name: /Resolved/ });
-
-    // A convenience, not a boundary — the server refuses it too, and there is a
-    // backend test saying so.
-    expect(resolved).toHaveAttribute('aria-disabled', 'true');
-    expect(resolved).toHaveTextContent('Needs permission');
+    expect(screen.getByText('Resolved')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Resolve ticket/ })).toBeDisabled();
   });
 });
 
@@ -178,8 +126,7 @@ describe('AC3 — resolution requires substance', () => {
 
     mount(FULL, ticket({ sla: { firstRespondedAt: null } } as Partial<TicketDetail>));
 
-    await user.click(screen.getByRole('combobox', { name: 'Status' }));
-    await user.click(await screen.findByRole('option', { name: /Resolved/ }));
+    await user.click(screen.getByRole('button', { name: /Resolve ticket/ }));
 
     expect(await screen.findByText(/Resolve without replying\?/)).toBeInTheDocument();
 
@@ -199,8 +146,7 @@ describe('AC3 — resolution requires substance', () => {
 
     mount(FULL);
 
-    await user.click(screen.getByRole('combobox', { name: 'Status' }));
-    await user.click(await screen.findByRole('option', { name: /Resolved/ }));
+    await user.click(screen.getByRole('button', { name: /Resolve ticket/ }));
 
     await user.click(await screen.findByRole('button', { name: 'Cancel' }));
 
@@ -217,8 +163,7 @@ describe('AC3 — resolution requires substance', () => {
       ticket({ sla: { firstRespondedAt: '2026-08-20T09:00:00.000Z' } } as Partial<TicketDetail>),
     );
 
-    await user.click(screen.getByRole('combobox', { name: 'Status' }));
-    await user.click(await screen.findByRole('option', { name: /Resolved/ }));
+    await user.click(screen.getByRole('button', { name: /Resolve ticket/ }));
 
     await waitFor(() => {
       expect(patches()).toEqual([{ status: 'RESOLVED' }]);
@@ -232,8 +177,6 @@ describe('Arabic', () => {
   test('it renders in Arabic with no physical-direction classes', async () => {
     await i18n.changeLanguage('ar');
 
-    const user = userEvent.setup();
-
     publishSession(FULL);
 
     const { container } = render(
@@ -242,9 +185,8 @@ describe('Arabic', () => {
       </AppProviders>,
     );
 
-    await user.click(screen.getByRole('combobox', { name: 'الحالة' }));
-
-    expect(await screen.findByRole('option', { name: /تم حلها/ })).toBeInTheDocument();
+    expect(screen.getByText('بانتظار الموظف')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /حل التذكرة/ })).toBeInTheDocument();
 
     for (const element of container.querySelectorAll('*')) {
       const classes = element.className;

@@ -1,10 +1,26 @@
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router';
-import { AlertCircle, ArrowLeft, Check, LifeBuoy, LoaderCircle, Send } from 'lucide-react';
+import {
+  AlertCircle,
+  ArrowLeft,
+  CalendarDays,
+  Check,
+  CheckCircle2,
+  Clock,
+  Inbox,
+  LifeBuoy,
+  LoaderCircle,
+  MessageSquare,
+  MessageSquareReply,
+  Send,
+  Sparkles,
+  Tag,
+} from 'lucide-react';
 import type { PortalMessage, PortalTicketDetail, TicketStatus } from '@crm/shared';
 
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -12,15 +28,13 @@ import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { LanguageToggle } from '@/components/language-toggle';
+import { DeleteTicketDialog } from '@/components/domain/delete-ticket-dialog';
 import { cn } from '@/lib/utils';
-import { usePortalReply, usePortalRequest } from './use-portal';
+import { useDeletePortalTicket, usePortalReply, usePortalRequest } from './use-portal';
+import { PortalProfileDialog } from './portal-profile-dialog';
 
 /**
  * The three steps AC4 names, and which portal statuses each covers.
- *
- * Derived from the status the payload already carries — no new field, and **no
- * SLA timer to replace**, because the portal contract has never carried one.
- * AC4's second half is satisfied by an absence that already existed.
  */
 const STEPS = ['received', 'in_progress', 'resolved'] as const;
 
@@ -34,10 +48,6 @@ function stepIndexFor(status: TicketStatus): number {
 
 /**
  * Received → In Progress → Resolved — AC4.
- *
- * The reached steps carry a tick as well as the accent colour: a progress
- * indicator that distinguishes done from pending by hue alone fails the
- * definition of done.
  */
 function Progress({ status }: { status: TicketStatus }): React.JSX.Element {
   const { t } = useTranslation();
@@ -47,22 +57,33 @@ function Progress({ status }: { status: TicketStatus }): React.JSX.Element {
     <ol aria-label={t('portal.request.progress')} className="flex flex-wrap items-center gap-2">
       {STEPS.map((step, index) => {
         const done = index <= reached;
+        const current = index === reached;
 
         return (
           <li key={step} className="flex items-center gap-2">
             <span
-              aria-current={index === reached ? 'step' : undefined}
+              aria-current={current ? 'step' : undefined}
               className={cn(
-                'text-meta flex items-center gap-1.5 rounded-full border px-2.5 py-1',
-                done ? 'border-ink/15 bg-secondary text-ink' : 'border-line text-ink-faint',
+                'flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+                current
+                  ? 'border-primary/40 bg-primary/10 text-primary font-semibold'
+                  : done
+                    ? 'border-muted-foreground/30 bg-muted/60 text-foreground'
+                    : 'border-muted text-muted-foreground opacity-60',
               )}
             >
-              {done ? <Check aria-hidden="true" className="size-3" /> : null}
+              {done ? (
+                <Check aria-hidden="true" className="size-3.5 text-primary" />
+              ) : (
+                <span className="flex size-3.5 items-center justify-center rounded-full bg-muted text-[10px] font-bold">
+                  {index + 1}
+                </span>
+              )}
               {t(`portal.request.steps.${step}`)}
             </span>
 
             {index < STEPS.length - 1 ? (
-              <span aria-hidden="true" className="bg-line h-px w-4" />
+              <span aria-hidden="true" className="bg-border h-px w-4 sm:w-6" />
             ) : null}
           </li>
         );
@@ -78,13 +99,6 @@ function initialOf(name: string | null): string {
 
 /**
  * One message in the thread — AC1 and AC3.
- *
- * Two-sided by alignment: the customer's own on the inline **end**, support's on
- * the inline start. `self-end`/`self-start` and `ms`/`me`, so Arabic mirrors
- * without a single directional class.
- *
- * A support message carries a first name and an avatar and nothing else, which is
- * the most AC3 allows — and the most the payload contains.
  */
 function Bubble({ message }: { message: PortalMessage }): React.JSX.Element {
   const { t, i18n } = useTranslation();
@@ -96,15 +110,20 @@ function Bubble({ message }: { message: PortalMessage }): React.JSX.Element {
   }).format(new Date(message.createdAt));
 
   return (
-    <li className={cn('flex max-w-[85%] gap-2.5', mine ? 'self-end' : 'self-start')}>
-      {mine ? null : (
-        <Avatar className="mt-0.5 size-8 shrink-0">
-          <AvatarFallback className="text-meta">{initialOf(message.authorName)}</AvatarFallback>
-        </Avatar>
-      )}
+    <li className={cn('flex max-w-[88%] gap-3', mine ? 'self-end flex-row-reverse' : 'self-start')}>
+      <Avatar className="mt-0.5 size-8 shrink-0 border shadow-2xs">
+        <AvatarFallback
+          className={cn(
+            'text-xs font-semibold',
+            mine ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground',
+          )}
+        >
+          {mine ? 'Y' : initialOf(message.authorName)}
+        </AvatarFallback>
+      </Avatar>
 
-      <div>
-        <p className="text-meta text-ink-muted mb-1">
+      <div className={cn('flex flex-col', mine ? 'items-end' : 'items-start')}>
+        <p className="mb-1 text-xs text-muted-foreground">
           {mine ? t('portal.request.you') : (message.authorName ?? t('portal.request.support'))}
           {' · '}
           <span className="tabular">{when}</span>
@@ -112,11 +131,13 @@ function Bubble({ message }: { message: PortalMessage }): React.JSX.Element {
 
         <div
           className={cn(
-            'rounded-lg border px-3.5 py-2.5',
-            mine ? 'bg-secondary border-line' : 'bg-card border-line',
+            'rounded-2xl p-4 shadow-xs transition-colors',
+            mine
+              ? 'rounded-tr-xs bg-primary text-primary-foreground'
+              : 'rounded-tl-xs border bg-card text-card-foreground',
           )}
         >
-          <p className="text-body text-ink whitespace-pre-wrap">{message.body}</p>
+          <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.body}</p>
         </div>
       </div>
     </li>
@@ -125,23 +146,22 @@ function Bubble({ message }: { message: PortalMessage }): React.JSX.Element {
 
 /**
  * A status change, in plain language — AC6.
- *
- * The API sends a **kind**; the sentence is here, in the translations. Nothing
- * about the event names an agent, a field or an internal status — see
- * `PortalEventSchema`.
  */
 function EventLine({ kind, at }: { kind: string; at: string }): React.JSX.Element {
   const { t, i18n } = useTranslation();
 
   return (
-    <li className="self-center">
-      <p className="text-meta text-ink-muted text-center">
-        {t(`portal.request.events.${kind}`)}
-        {' · '}
-        <span className="tabular">
-          {new Intl.DateTimeFormat(i18n.language, { dateStyle: 'medium' }).format(new Date(at))}
-        </span>
-      </p>
+    <li className="my-2 self-center">
+      <div className="flex items-center gap-2 rounded-full border bg-muted/40 px-3.5 py-1 text-xs text-muted-foreground shadow-2xs">
+        <Clock aria-hidden="true" className="size-3 text-muted-foreground" />
+        <p className="text-center">
+          {t(`portal.request.events.${kind}`)}
+          {' · '}
+          <span className="tabular">
+            {new Intl.DateTimeFormat(i18n.language, { dateStyle: 'medium' }).format(new Date(at))}
+          </span>
+        </p>
+      </div>
     </li>
   );
 }
@@ -162,22 +182,12 @@ function Thread({ request }: { request: PortalTicketDetail }): React.JSX.Element
   return <ul className="flex flex-col gap-4">{entries.map((entry) => entry.node)}</ul>;
 }
 
-/**
- * One request, read and replied to — US-85.
- *
- * **AC5's attachment button is not here.** Object storage is US-51, deferred, so
- * a button would open a picker that cannot upload — the same call US-86 made
- * about its own form. Flagged in the plan rather than faked.
- *
- * There is no mode switcher and no canned replies, which AC5 forbids: the staff
- * composer's internal-note tab is exactly what must not exist on this screen, and
- * there is no `isInternal` in the request contract for one to toggle.
- */
 export function PortalRequestPage(): React.JSX.Element {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { id = '' } = useParams();
   const request = usePortalRequest(id);
   const reply = usePortalReply(id);
+  const deleteTicket = useDeletePortalTicket(id, request.data?.number);
   const [draft, setDraft] = useState('');
 
   const send = useCallback(() => {
@@ -188,8 +198,6 @@ export function PortalRequestPage(): React.JSX.Element {
     reply.mutate(
       { body: draft.trim() },
       {
-        // Cleared only once it is delivered. A failed send that wiped the text
-        // would lose what the customer wrote.
         onSuccess: () => {
           setDraft('');
         },
@@ -199,36 +207,91 @@ export function PortalRequestPage(): React.JSX.Element {
 
   const detail = request.data;
 
+  const statusConfig = detail
+    ? {
+        WAITING_FOR_CUSTOMER: {
+          badgeClass: 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400',
+          icon: MessageSquareReply,
+        },
+        WAITING_FOR_AGENT: {
+          badgeClass: 'border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-400',
+          icon: Clock,
+        },
+        RESOLVED: {
+          badgeClass: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
+          icon: CheckCircle2,
+        },
+        NEW: {
+          badgeClass: 'border-indigo-500/30 bg-indigo-500/10 text-indigo-700 dark:text-indigo-400',
+          icon: Sparkles,
+        },
+      }[detail.status] ?? {
+        badgeClass: 'border-muted bg-muted text-muted-foreground',
+        icon: Inbox,
+      }
+    : null;
+
+  const StatusIcon = statusConfig?.icon;
+
+  const date = (iso: string): string =>
+    new Intl.DateTimeFormat(i18n.language, { dateStyle: 'medium' }).format(new Date(iso));
+
   return (
-    <div className="bg-canvas min-h-screen">
-      <header className="border-line bg-card border-b">
-        <div className="mx-auto flex max-w-2xl items-center justify-between gap-3 px-6 py-4">
+    <div className="bg-background min-h-screen text-foreground">
+      {/* Top Header */}
+      <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur-md">
+        <div className="mx-auto flex max-w-4xl items-center justify-between gap-3 px-6 py-3.5">
           <Link to="/portal" className="flex items-center gap-2.5">
-            <LifeBuoy aria-hidden="true" className="text-ink size-5" />
-            <span className="text-section font-semibold">{t('portal.home.brand')}</span>
+            <div className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-xs">
+              <LifeBuoy aria-hidden="true" className="size-5" />
+            </div>
+            <div>
+              <span className="text-sm font-bold tracking-tight text-foreground">
+                {t('portal.home.brand')}
+              </span>
+              <span className="ms-2 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground uppercase">
+                Portal
+              </span>
+            </div>
           </Link>
-          <LanguageToggle />
+          <div className="flex items-center gap-2">
+            <PortalProfileDialog />
+            <LanguageToggle />
+          </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-2xl px-6 py-8">
-        <Button asChild variant="ghost" size="sm" className="mb-4 gap-2">
-          <Link to="/portal">
-            {/* `-start` rather than a left arrow flipped by hand. */}
-            <ArrowLeft aria-hidden="true" className="size-4 rtl:rotate-180" />
-            {t('portal.request.back')}
-          </Link>
-        </Button>
+      {/* Main Content */}
+      <main className="mx-auto max-w-4xl px-6 py-8">
+        {/* Back Link & Top Actions */}
+        <div className="mb-6 flex items-center justify-between">
+          <Button asChild variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-foreground">
+            <Link to="/portal">
+              <ArrowLeft aria-hidden="true" className="size-4 rtl:rotate-180" />
+              {t('portal.request.back')}
+            </Link>
+          </Button>
+
+          {detail && detail.status !== 'RESOLVED' ? (
+            <DeleteTicketDialog
+              ticketNumber={detail.number}
+              isDeleting={deleteTicket.isPending}
+              onConfirm={async () => {
+                await deleteTicket.mutateAsync();
+              }}
+            />
+          ) : null}
+        </div>
 
         {request.isPending ? (
-          <div className="space-y-3">
-            <Skeleton className="h-24 w-full" />
-            <Skeleton className="h-40 w-full" />
+          <div className="space-y-4">
+            <Skeleton className="h-32 w-full rounded-2xl" />
+            <Skeleton className="h-48 w-full rounded-2xl" />
           </div>
         ) : request.isError || detail === undefined ? (
-          <Card>
-            <CardContent className="p-6">
-              <p className="text-body text-ink">{t('portal.request.notFound')}</p>
+          <Card className="rounded-2xl border">
+            <CardContent className="p-8 text-center">
+              <p className="text-sm font-medium text-foreground">{t('portal.request.notFound')}</p>
               <Button asChild variant="outline" size="sm" className="mt-4">
                 <Link to="/portal">{t('portal.request.back')}</Link>
               </Button>
@@ -236,50 +299,98 @@ export function PortalRequestPage(): React.JSX.Element {
           </Card>
         ) : (
           <>
-            <Card className="gap-0 py-0">
-              <CardContent className="space-y-4 p-5">
-                <div>
-                  <p className="tabular text-meta text-ink-muted">
-                    {t('portal.requests.number', { number: detail.number })}
-                  </p>
-                  <h1 className="text-page text-ink mt-0.5 font-semibold">{detail.subject}</h1>
+            {/* Ticket Header Card */}
+            <Card className="overflow-hidden rounded-2xl border bg-card shadow-xs">
+              <CardContent className="p-6 sm:p-7 space-y-6">
+                {/* Meta Top: Ticket number, category pill & status */}
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-mono text-xs font-semibold px-2.5 py-1 rounded-md bg-muted text-muted-foreground">
+                      {t('portal.requests.number', { number: detail.number })}
+                    </span>
+
+                    <Badge variant="outline" className="gap-1 font-normal text-xs text-muted-foreground">
+                      <Tag aria-hidden="true" className="size-3" />
+                      {detail.categoryName ?? t('portal.requests.noCategory')}
+                    </Badge>
+                  </div>
+
+                  {statusConfig && StatusIcon ? (
+                    <Badge variant="outline" className={cn('gap-1.5 py-1 text-xs font-medium', statusConfig.badgeClass)}>
+                      <StatusIcon aria-hidden="true" className="size-3.5" />
+                      {t(`portal.requests.status.${detail.status}`)}
+                    </Badge>
+                  ) : null}
                 </div>
 
-                {/* AC4 — the indicator, where a staff header would show clocks. */}
-                <Progress status={detail.status} />
+                {/* Subject Title */}
+                <div>
+                  <h1 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
+                    {detail.subject}
+                  </h1>
+                </div>
 
+                {/* Stepper Progress */}
+                <div className="rounded-xl bg-muted/30 p-3.5 border">
+                  <Progress status={detail.status} />
+                </div>
+
+                {/* Description Body */}
                 {detail.description === null ? null : (
-                  <>
+                  <div className="space-y-2">
                     <Separator />
-                    <p className="text-body text-ink whitespace-pre-wrap">{detail.description}</p>
-                  </>
+                    <div className="pt-2 text-sm text-foreground/90 leading-relaxed whitespace-pre-wrap">
+                      {detail.description}
+                    </div>
+                  </div>
                 )}
+
+                {/* Footer Metadata */}
+                <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground border-t pt-4">
+                  <span className="flex items-center gap-1.5">
+                    <CalendarDays aria-hidden="true" className="size-3.5" />
+                    {t('portal.requests.openedOn', { date: date(detail.createdAt) })}
+                  </span>
+                  <span>•</span>
+                  <span className="flex items-center gap-1.5">
+                    <Clock aria-hidden="true" className="size-3.5" />
+                    {t('portal.requests.updatedOn', { date: date(detail.updatedAt) })}
+                  </span>
+                </div>
               </CardContent>
             </Card>
 
-            <section aria-label={t('portal.request.conversation')} className="mt-6">
+            {/* Conversation Thread */}
+            <section aria-label={t('portal.request.conversation')} className="mt-8">
+              <div className="mb-4 flex items-center gap-2">
+                <MessageSquare className="size-4 text-muted-foreground" />
+                <h2 className="text-sm font-semibold tracking-tight text-foreground">
+                  {t('portal.request.conversation')}
+                </h2>
+              </div>
               <Thread request={detail} />
             </section>
 
-            <Card className="mt-6">
-              <CardContent className="p-5">
+            {/* Reply Composer Card */}
+            <Card className="mt-8 rounded-2xl border bg-card shadow-xs">
+              <CardContent className="p-6">
                 {reply.isError ? (
                   <div
                     role="alert"
-                    className="border-sla-breach/30 bg-sla-breach-soft text-sla-breach mb-4 flex items-start gap-2 rounded-md border px-3 py-2.5"
+                    className="border-destructive/30 bg-destructive/10 text-destructive mb-4 flex items-start gap-2 rounded-xl border p-3 text-xs"
                   >
                     <AlertCircle aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-                    <span className="text-body">{t('portal.request.replyFailed')}</span>
+                    <span className="font-medium">{t('portal.request.replyFailed')}</span>
                   </div>
                 ) : null}
 
-                <Label htmlFor="portal-reply" className="mb-1.5">
+                <Label htmlFor="portal-reply" className="mb-2 block text-xs font-semibold text-foreground">
                   {t('portal.request.replyLabel')}
                 </Label>
                 <Textarea
                   id="portal-reply"
                   rows={4}
-                  className="text-start"
+                  className="min-h-[110px] resize-y placeholder:text-muted-foreground"
                   placeholder={t('portal.request.replyPlaceholder')}
                   value={draft}
                   onChange={(event) => {
@@ -287,12 +398,15 @@ export function PortalRequestPage(): React.JSX.Element {
                   }}
                 />
 
-                <div className="mt-3 flex justify-end">
+                <div className="mt-4 flex items-center justify-between">
+                  <span className="text-[11px] text-muted-foreground">
+                    Press send to submit your reply
+                  </span>
                   <Button
                     type="button"
                     disabled={reply.isPending || draft.trim() === ''}
                     aria-busy={reply.isPending}
-                    className="gap-2"
+                    className="gap-2 shadow-xs"
                     onClick={send}
                   >
                     {reply.isPending ? (
@@ -311,3 +425,4 @@ export function PortalRequestPage(): React.JSX.Element {
     </div>
   );
 }
+
