@@ -9,6 +9,28 @@ escalate → resolve → report**
 
 ---
 
+## Where this stands
+
+**This is unfinished, on purpose.** It is built alongside a full-time job, in the time
+that leaves, with heavy use of AI assistance — so it advances in bursts and stops
+mid-slice rather than arriving complete.
+
+My day job is full-stack **Vue + .NET**; my own specialism is **frontend React**. This
+repository is where the React side gets exercised properly, which is why the frontend is
+further along and more opinionated than a project at this stage would usually be.
+
+What that means for anyone reading the code:
+
+- **Finished work is genuinely finished** — tested, verified against the acceptance
+  criteria it was built from, and documented where it deviates.
+- **Unfinished work is named rather than hidden.**
+  [`.squad/plans/00-workflow-status.md`](./.squad/plans/00-workflow-status.md) lists what is
+  done, what is next, and every acceptance criterion deliberately left unmet — with the
+  reason, and the story that would complete it.
+- Sidebar items that say **not built yet** mean exactly that. They are not broken links.
+
+---
+
 ## Getting started
 
 **→ [`docs/running-the-project.md`](./docs/running-the-project.md) is the full runbook** —
