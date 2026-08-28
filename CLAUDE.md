@@ -13,7 +13,10 @@ escalate → resolve → report**
 
 All 125 user stories live in Notion, not in this repo.
 
-**Database:** https://app.notion.com/p/fdeccf91bcb64167bfc52ba514a74b18
+**Database:** https://app.notion.com/p/fdeccf91bcb64167bfc52ba514a74b18?v=3c79e0838523814a945d000cf1a54ea3
+
+That link opens the view the stories are read from. The bare page id is the same database
+without the view.
 
 Query it through the Notion MCP server. Each row is one story; the page body holds the
 full acceptance criteria.
