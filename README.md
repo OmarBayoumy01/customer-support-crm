@@ -29,6 +29,18 @@ What that means for anyone reading the code:
   reason, and the story that would complete it.
 - Sidebar items that say **not built yet** mean exactly that. They are not broken links.
 
+### Where the work comes from
+
+The 125 user stories are not in this repository — they live in Notion, and each row carries
+its own acceptance criteria:
+
+**→ [User stories](https://app.notion.com/p/fdeccf91bcb64167bfc52ba514a74b18?v=3c79e0838523814a945d000cf1a54ea3)**
+
+That is the spec. Every commit here traces back to a story ref (`US-42`, `US-58`, …), the
+acceptance criteria are checked one by one before a story is marked reviewed, and anything
+that could not be met honestly is recorded as unmet instead. `CLAUDE.md` explains how the
+database is read and in what order.
+
 ---
 
 ## Getting started
