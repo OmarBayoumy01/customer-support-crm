@@ -41,6 +41,27 @@ acceptance criteria are checked one by one before a story is marked reviewed, an
 that could not be met honestly is recorded as unmet instead. `CLAUDE.md` explains how the
 database is read and in what order.
 
+### What this was meant to be
+
+The setup I actually wanted was larger than what is here.
+
+**Figma for the design and Jira for the work, linked to each other** — every Jira card
+carrying its own frame, so a story arrived with both its acceptance criteria and the screen
+it was supposed to produce. Both pulled into the agent through **MCP servers**, so the
+design and the ticket were read from the source rather than pasted into a prompt. And the
+build itself driven by a spec-driven harness — **Squad Kit**, **Superpowers**, or
+**OpenSpec** — where a strong model plans once and a cheaper one executes that plan many
+times.
+
+**I ran out of credits before that existed.** Claude and the Google AI Pro plan both went on
+my day job first — full-stack Vue and .NET — and what was left funded this. So the design
+half was never wired up: the stories live in Notion, read through its MCP server, and the
+plan-per-story flow in `.squad/plans/` is the modest version of the harness I was aiming at.
+
+It is worth saying plainly rather than implying the tooling was a choice. The architecture
+in this repository is what I would build again; the pipeline around it is not finished, and
+the reason is budget rather than design.
+
 ---
 
 ## Getting started
